@@ -2618,7 +2618,7 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
         )}
 
         {/* Payment Modal */}
-        {payModal && <PaymentModal order={payModal} onClose={()=>setPayModal(null)} onSave={(updated)=>{ onUpdateOrder(updated); setPayModal(null); }} />}}
+        {payModal && <PaymentModal order={payModal} onClose={()=>setPayModal(null)} onSave={(updated)=>{ onUpdateOrder(updated); setPayModal(null); }} />}
 
         {/* Footer actions */}
         <div className="p-4 border-t border-gray-100 flex gap-2 shrink-0">
