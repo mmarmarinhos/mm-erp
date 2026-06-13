@@ -8074,7 +8074,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [] 
         <div className="flex gap-2 p-5 border-t border-gray-100 shrink-0">
           <button onClick={onClose} className="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
           {!isNew && (
-            <button onClick={()=>gerarCotacaoPDF(form)}
+            <button onClick={()=>gerarCotacaoPDF(form, empresa)}
               className="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-600 text-sm font-medium hover:bg-indigo-100 flex items-center gap-1.5 whitespace-nowrap">
               📄 Exportar PDF
             </button>
@@ -8090,10 +8090,11 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [] 
 
 // ─── Cotações Module ──────────────────────────────────────────────────────
 const gerarCotacaoPDF = (cotacao, empresa = {}) => {
-  const empresaNome = empresa.name || "MM Armarinhos";
+  const empresaNome = empresa.nomeFantasia || empresa.razaoSocial || "MM Armarinhos";
   const empresaCnpj = empresa.cnpj || "";
-  const empresaTel  = empresa.phone || "";
+  const empresaTel  = empresa.celular || empresa.telefone || "";
   const empresaEmail= empresa.email || "";
+  const empresaSite = empresa.site || "";
   const subtotal = (cotacao.items||cotacao.itemsList||[]).reduce((s,it)=>s+(it.total||0),0);
   const total = parseFloat(cotacao.total)||subtotal;
   const items = cotacao.items||cotacao.itemsList||[];
@@ -8150,8 +8151,9 @@ const gerarCotacaoPDF = (cotacao, empresa = {}) => {
       <div class="empresa-nome">${empresaNome}</div>
       <div class="empresa-info">
         ${empresaCnpj ? `CNPJ: ${empresaCnpj}<br>` : ""}
-        ${empresaTel  ? `Tel: ${empresaTel}<br>` : ""}
-        ${empresaEmail? `E-mail: ${empresaEmail}` : ""}
+        ${empresaTel  ? `Cel: ${empresaTel}<br>` : ""}
+        ${empresaEmail? `E-mail: ${empresaEmail}<br>` : ""}
+        ${empresaSite ? `Site: ${empresaSite}` : ""}
       </div>
     </div>
     <div style="text-align:right;">
