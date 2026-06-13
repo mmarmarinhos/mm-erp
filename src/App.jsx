@@ -2274,8 +2274,8 @@ const PaymentModal = ({ order, onClose, onSave }) => {
             <p className="text-xs text-gray-500 mt-0.5">{markPaid ? "Pedido será marcado como pago" : "Remover pagamento"}</p>
           </div>
           <button onClick={()=>setMarkPaid(v=>!v)}
-            className={}>
-            <span className={}/>
+            className={`w-12 h-6 rounded-full transition-all ${markPaid?"bg-green-500":"bg-gray-300"} relative`}>
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${markPaid?"right-0.5":"left-0.5"}`}/>
           </button>
         </div>
         {markPaid && (
