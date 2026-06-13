@@ -1,8 +1,8 @@
 // ─── Supabase REST helper ─────────────────────────────────────────────────
 // Sem SDK — chamadas diretas à API REST do Supabase
 
-const SB_URL = import.meta.env.VITE_SUPABASE_URL
-const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+const SB_URL = import.meta.env.VITE_SUPABASE_URL || 'https://mfgaxixmuxmildztcmry.supabase.co'
+const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mZ2F4aXhtdXhtaWxkenRjbXJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkzMjU2NjksImV4cCI6MjA2NDkwMTY2OX0.Ex7S2x-HDFih6quatKN6paoFUv88R8Sxeo6ErTWe8nY'
 
 function sbHeaders(extra = {}) {
   return {
