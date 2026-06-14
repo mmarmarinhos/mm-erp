@@ -2650,6 +2650,22 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
 
 // ─── CRM Module ───────────────────────────────────────────────────────────
 const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) => {
+  // ── Calcular stats de pedidos dinamicamente ─────────────────────────
+  const customerStats = useMemo(() => {
+    const map = {};
+    (orders || []).filter(o => o.status !== "Cancelado").forEach(o => {
+      const key = (o.customer || "").toLowerCase().trim();
+      if (!key) return;
+      if (!map[key]) map[key] = { totalOrders: 0, totalSpent: 0, lastPurchase: "" };
+      map[key].totalOrders += 1;
+      map[key].totalSpent  += (o.total || 0);
+      if (!map[key].lastPurchase || o.date > map[key].lastPurchase)
+        map[key].lastPurchase = o.date;
+    });
+    return map;
+  }, [orders]);
+  const getStats = (name) => customerStats[(name||"").toLowerCase().trim()] || { totalOrders: 0, totalSpent: 0, lastPurchase: "" };
+
   const [search, setSearch]       = useState("");
   const [filterSeg, setFilterSeg] = useState("Todos");
   const [filterCh, setFilterCh]   = useState("Todos");
@@ -2870,9 +2886,9 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
                       <td className="px-4 py-3">
                         <Badge label={c.segment} style={seg}/>
                       </td>
-                      <td className="px-4 py-3 text-right hidden md:table-cell text-gray-600">{c.totalOrders}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-900">{fmt(c.totalSpent)}</td>
-                      <td className="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">{c.lastPurchase || "—"}</td>
+                      <td className="px-4 py-3 text-right hidden md:table-cell text-gray-600">{getStats(c.name).totalOrders}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900">{fmt(getStats(c.name).totalSpent)}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">{getStats(c.name).lastPurchase ? new Date(getStats(c.name).lastPurchase+"T12:00:00").toLocaleDateString("pt-BR") : "—"}</td>
                     </tr>
                   );
                 })}
