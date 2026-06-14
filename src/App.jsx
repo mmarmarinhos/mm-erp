@@ -5247,7 +5247,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Categoria</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Estoque</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Mín</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Preço</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Custo Méd.</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Margem</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Ações</th>
                 </tr>
@@ -5279,7 +5279,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center text-xs text-gray-500 hidden md:table-cell">{p.minStock}</td>
-                      <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900 hidden lg:table-cell">{p.price>0?fmt(p.price):"—"}</td>
+                      <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900 hidden lg:table-cell">{p.cost>0?fmt(p.cost):"—"}</td>
                       <td className="px-4 py-3 text-right hidden lg:table-cell">
                         {mar!==null ? <span className={`text-xs font-bold ${Number(mar)>30?"text-green-600":Number(mar)>15?"text-amber-600":"text-red-500"}`}>{mar}%</span> : <span className="text-gray-400">—</span>}
                       </td>
