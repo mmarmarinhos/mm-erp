@@ -3675,42 +3675,58 @@ const SupplierDetailPanel = ({ supplier, finance, purchases, onClose, onEdit, on
 
         {panelTab==="dados" && (
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
+
+          {/* Métricas — igual ao cliente */}
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label:"Total Comprado",  value: fmt(supPurchases.filter(p=>p.status!=="Cancelado").reduce((s,p)=>s+p.total,0)||supplier.totalPurchased||0), color:"text-indigo-700" },
+              { label:"Compras",         value: supPurchases.filter(p=>p.status!=="Cancelado").length || 0,                                                  color:"text-gray-900"   },
+              { label:"Ticket Médio",    value: (() => { const a=supPurchases.filter(p=>p.status!=="Cancelado"); return a.length ? fmt(a.reduce((s,p)=>s+p.total,0)/a.length) : "—"; })(), color:"text-gray-900" },
+              { label:"Última Compra",   value: supPurchases.filter(p=>p.status!=="Cancelado").length
+                  ? new Date(supPurchases.filter(p=>p.status!=="Cancelado").map(p=>p.date).sort().reverse()[0]+"T12:00:00").toLocaleDateString("pt-BR")
+                  : "—",
+                color: (() => {
+                  const last = supPurchases.filter(p=>p.status!=="Cancelado").map(p=>p.date).sort().reverse()[0];
+                  if (!last) return "text-gray-400";
+                  const days = Math.floor((new Date()-new Date(last+"T12:00:00"))/86400000);
+                  return days > 60 ? "text-red-500" : "text-gray-900";
+                })()
+              },
+            ].map(m => (
+              <div key={m.label} className="bg-gray-50 rounded-xl p-3">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide">{m.label}</p>
+                <p className={`font-bold text-base mt-0.5 ${m.color}`}>{m.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Avaliação + Desde */}
           <div className="flex items-center justify-between">
             <StarRating value={supplier.rating} readOnly/>
             <span className="text-xs text-gray-400">Desde {supplier.createdAt}</span>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { label:"Total Comprado",  value:fmt(supplier.totalPurchased),                                     color:"text-indigo-700" },
-              { label:"Última Compra",   value:supplier.lastPurchase||"—",                                       color:"text-gray-800"   },
-              { label:"Prazo Pgto.",     value:supplier.paymentTerms,                                            color:"text-gray-800"   },
-              { label:"Pedido Mínimo",   value:supplier.minOrder ? fmt(supplier.minOrder) : "Sem mínimo",        color:"text-gray-800"   },
-            ].map(m => (
-              <div key={m.label} className="bg-gray-50 rounded-xl p-3">
-                <p className="text-[10px] text-gray-400 uppercase tracking-wide">{m.label}</p>
-                <p className={`font-bold text-sm mt-0.5 ${m.color}`}>{m.value}</p>
-              </div>
-            ))}
-          </div>
+
+          {/* Desconto negociado */}
           {supplier.discount > 0 && (
             <div className="bg-green-50 border border-green-100 rounded-xl px-3 py-2 flex items-center gap-2">
               <span className="text-green-500 text-base font-bold">%</span>
               <span className="text-sm text-green-700 font-medium">Desconto negociado: <strong>{supplier.discount}%</strong></span>
             </div>
           )}
+
+          {/* Bloco de contato — mesma estrutura do cliente */}
           <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-2.5">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Contato</p>
-
-            {supplier.contact && (
-              <div className="flex items-start gap-2 text-sm">
-                <span className="w-5 shrink-0">👤</span>
-                <span className="text-gray-700 font-medium">{supplier.contact}</span>
-              </div>
-            )}
             {supplier.cnpj && (
               <div className="flex items-start gap-2 text-sm">
                 <span className="w-5 shrink-0">🪪</span>
                 <span className="text-gray-700 font-mono text-xs">{supplier.cnpj}</span>
+              </div>
+            )}
+            {supplier.contact && (
+              <div className="flex items-start gap-2 text-sm">
+                <span className="w-5 shrink-0">👤</span>
+                <span className="text-gray-700 font-medium">{supplier.contact}</span>
               </div>
             )}
             {supplier.phone && (
@@ -3732,8 +3748,6 @@ const SupplierDetailPanel = ({ supplier, finance, purchases, onClose, onEdit, on
                   className="text-indigo-600 hover:underline truncate">{supplier.website}</a>
               </div>
             )}
-
-            {/* Full address */}
             {(supplier.cep || supplier.rua || supplier.city) && (
               <div className="flex items-start gap-2 text-sm">
                 <span className="w-5 shrink-0 mt-0.5">📍</span>
@@ -3749,11 +3763,28 @@ const SupplierDetailPanel = ({ supplier, finance, purchases, onClose, onEdit, on
                 </div>
               </div>
             )}
-
-            {!supplier.contact && !supplier.cnpj && !supplier.phone && !supplier.email && !supplier.city && !supplier.rua && (
+            {!supplier.cnpj && !supplier.contact && !supplier.phone && !supplier.email && !supplier.city && !supplier.rua && (
               <p className="text-xs text-gray-400 italic">Nenhum contato cadastrado</p>
             )}
           </div>
+
+          {/* Prazo + Ped. Mínimo */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+              <p className="text-[10px] text-indigo-500 uppercase tracking-wide font-medium">Prazo Pgto.</p>
+              <p className="text-sm font-bold text-indigo-700 mt-0.5">
+                {Number(supplier.paymentTerms)>0 ? `${supplier.paymentTerms} dias` : "À vista"}
+              </p>
+            </div>
+            <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide">Ped. Mínimo</p>
+              <p className="text-sm font-bold text-gray-800 mt-0.5">
+                {supplier.minOrder ? fmt(supplier.minOrder) : "Sem mínimo"}
+              </p>
+            </div>
+          </div>
+
+          {/* Tags */}
           {supplier.tags?.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tags</p>
@@ -3762,6 +3793,8 @@ const SupplierDetailPanel = ({ supplier, finance, purchases, onClose, onEdit, on
               </div>
             </div>
           )}
+
+          {/* Observações */}
           {supplier.notes && (
             <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
               <p className="text-xs font-semibold text-amber-600 mb-1">📝 Observações</p>
