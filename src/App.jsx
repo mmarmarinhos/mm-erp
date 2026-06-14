@@ -3493,11 +3493,10 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Condições Comerciais</p>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Prazo Pgto.</label>
-                    <select className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                      value={form.paymentTerms} onChange={e=>set("paymentTerms",e.target.value)}>
-                      {PAYMENT_TERMS.map(p=><option key={p}>{p}</option>)}
-                    </select>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">Prazo Pgto. (dias)</label>
+                    <input type="number" min="0" max="365"
+                      className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                      value={form.paymentTerms||""} onChange={e=>set("paymentTerms",e.target.value)} placeholder="0"/>
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-600 mb-1 block">Ped. Mín (R$)</label>
