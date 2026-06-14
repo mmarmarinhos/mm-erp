@@ -7929,7 +7929,7 @@ const StockEntryModal = ({ purchase, products = [], onClose, onConfirm }) => {
   );
 };
 
-const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], setProducts }) => {
+const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], setProducts, movements = [], setMovements }) => {
   const [modal,      setModal]      = useState(null);
   const [detail,     setDetail]     = useState(null);
   const [stockEntry, setStockEntry] = useState(false);
@@ -8028,7 +8028,8 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
     setPurchases(prev => prev.map(p => p.id === detail.id ? updatedPurchase : p));
     setDetail(updatedPurchase);
 
-    // 2. Aplicar entrada no estoque e custo médio ponderado para itens recém-vinculados
+    // 2. Aplicar entrada no estoque, custo médio e registrar movements
+    const novosMovimentos = [];
     if (setProducts) {
       setProducts(prev => prev.map(prod => {
         const newItem = updatedItems.find(it => it._prodId === prod.id);
@@ -8043,8 +8044,31 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
         const novoCusto = estAtual > 0
           ? parseFloat(((estAtual * custoAtual + qtd * preco) / (estAtual + qtd)).toFixed(4))
           : preco;
+        // Registrar movimento de entrada
+        novosMovimentos.push({
+          productId: prod.id,
+          type: "entrada",
+          qty: qtd,
+          date: detail.date || today(),
+          reason: "Entrada por compra",
+          notes: `Pedido ${detail.id} · ${detail.supplierName || ""}`.trim(),
+        });
         return { ...prod, stock: estAtual + qtd, cost: novoCusto };
       }));
+    }
+    // 3. Salvar movements com IDs sequenciais
+    if (setMovements && novosMovimentos.length > 0) {
+      setMovements(prev => {
+        let base = prev;
+        return [
+          ...base,
+          ...novosMovimentos.map((m, i) => {
+            const n = base.map(x => parseInt(x.id.replace("MOV-",""))||0);
+            const nextId = `MOV-${String(Math.max(0,...n,0)+i+1).padStart(3,"0")}`;
+            return { ...m, id: nextId };
+          }),
+        ];
+      });
     }
     setStockEntry(false);
   };
@@ -9496,7 +9520,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases}/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases}/>;
-      case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts}/>;
+      case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
       case "empresa":   return <EmpresaModule onSave={(data) => setEmpresaForm(data)}/>;
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes}/>;
