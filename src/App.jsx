@@ -1943,8 +1943,28 @@ const FinanceModule = ({ finance, setFinance, orders, purchases }) => {
       {tab === "pagar" && (() => {
         const today0 = new Date(); today0.setHours(0,0,0,0);
         const diffDays = (a,b) => Math.round((a-b)/86400000);
-        const pagItems = (purchases||[])
+        // Compras pendentes
+        const purchaseItems = (purchases||[])
           .filter(p => p.status !== "Cancelado" && !p.paidDate)
+          .map(p => ({
+            ...p,
+            _type: "compra",
+            amount: p.total,
+            description: p.supplier || p.description || "Compra",
+          }));
+
+        // Lançamentos manuais de despesa pendentes
+        const financeItems = (finance||[])
+          .filter(t => t.type === "despesa" && t.status !== "pago" && t.status !== "cancelado")
+          .map(t => ({
+            ...t,
+            _type: "lancamento",
+            total: t.amount,
+            dueDate: t.dueDate || t.date,
+            description: t.description || t.category || "Despesa",
+          }));
+
+        const pagItems = [...purchaseItems, ...financeItems]
           .map(p => {
             const due = p.dueDate ? new Date(p.dueDate+"T12:00:00") : null;
             if (due) due.setHours(0,0,0,0);
