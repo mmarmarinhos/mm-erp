@@ -1466,6 +1466,51 @@ const FinPayModal = ({ order, onClose, onSave }) => {
   );
 };
 
+
+// ─── FinPagModal — Registrar Pagamento de Despesa ─────────────────────────
+const FinPagModal = ({ item, onClose, onSave }) => {
+  const todayStr = new Date().toISOString().split("T")[0];
+  const [paidDate, setPaidDate] = useState(todayStr);
+  const [payment,  setPayment]  = useState(item.paymentTerms || "Pix");
+  const title = item._type === "lancamento"
+    ? (item.description || item.category || "Despesa")
+    : (item.supplierName || "Compra");
+  const handleSave = () => onSave({ ...item, paidDate, payment });
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-gray-900">Registrar Pagamento</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <div className="bg-gray-50 rounded-xl p-3 text-sm">
+          <p className="font-mono font-bold text-indigo-600 text-xs">{item.id}</p>
+          <p className="text-gray-600 text-xs mt-0.5 truncate">{title}</p>
+          <p className="font-bold text-red-600 text-lg mt-1">{fmt(item.total||item.amount||0)}</p>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">📅 Data de Pagamento</label>
+          <input type="date" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            value={paidDate} onChange={e=>setPaidDate(e.target.value)}/>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">💳 Forma de Pagamento</label>
+          <select className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            value={payment} onChange={e=>setPayment(e.target.value)}>
+            {PAYMENT_METHODS.map(p=><option key={p}>{p}</option>)}
+          </select>
+        </div>
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button onClick={handleSave} className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700">
+            💸 Confirmar Pagamento
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) => {
   const [tab, setTab]         = useState("overview");
   const [filterMode, setFilterMode] = useState("mes");  // mes | trimestre | ano | personalizado | todos
