@@ -2784,18 +2784,6 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
             </div>
           )}
 
-          {/* Status */}
-          {!isNew && (
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
-              <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                value={form.status} onChange={e=>set("status",e.target.value)}>
-                <option value="pendente">Pendente</option>
-                <option value="pago">Pago</option>
-                <option value="cancelado">Cancelado</option>
-              </select>
-            </div>
-          )}
           {/* Notes */}
           {customer.notes && (
             <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
