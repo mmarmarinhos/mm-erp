@@ -621,10 +621,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [] }) =
               <label className="text-xs font-medium text-gray-600 mb-1 block">📅 Vencimento do Boleto</label>
               <input type="date" className={inp} value={form.dueDate||""} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))}/>
             </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">✅ Data de Pagamento</label>
-              <input type="date" className={inp} value={form.paidDate||""} onChange={e=>setForm(f=>({...f,paidDate:e.target.value}))}/>
-            </div>
+
             <div className="col-span-2">
               <label className="text-xs font-medium text-gray-600 mb-1 block">Observações</label>
               <textarea rows={2} className={`${inp} resize-none`} value={form.notes||""} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="Notas internas (opcional)"/>
