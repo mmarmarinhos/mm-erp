@@ -2820,9 +2820,9 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
           </p>
         </div>
         <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm text-center">
-          <p className="text-xs text-gray-400 uppercase tracking-wide">B2B / Atacado</p>
+          <p className="text-xs text-gray-400 uppercase tracking-wide">Total de Pedidos</p>
           <p className="text-lg font-bold text-gray-800 mt-0.5">
-            {customers.filter(c => c.tags.includes("atacado") || c.tags.includes("B2B")).length}
+            {totalOrdersAll}
           </p>
         </div>
       </div>
