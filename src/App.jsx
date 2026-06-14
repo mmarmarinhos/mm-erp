@@ -8089,7 +8089,8 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [] 
 };
 
 // ─── Cotações Module ──────────────────────────────────────────────────────
-const gerarCotacaoPDF = (cotacao, empresa = {}) => {
+const gerarCotacaoPDF = (cotacao, empresaRaw) => {
+  const empresa = empresaRaw || {};
   const empresaNome = empresa.nomeFantasia || empresa.razaoSocial || "MM Armarinhos";
   const empresaCnpj = empresa.cnpj || "";
   const empresaTel  = empresa.celular || empresa.telefone || "";
@@ -8627,7 +8628,7 @@ export default function App() {
 }
 
 function ERPApp({ currentUser, onLogout }) {
-  const [form, setEmpresaForm] = useState(null); // empresa data for sidebar
+  const [form, setEmpresaForm] = useState(EMPRESA_EMPTY); // empresa data for sidebar
   const [orders, setOrders]         = useState([]);
   const [finance, setFinance]       = useState([]);
   const [customers, setCustomers]   = useState([]);
