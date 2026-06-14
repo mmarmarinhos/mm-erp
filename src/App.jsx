@@ -4422,7 +4422,7 @@ const ProductDetailPanel = ({ product, movements, onClose, onEdit, onDelete, onM
   const cc  = avatarColor(product.name);
   const catColor = INV_CAT_COLORS[product.category]||"#94a3b8";
   const margin = product.price&&product.cost ? ((product.price-product.cost)/product.price*100).toFixed(1) : null;
-  const prdMoves = movements.filter(m=>m.productId===product.id).sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const prdMoves = movements.filter(m=>m.productId===product.id).sort((a,b)=> parseInt(b.id.replace(/\D/g,"")) - parseInt(a.id.replace(/\D/g,"")));
   const totalIn  = prdMoves.filter(m=>m.type==="entrada").reduce((s,m)=>s+m.qty,0);
   const totalOut = prdMoves.filter(m=>m.type==="saida").reduce((s,m)=>s+m.qty,0);
 
