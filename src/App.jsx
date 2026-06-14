@@ -2319,11 +2319,11 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
   const [payModal, setPayModal] = useState(null); // order being paid
   const seg = SEG_STYLES[customer.segment] || SEG_STYLES.Novo;
   const cOrders = orders.filter(o => o.customer.toLowerCase() === customer.name.toLowerCase());
-  const activeOrders   = cOrders.filter(o => o.status !== "Cancelado");
-  const dynTotalSpent  = activeOrders.reduce((s,o) => s + (o.total||0), 0);
-  const dynTotalOrders = activeOrders.length;
-  const dynLastPurchase = activeOrders.length
-    ? activeOrders.map(o=>o.date).sort().reverse()[0]
+  const statsOrders    = cOrders.filter(o => o.status !== "Cancelado");
+  const dynTotalSpent  = statsOrders.reduce((s,o) => s + (o.total||0), 0);
+  const dynTotalOrders = statsOrders.length;
+  const dynLastPurchase = statsOrders.length
+    ? statsOrders.map(o=>o.date).sort().reverse()[0]
     : null;
   const avgTicket  = dynTotalOrders > 0 ? dynTotalSpent / dynTotalOrders : 0;
   const daysSince  = dynLastPurchase
