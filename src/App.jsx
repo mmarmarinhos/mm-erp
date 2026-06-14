@@ -1526,6 +1526,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [search, setSearch]   = useState("");
   const [payRec, setPayRec]   = useState(null); // order being marked as paid
+  const [payPag, setPayPag]   = useState(null); // expense being marked as paid
 
   // ── Period filter logic ──
   const filterByPeriod = (tx) => {
