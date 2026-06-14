@@ -8212,145 +8212,104 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [] 
 
 // ─── Cotações Module ──────────────────────────────────────────────────────
 const gerarCotacaoPDF = (cotacao, empresaRaw) => {
-  const empresa = empresaRaw || {};
-  const empresaNome = empresa.nomeFantasia || empresa.razaoSocial || "MM Armarinhos";
-  const empresaCnpj = empresa.cnpj || "";
-  const empresaTel  = empresa.celular || empresa.telefone || "";
-  const empresaEmail= empresa.email || "";
-  const empresaSite = empresa.site || "";
-  const subtotal = (cotacao.items||cotacao.itemsList||[]).reduce((s,it)=>s+(it.total||0),0);
-  const total = parseFloat(cotacao.total)||subtotal;
-  const items = cotacao.items||cotacao.itemsList||[];
+  const emp = empresaRaw || {};
+  const eNome  = emp.nomeFantasia || emp.razaoSocial || "MM Armarinhos";
+  const eCnpj  = emp.cnpj   || "";
+  const eTel   = emp.celular || emp.telefone || "";
+  const eEmail = emp.email  || "";
+  const eSite  = emp.site   || "";
 
-  const rows = items.map(it => `
-    <tr>
-      <td style="padding:10px 8px;border-bottom:1px solid #f1f5f9;">${it.sku||"—"}</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f1f5f9;">${it.description||""}</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:center;">${it.qty||1}</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:center;">${it.unit||"un"}</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:right;">R$ ${(it.unitPrice||0).toFixed(2).replace(".",",")}</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:center;">${it.discount>0?(it.discountType==="%"?`${it.discount}%`:`R$ ${it.discount.toFixed(2).replace(".",",")}`):"—"}</td>
-      <td style="padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:700;">R$ ${(it.total||0).toFixed(2).replace(".",",")}</td>
-    </tr>
-  `).join("");
+  const items = cotacao.items || cotacao.itemsList || [];
+  const subtotal = items.reduce(function(s,it){ return s + (it.total||0); }, 0);
+  const total = parseFloat(cotacao.total) || subtotal;
+  const hoje = new Date().toLocaleDateString("pt-BR");
 
-  const frete = parseFloat(cotacao.freight)||0;
-  const desc  = parseFloat(cotacao.discount)||0;
+  const infoEmp = (eCnpj  ? "CNPJ: "  + eCnpj  + "<br>" : "")
+                + (eTel   ? "Cel: "    + eTel   + "<br>" : "")
+                + (eEmail ? "E-mail: " + eEmail + "<br>" : "")
+                + (eSite  ? "Site: "   + eSite           : "");
 
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-  <title>Cotação ${cotacao.id||""} — ${cotacao.customer||""}</title>
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Segoe UI',Arial,sans-serif; color:#1e293b; background:#fff; padding:40px; font-size:13px; }
-    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:32px; padding-bottom:20px; border-bottom:3px solid #6366f1; }
-    .empresa-nome { font-size:22px; font-weight:800; color:#6366f1; }
-    .empresa-info { font-size:11px; color:#64748b; margin-top:4px; line-height:1.6; }
-    .cot-badge { background:#6366f1; color:#fff; font-size:18px; font-weight:700; padding:8px 18px; border-radius:10px; }
-    .cot-sub { font-size:11px; color:#64748b; text-align:right; margin-top:6px; }
-    .section { margin-bottom:24px; }
-    .section-title { font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px; }
-    .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    .info-box { background:#f8fafc; border-radius:10px; padding:14px; }
-    .info-label { font-size:10px; color:#94a3b8; text-transform:uppercase; letter-spacing:.06em; }
-    .info-value { font-size:13px; font-weight:600; color:#1e293b; margin-top:2px; }
-    table { width:100%; border-collapse:collapse; margin-top:8px; }
-    thead th { background:#f1f5f9; padding:10px 8px; text-align:left; font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.06em; }
-    thead th:last-child, thead th:nth-child(5), thead th:nth-child(7) { text-align:right; }
-    thead th:nth-child(3), thead th:nth-child(4), thead th:nth-child(6) { text-align:center; }
-    .totals { display:flex; justify-content:flex-end; margin-top:16px; }
-    .totals-box { background:#f8fafc; border-radius:10px; padding:16px; width:280px; }
-    .totals-row { display:flex; justify-content:space-between; padding:4px 0; font-size:12px; color:#64748b; }
-    .totals-total { display:flex; justify-content:space-between; padding:10px 0 0; margin-top:8px; border-top:2px solid #6366f1; font-size:18px; font-weight:800; color:#6366f1; }
-    .notes { background:#fafafa; border:1px solid #e2e8f0; border-radius:10px; padding:14px; font-size:12px; color:#64748b; line-height:1.6; }
-    .footer { margin-top:40px; border-top:1px solid #e2e8f0; padding-top:16px; display:flex; justify-content:space-between; font-size:11px; color:#94a3b8; }
-    .approval { margin-top:32px; border-top:2px dashed #e2e8f0; padding-top:24px; }
-    .approval-title { font-size:11px; color:#94a3b8; text-transform:uppercase; font-weight:700; margin-bottom:16px; }
-    .sig-row { display:flex; gap:32px; }
-    .sig-box { flex:1; border-top:1px solid #94a3b8; padding-top:8px; font-size:11px; color:#64748b; }
-    @media print { body { padding:20px; } }
-  </style></head><body>
-  <div class="header">
-    <div>
-      <div class="empresa-nome">${empresaNome}</div>
-      <div class="empresa-info">
-        ${empresaCnpj ? `CNPJ: ${empresaCnpj}<br>` : ""}
-        ${empresaTel  ? `Cel: ${empresaTel}<br>` : ""}
-        ${empresaEmail? `E-mail: ${empresaEmail}<br>` : ""}
-        ${empresaSite ? `Site: ${empresaSite}` : ""}
-      </div>
-    </div>
-    <div style="text-align:right;">
-      <div class="cot-badge">COTAÇÃO ${cotacao.id||""}</div>
-      <div class="cot-sub">
-        Data: ${cotacao.date||"—"}<br>
-        ${cotacao.validUntil ? `Válida até: ${cotacao.validUntil}` : ""}
-      </div>
-    </div>
-  </div>
+  var rows = "";
+  items.forEach(function(it) {
+    var desc = it.description || it.desc || it.sku || "-";
+    var sku  = it.sku || "-";
+    var qty  = it.qty || it.quantity || 1;
+    var un   = it.unit || "un";
+    var price = (it.price || it.unitPrice || 0).toFixed(2).replace(".",",");
+    var disc  = it.discount ? it.discount + "%" : "-";
+    var tot   = (it.total || 0).toFixed(2).replace(".",",");
+    rows += "<tr>"
+      + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;'>" + sku + "</td>"
+      + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;'>" + desc + "</td>"
+      + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:center;'>" + qty + "</td>"
+      + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:center;'>" + un + "</td>"
+      + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:right;'>R$ " + price + "</td>"
+      + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:center;'>" + disc + "</td>"
+      + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:700;'>R$ " + tot + "</td>"
+      + "</tr>";
+  });
 
-  <div class="section">
-    <div class="section-title">Cliente</div>
-    <div class="info-grid">
-      <div class="info-box">
-        <div class="info-label">Nome</div>
-        <div class="info-value">${cotacao.customer||"—"}</div>
-      </div>
-      <div class="info-grid" style="grid-template-columns:1fr 1fr;">
-        <div class="info-box">
-          <div class="info-label">Canal</div>
-          <div class="info-value">${cotacao.channel||"—"}</div>
-        </div>
-        <div class="info-box">
-          <div class="info-label">Pagamento</div>
-          <div class="info-value">${cotacao.payment||"—"}</div>
-        </div>
-      </div>
-    </div>
-  </div>
+  const notesHTML = cotacao.notes
+    ? "<div style='background:#fafafa;border:1px solid #e2e8f0;border-radius:10px;padding:14px;font-size:12px;color:#64748b;line-height:1.6;margin-bottom:20px;'>" + cotacao.notes + "</div>"
+    : "";
 
-  <div class="section">
-    <div class="section-title">Itens</div>
-    <table>
-      <thead><tr>
-        <th style="width:80px;">SKU</th>
-        <th>Descrição</th>
-        <th style="width:50px;">Qtd</th>
-        <th style="width:40px;">Un</th>
-        <th style="width:90px;">Preço Unit.</th>
-        <th style="width:80px;">Desconto</th>
-        <th style="width:90px;">Total</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </div>
+  const validLine = cotacao.validUntil ? "<br>Valida ate: " + cotacao.validUntil : "";
 
-  <div class="totals">
-    <div class="totals-box">
-      <div class="totals-row"><span>Subtotal</span><span>R$ ${subtotal.toFixed(2).replace(".",",")}</span></div>
-      ${frete>0?`<div class="totals-row"><span>Frete</span><span>R$ ${frete.toFixed(2).replace(".",",")}</span></div>`:""}
-      ${desc>0?`<div class="totals-row"><span>Desconto</span><span>- R$ ${desc.toFixed(2).replace(".",",")}</span></div>`:""}
-      <div class="totals-total"><span>TOTAL</span><span>R$ ${total.toFixed(2).replace(".",",")}</span></div>
-    </div>
-  </div>
+  const css = "<style>"
+    + "* {margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif;}"
+    + "body {padding:32px;color:#1e293b;font-size:13px;}"
+    + ".hdr {display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #6366f1;}"
+    + ".enome {font-size:22px;font-weight:800;color:#6366f1;}"
+    + ".einfo {font-size:11px;color:#64748b;margin-top:4px;line-height:1.7;}"
+    + ".badge {background:#6366f1;color:#fff;font-size:18px;font-weight:700;padding:8px 18px;border-radius:10px;}"
+    + ".bsub {font-size:11px;color:#64748b;text-align:right;margin-top:6px;}"
+    + ".sec {margin-bottom:24px;}"
+    + ".stitle {font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}"
+    + ".grid {display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;}"
+    + ".ibox {background:#f8fafc;border-radius:8px;padding:10px 12px;border:1px solid #e2e8f0;}"
+    + ".ilabel {font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px;}"
+    + ".ival {font-size:13px;font-weight:600;color:#1e293b;}"
+    + "table {width:100%;border-collapse:collapse;}"
+    + "th {background:#f8fafc;text-align:left;padding:9px 8px;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;}"
+    + ".tbox {display:flex;justify-content:flex-end;margin-top:16px;}"
+    + ".tinner {background:#f8fafc;border-radius:10px;padding:16px;width:280px;}"
+    + ".trow {display:flex;justify-content:space-between;padding:4px 0;font-size:12px;color:#64748b;}"
+    + ".tfinal {display:flex;justify-content:space-between;padding:10px 0 0;margin-top:8px;border-top:2px solid #6366f1;font-size:18px;font-weight:800;color:#6366f1;}"
+    + ".aprov {margin-top:32px;border-top:2px dashed #e2e8f0;padding-top:24px;}"
+    + ".sig-row {display:flex;gap:32px;}"
+    + ".sig-box {flex:1;border-top:1px solid #94a3b8;padding-top:8px;font-size:11px;color:#64748b;}"
+    + ".ftr {margin-top:40px;border-top:1px solid #e2e8f0;padding-top:16px;display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;}"
+    + "@media print {body {padding:20px;}}"
+    + "</style>";
 
-  ${cotacao.notes ? `<div class="section" style="margin-top:24px;"><div class="section-title">Observações</div><div class="notes">${cotacao.notes}</div></div>` : ""}
+  const body = "<div class='hdr'>"
+    + "<div><div class='enome'>" + eNome + "</div><div class='einfo'>" + infoEmp + "</div></div>"
+    + "<div><div class='badge'>COTACAO " + (cotacao.id||"") + "</div>"
+    + "<div class='bsub'>Data: " + (cotacao.date||"-") + validLine + "</div></div>"
+    + "</div>"
+    + "<div class='sec'><div class='stitle'>Cliente</div><div class='grid'>"
+    + "<div class='ibox'><div class='ilabel'>Nome</div><div class='ival'>" + (cotacao.customer||"-") + "</div></div>"
+    + "<div class='ibox'><div class='ilabel'>Canal</div><div class='ival'>" + (cotacao.channel||"-") + "</div></div>"
+    + "<div class='ibox'><div class='ilabel'>Pagamento</div><div class='ival'>" + (cotacao.payment||"-") + "</div></div>"
+    + "</div></div>"
+    + "<div class='sec'><div class='stitle'>Itens</div>"
+    + "<table><thead><tr>"
+    + "<th>SKU</th><th>Descricao</th><th style='text-align:center'>Qtd</th><th style='text-align:center'>Un</th><th style='text-align:right'>Preco Unit.</th><th style='text-align:center'>Desc.</th><th style='text-align:right'>Total</th>"
+    + "</tr></thead><tbody>" + rows + "</tbody></table>"
+    + "<div class='tbox'><div class='tinner'>"
+    + "<div class='trow'><span>Subtotal</span><span>R$ " + subtotal.toFixed(2).replace(".",",") + "</span></div>"
+    + "<div class='tfinal'><span>TOTAL</span><span>R$ " + total.toFixed(2).replace(".",",") + "</span></div>"
+    + "</div></div></div>"
+    + notesHTML
+    + "<div class='aprov'><p style='font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:16px;'>Aprovacao</p>"
+    + "<div class='sig-row'>"
+    + "<div class='sig-box'>( ) Aprovado &nbsp;&nbsp; ( ) Reprovado<br><br>Assinatura: ___________________</div>"
+    + "<div class='sig-box'>Nome: ___________________<br><br>Data: ___/___/______</div>"
+    + "</div></div>"
+    + "<div class='ftr'><span>" + eNome + " - Cotacao gerada em " + hoje + "</span><span>Documento nao possui valor fiscal</span></div>"
+    + "<script>window.onload=function(){window.print();}<" + "/script>";
 
-  <div class="approval">
-    <div class="approval-title">Aprovação</div>
-    <div class="sig-row">
-      <div class="sig-box">( ) Aprovado &nbsp;&nbsp;&nbsp; ( ) Reprovado<br><br>Assinatura: ___________________________</div>
-      <div class="sig-box">Nome: ___________________________<br><br>Data: ___/___/______</div>
-    </div>
-  </div>
-
-  <div class="footer">
-    <span>${empresaNome} — Cotação gerada em ${new Date().toLocaleDateString("pt-BR")}</span>
-    <span>Documento não possui valor fiscal</span>
-  </div>
-
-  <script>window.onload = () => { window.print(); }</script>
-  </body></html>`;
-
+  const html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Cotacao " + (cotacao.id||"") + "</title>" + css + "</head><body>" + body + "</body></html>";
   const w = window.open("", "_blank", "width=900,height=700");
   if (w) { w.document.write(html); w.document.close(); }
 };
