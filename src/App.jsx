@@ -2098,7 +2098,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
 
         // Lançamentos manuais de despesa (pendentes ou pagos se showPaidPag)
         const financeItems = (finance||[])
-          .filter(t => t.type === "despesa" && t.status !== "cancelado" && (showPaidPag ? true : t.status !== "pago"))
+          .filter(t => t.type === "despesa" && t.status !== "cancelado" && (showPaidPag ? true : (t.status !== "pago" && !t.paidDate)))
           .map(t => ({
             ...t,
             _type: "lancamento",
