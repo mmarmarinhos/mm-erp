@@ -1814,7 +1814,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
               <h3 className="font-semibold text-gray-700 text-sm mb-3">Últimos Lançamentos</h3>
               <div className="space-y-2">
                 {periodTx.slice(0,6).map(t => (
-                  <div key={t.id} className="flex items-start justify-between py-1 border-b border-gray-50 last:border-0">
+                  <div key={t.id} onClick={()=>setModal(t)} className="flex items-start justify-between py-1 border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors">
                     <div className="flex items-start gap-2 flex-1 min-w-0">
                       <span className={`mt-0.5 shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${t.type==="receita" ? "bg-green-100 text-green-600" : "bg-red-100 text-red-500"}`}>
                         {t.type==="receita" ? "↑" : "↓"}
