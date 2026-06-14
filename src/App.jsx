@@ -1406,6 +1406,66 @@ const FinTooltip = ({ active, payload, label }) => {
 };
 
 // ─── Finance Module ───────────────────────────────────────────────────────
+
+// ─── FinPayModal — Registrar Pagamento (Financeiro) ───────────────────────
+const FinPayModal = ({ order, onClose, onSave }) => {
+  const todayStr = new Date().toISOString().split("T")[0];
+  const [paidDate, setPaidDate] = useState(todayStr);
+  const [payment,  setPayment]  = useState(order.payment || "Pix");
+  const [markPaid, setMarkPaid] = useState(true);
+  const handleSave = () => onSave({
+    ...order,
+    paidDate: markPaid ? paidDate : "",
+    payment,
+    status: markPaid ? "Entregue" : order.status,
+  });
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-gray-900">Registrar Pagamento</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <div className="bg-gray-50 rounded-xl p-3 text-sm">
+          <p className="font-mono font-bold text-indigo-600 text-xs">{order.id}</p>
+          <p className="text-gray-600 text-xs mt-0.5 truncate">{order.customer}</p>
+          <p className="font-bold text-gray-900 text-lg mt-1">{fmt(order.total)}</p>
+        </div>
+        <div className="flex items-center justify-between p-3 bg-green-50 border border-green-100 rounded-xl">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Marcar como pago</p>
+            <p className="text-xs text-gray-500 mt-0.5">{markPaid ? "Pedido será marcado como pago" : "Remover pagamento"}</p>
+          </div>
+          <button onClick={()=>setMarkPaid(v=>!v)}
+            className={"w-12 h-6 rounded-full transition-all relative " + (markPaid?"bg-green-500":"bg-gray-300")}>
+            <span className={"absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all " + (markPaid?"right-0.5":"left-0.5")}/>
+          </button>
+        </div>
+        {markPaid && (<>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">✅ Data de Pagamento</label>
+            <input type="date" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              value={paidDate} onChange={e=>setPaidDate(e.target.value)}/>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">💳 Forma de Pagamento</label>
+            <select className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              value={payment} onChange={e=>setPayment(e.target.value)}>
+              {PAYMENT_METHODS.map(p=><option key={p}>{p}</option>)}
+            </select>
+          </div>
+        </>)}
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button onClick={handleSave} className="flex-1 px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700">
+            {markPaid ? "✅ Confirmar Pagamento" : "Salvar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) => {
   const [tab, setTab]         = useState("overview");
   const [filterMode, setFilterMode] = useState("mes");  // mes | trimestre | ano | personalizado | todos
@@ -1939,6 +1999,10 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
                   );
                 })}
               </div>
+            )}
+            {payRec && (
+              <FinPayModal order={payRec} onClose={()=>setPayRec(null)}
+                onSave={(updated)=>{ if(setOrders) setOrders(prev=>prev.map(o=>o.id===updated.id?updated:o)); setPayRec(null); }}/>
             )}
           </div>
         );
