@@ -1640,8 +1640,13 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
       if (!cats[t.category]) cats[t.category] = { cat:t.category, type:t.type, total:0 };
       cats[t.category].total += t.amount;
     });
+    paidOrdersInPeriod.forEach(o => {
+      const cat = o.channel || "Vendas";
+      if (!cats[cat]) cats[cat] = { cat, type:"receita", total:0 };
+      cats[cat].total += (o.total||0);
+    });
     return Object.values(cats).sort((a,b) => b.total-a.total);
-  }, [periodActive]);
+  }, [periodActive, paidOrdersInPeriod]);
 
   // ── Filtered list ──
   const allCats = ["Todas", ...INCOME_CATS, ...EXPENSE_CATS];
