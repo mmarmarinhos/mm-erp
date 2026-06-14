@@ -2316,13 +2316,18 @@ const CustomerModal = ({ customer, onClose, onSave, orders = [], customers = [] 
                 <EnderecoFields form={form} set={set}
                   inp="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">Prazo Pgto (dias)</label>
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl">
+                <label className="text-xs font-bold text-indigo-700 mb-1 block">⏱ Prazo de Pagamento</label>
+                <div className="flex items-center gap-2">
                   <input type="number" min="0" max="365"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    className="w-24 border border-indigo-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
                     value={form.paymentTerms||""} onChange={e=>set("paymentTerms",e.target.value)} placeholder="0"/>
+                  <span className="text-sm text-indigo-600 font-medium">
+                    {Number(form.paymentTerms)>0 ? `${form.paymentTerms} dias após a compra` : "Pagamento imediato (à vista)"}
+                  </span>
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Canal Preferencial</label>
                   <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
