@@ -2743,16 +2743,22 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
 
   // Recalculate segments
   const handleRecalc = () => {
-    const REF = new Date("2025-06-10");
+    const TODAY = new Date();
+    TODAY.setHours(0,0,0,0);
     setCustomers(prev => prev.map(c => {
-      const days = c.lastPurchase ? Math.floor((REF - new Date(c.lastPurchase)) / 86400000) : 999;
+      const stats = getStats(c.name);
+      const lastDate = stats.lastPurchase;
+      const days = lastDate
+        ? Math.floor((TODAY - new Date(lastDate + "T12:00:00")) / 86400000)
+        : 999;
       let segment = "Novo";
-      if (days > 90)                                   segment = "Inativo";
-      else if (c.totalSpent >= 500 || c.totalOrders >= 7) segment = "VIP";
-      else if (c.totalOrders >= 2)                        segment = "Regular";
+      if (days > 90)                                         segment = "Inativo";
+      else if (stats.totalSpent >= 500 || stats.totalOrders >= 7) segment = "VIP";
+      else if (stats.totalOrders >= 2)                           segment = "Regular";
+      else if (stats.totalOrders >= 1)                           segment = "Ativo";
       return { ...c, segment };
     }));
-    showToast("✅ Statuss recalculados!");
+    showToast("✅ Status recalculados!");
   };
 
   return (
