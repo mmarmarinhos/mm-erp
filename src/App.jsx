@@ -5248,14 +5248,14 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Estoque</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Mín</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Custo Méd.</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Margem</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Preço Rep.</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filtered.map(p => {
                   const ss  = stockStatus(p.stock, p.minStock);
-                  const mar = p.price&&p.cost ? ((p.price-p.cost)/p.price*100).toFixed(0) : null;
+                  const repPrice = p.lastPurchasePrice || null;
                   const barW = p.minStock>0 ? Math.min(100, p.stock/(p.minStock*2)*100) : 100;
                   const catColor = INV_CAT_COLORS[p.category]||"#94a3b8";
                   return (
@@ -5281,7 +5281,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
                       <td className="px-4 py-3 text-center text-xs text-gray-500 hidden md:table-cell">{p.minStock}</td>
                       <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900 hidden lg:table-cell">{p.cost>0?fmt(p.cost):"—"}</td>
                       <td className="px-4 py-3 text-right hidden lg:table-cell">
-                        {mar!==null ? <span className={`text-xs font-bold ${Number(mar)>30?"text-green-600":Number(mar)>15?"text-amber-600":"text-red-500"}`}>{mar}%</span> : <span className="text-gray-400">—</span>}
+                        {repPrice ? <span className="text-sm font-semibold text-gray-800">{fmt(repPrice)}</span> : <span className="text-gray-400">—</span>}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
@@ -8053,7 +8053,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
           reason: "Entrada por compra",
           notes: `Pedido ${detail.id} · ${detail.supplierName || ""}`.trim(),
         });
-        return { ...prod, stock: estAtual + qtd, cost: novoCusto };
+        return { ...prod, stock: estAtual + qtd, cost: novoCusto, lastPurchasePrice: preco };
       }));
     }
     // 3. Salvar movements com IDs sequenciais
