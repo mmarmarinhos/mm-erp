@@ -7621,7 +7621,7 @@ const EmpresaField = ({label, children, span=false}) => (
   </div>
 );
 
-const EmpresaModule = () => {
+const EmpresaModule = ({ onSave }) => {
   const [form,    setForm]   = useState(EMPRESA_EMPTY);
   const [loading, setLoading]= useState(true);
   const [saved,   setSaved]  = useState(false);
@@ -8861,7 +8861,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases}/>;
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
-      case "empresa":   return <EmpresaModule/>;
+      case "empresa":   return <EmpresaModule onSave={(data) => setEmpresaForm(data)}/>;
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
       case "reports":   return <ReportsModule orders={orders} finance={finance} customers={customers} suppliers={suppliers}/>;
