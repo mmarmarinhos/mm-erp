@@ -35,6 +35,8 @@ const Icon = ({ name, size = 18, className = "" }) => {
 
 // ─── Constants ────────────────────────────────────────────────────────────
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
+const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
+const chId = (ch) => CHANNEL_TO_ID[ch] || ch;
 const ORDER_STATUSES = ["Novo", "Em Separação", "Enviado", "Entregue", "Cancelado"];
 const PAYMENT_METHODS = ["Pix", "Cartão de Crédito", "Boleto", "Mercado Pago", "Dinheiro"];
 
@@ -354,7 +356,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [] }) =
 
   const selectProduct = (i, prod) => {
     setForm(f => {
-      const cpRaw = prod.channelPrices?.[f.channel];
+      const cpRaw = prod.channelPrices?.[chId(f.channel)];
       const channelPrice = cpRaw ? (typeof cpRaw==='object' ? cpRaw.price : cpRaw) : 0;
       const unitPrice = (channelPrice > 0) ? channelPrice : (prod.price||0);
       const itemsList = f.itemsList.map((it,idx) => {
@@ -8042,7 +8044,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [] 
                     if (!it._prodId) return {...it, [Symbol.for("skip")]:true};
                     const prod = products.find(p=>p.id===it._prodId);
                     if (!prod) return it;
-                    const cpRaw2 = prod.channelPrices?.[newChannel];
+                    const cpRaw2 = prod.channelPrices?.[chId(newChannel)];
                     const channelPrice = cpRaw2 ? (typeof cpRaw2==='object' ? cpRaw2.price : cpRaw2) : 0;
                     if (!channelPrice || channelPrice <= 0) return it;
                     const updated = { ...it, unitPrice: channelPrice };
