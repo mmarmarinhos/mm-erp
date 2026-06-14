@@ -1381,6 +1381,12 @@ const FinanceModal = ({ tx, onClose, onSave }) => {
         </div>
         <div className="flex gap-2 p-5 border-t border-gray-100">
           <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          {!isNew && form.status === "pago" && (
+            <button onClick={()=>onSave({...form, amount:parseFloat(form.amount), status:"pendente", paidDate:""})}
+              className="px-4 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 text-sm font-medium hover:bg-amber-100">
+              ↩ Voltar Pendente
+            </button>
+          )}
           <button onClick={handleSave} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
             {isNew ? "Criar Lançamento" : "Salvar"}
           </button>
@@ -2768,6 +2774,18 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
             </div>
           )}
 
+          {/* Status */}
+          {!isNew && (
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
+              <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                value={form.status} onChange={e=>set("status",e.target.value)}>
+                <option value="pendente">Pendente</option>
+                <option value="pago">Pago</option>
+                <option value="cancelado">Cancelado</option>
+              </select>
+            </div>
+          )}
           {/* Notes */}
           {customer.notes && (
             <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
