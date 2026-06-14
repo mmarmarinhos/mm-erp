@@ -3653,6 +3653,97 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
 
   return (
     <div className="space-y-4">
+      {/* Modal de detalhe da cotação */}
+      {detail && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl max-h-[92vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center gap-3 p-5 border-b border-gray-100 shrink-0">
+              <div className="flex-1">
+                <p className="text-xs font-mono font-bold text-indigo-500">{detail.id}</p>
+                <h2 className="font-bold text-gray-900 text-lg">{detail.customer}</h2>
+              </div>
+              <span className={`text-xs font-semibold px-3 py-1 rounded-full ${st(detail.status).bg} ${st(detail.status).text}`}>{detail.status}</span>
+              <button onClick={()=>setDetail(null)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+            </div>
+            {/* Body */}
+            <div className="overflow-y-auto p-5 space-y-4 flex-1">
+              {(() => { const daysLeft = getDaysLeft(detail.validUntil); const converted = detail.status==="Convertida"; return (<>
+                {converted && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 flex items-center gap-2">
+                    <span className="text-purple-600 font-medium text-sm">✅ Convertida no pedido</span>
+                    <span className="font-mono font-bold text-purple-700">{detail.orderId}</span>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  {[["📅 Data", detail.date],["⏳ Válida até", detail.validUntil||"—"],["💳 Pagamento", detail.payment],["📣 Canal", detail.channel]].map(([label,val])=>(
+                    <div key={label} className="bg-gray-50 border border-gray-100 rounded-xl p-3">
+                      <p className="text-[10px] text-gray-400">{label}</p>
+                      <p className="text-sm font-semibold text-gray-800">{val}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-50">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Itens da Cotação</p>
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead><tr className="bg-gray-50 text-xs text-gray-500 uppercase">
+                      <th className="px-4 py-2 text-left">Produto / Serviço</th>
+                      <th className="px-4 py-2 text-center">Qtd</th>
+                      <th className="px-4 py-2 text-center">Un</th>
+                      <th className="px-4 py-2 text-right">Preço Unit.</th>
+                      <th className="px-4 py-2 text-right">Total</th>
+                    </tr></thead>
+                    <tbody>
+                      {(detail.items||detail.itemsList||[]).map((it,i)=>(
+                        <tr key={i} className="border-t border-gray-50">
+                          <td className="px-4 py-2.5">{it.description||it.desc||it.sku||"—"}</td>
+                          <td className="px-4 py-2.5 text-center">{it.qty||1}</td>
+                          <td className="px-4 py-2.5 text-center text-gray-400">{it.unit||"un"}</td>
+                          <td className="px-4 py-2.5 text-right">{fmt(it.unitPrice||0)}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold">{fmt(it.total||0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot><tr className="border-t-2 border-gray-200">
+                      <td colSpan={4} className="px-4 py-3 text-right font-bold text-gray-700">Total</td>
+                      <td className="px-4 py-3 text-right font-bold text-indigo-600 text-base">{fmt(detail.total||0)}</td>
+                    </tr></tfoot>
+                  </table>
+                </div>
+                {detail.notes && (
+                  <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500">{detail.notes}</div>
+                )}
+                {!["Convertida","Recusada","Expirada"].includes(detail.status) && (
+                  <div className="flex flex-wrap gap-2">
+                    <p className="text-xs font-semibold text-gray-400 uppercase w-full">Alterar Status</p>
+                    {["Rascunho","Enviada","Aprovada","Recusada"].filter(s=>s!==detail.status).map(s=>(
+                      <button key={s} onClick={()=>{setCotacoes(prev=>prev.map(c=>c.id===detail.id?{...c,status:s}:c));setDetail(d=>({...d,status:s}));}}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border ${st(s).bg} ${st(s).text} border-current`}>{s}</button>
+                    ))}
+                  </div>
+                )}
+              </>); })()}
+            </div>
+            {/* Footer */}
+            <div className="flex gap-2 p-5 border-t border-gray-100 shrink-0 flex-wrap">
+              {!["Convertida","Recusada","Expirada"].includes(detail.status) && (
+                <button onClick={()=>{setModal(detail);setDetail(null);}} className="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Editar</button>
+              )}
+              {detail.status==="Aprovada" && (
+                <button onClick={()=>{handleConvert(detail);setDetail(null);}} className="flex-1 px-4 py-2 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700">🛒 Converter em Pedido</button>
+              )}
+              <button onClick={async()=>{const emp=await window.storage.get(EMPRESA_KEY).catch(()=>null);gerarCotacaoPDF(detail,emp?.value?JSON.parse(emp.value):{});}}
+                className="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 text-sm font-medium hover:bg-indigo-100">🖨️ PDF</button>
+              {detail.status!=="Convertida" && (
+                <button onClick={()=>setDelConf(detail)} className="px-4 py-2 rounded-xl border border-red-200 text-red-500 text-sm hover:bg-red-50">Excluir</button>
+              )}
+              <button onClick={()=>setDetail(null)} className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
       {toast && <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg">{toast}</div>}
 
       <div className="flex items-start justify-between gap-3">
@@ -8423,138 +8514,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
   const st = (s) => COT_STATUS_ST[s]||{bg:"bg-gray-100",text:"text-gray-600"};
 
   // Detail view
-  if (detail) {
-    const daysLeft = getDaysLeft(detail.validUntil);
-    const converted = detail.status==="Convertida";
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={()=>setDetail(null)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500">←</button>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold text-gray-900">{detail.id}</h1>
-            <p className="text-sm text-gray-500">{detail.customer} · {detail.date}</p>
-          </div>
-          <span className={`text-xs font-semibold px-3 py-1 rounded-full ${st(detail.status).bg} ${st(detail.status).text}`}>{detail.status}</span>
-          {!["Convertida","Recusada","Expirada"].includes(detail.status) && (
-            <button onClick={()=>setModal(detail)} className="px-3 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200">Editar</button>
-          )}
-
-          {detail.status==="Aprovada" && (
-            <button onClick={()=>handleConvert(detail)}
-              className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700">
-              🛒 Converter em Pedido
-            </button>
-          )}
-          {!converted && <button onClick={()=>setDelConf(detail)} className="px-3 py-2 border border-red-200 text-red-500 rounded-xl text-sm hover:bg-red-50">Excluir</button>}
-        </div>
-
-        {converted && (
-          <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 flex items-center gap-2">
-            <span className="text-purple-600 font-medium text-sm">✅ Convertida no pedido</span>
-            <span className="font-mono font-bold text-purple-700">{detail.orderId}</span>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[["📅 Data",         detail.date],
-            ["⏳ Válida até",    detail.validUntil||"—"],
-            ["💳 Pagamento",     detail.payment],
-            ["📣 Canal",         detail.channel],
-          ].map(([label,val])=>(
-            <div key={label} className="bg-white border border-gray-100 rounded-xl p-3">
-              <p className="text-[10px] text-gray-400">{label}</p>
-              <p className="text-sm font-semibold text-gray-800">{val}</p>
-            </div>
-          ))}
-        </div>
-
-        {daysLeft !== null && !["Convertida","Recusada","Expirada"].includes(detail.status) && (
-          <div className={`rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-2
-            ${daysLeft<0?"bg-red-50 border border-red-200 text-red-700":
-              daysLeft===0?"bg-amber-50 border border-amber-200 text-amber-700":
-              daysLeft<=2?"bg-yellow-50 border border-yellow-200 text-yellow-700":
-              "bg-green-50 border border-green-200 text-green-700"}`}>
-            {daysLeft<0?`⏰ Vencida há ${Math.abs(daysLeft)} dia${Math.abs(daysLeft)!==1?"s":""}`:
-             daysLeft===0?"⏰ Vence hoje!":
-             `⏳ Válida por mais ${daysLeft} dia${daysLeft!==1?"s":""}`}
-          </div>
-        )}
-
-        {/* Items table */}
-        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-          <div className="px-4 py-3 border-b border-gray-50">
-            <p className="font-semibold text-gray-800 text-sm">Itens da Cotação</p>
-          </div>
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr className="text-xs text-gray-500">
-                <th className="text-left px-4 py-2">Produto / Serviço</th>
-                <th className="text-center px-3 py-2">Qtd</th>
-                <th className="text-center px-3 py-2">Un</th>
-                <th className="text-right px-3 py-2">Preço Unit.</th>
-                <th className="text-right px-4 py-2">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {detail.items.map((it,i)=>(
-                <tr key={i} className="border-t border-gray-50">
-                  <td className="px-4 py-2.5 text-gray-800">{it.description}</td>
-                  <td className="px-3 py-2.5 text-center text-gray-600">{it.qty}</td>
-                  <td className="px-3 py-2.5 text-center text-gray-400 text-xs">{it.unit}</td>
-                  <td className="px-3 py-2.5 text-right text-gray-600">{fmt(it.unitPrice)}</td>
-                  <td className="px-4 py-2.5 text-right font-medium text-gray-800">{fmt(it.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-gray-50 border-t border-gray-100">
-              {detail.freight>0  && <tr><td colSpan={4} className="px-4 py-1.5 text-right text-xs text-gray-500">Frete</td><td className="px-4 py-1.5 text-right text-xs text-gray-600">+{fmt(detail.freight)}</td></tr>}
-              {detail.discount>0 && <tr><td colSpan={4} className="px-4 py-1.5 text-right text-xs text-gray-500">Desconto</td><td className="px-4 py-1.5 text-right text-xs text-green-600">-{fmt(detail.discount)}</td></tr>}
-              <tr><td colSpan={4} className="px-4 py-2 text-right font-bold text-gray-800 text-sm">Total</td>
-                  <td className="px-4 py-2 text-right font-bold text-indigo-700 text-sm">{fmt(detail.total)}</td></tr>
-            </tfoot>
-          </table>
-        </div>
-
-        {detail.notes && (
-          <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-            <p className="text-xs font-semibold text-amber-600 mb-1">📝 Observações</p>
-            <p className="text-sm text-gray-700">{detail.notes}</p>
-          </div>
-        )}
-
-        {/* Quick status change */}
-        {!["Convertida","Expirada"].includes(detail.status) && (
-          <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Alterar Status</p>
-            <div className="flex gap-2 flex-wrap">
-              {COT_STATUS.filter(s=>s!==detail.status&&s!=="Convertida"&&s!=="Expirada").map(s=>(
-                <button key={s} onClick={()=>{ const u={...detail,status:s}; handleSave(u); setDetail(u); }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${st(s).bg} ${st(s).text} hover:opacity-80`}>
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {modal && <CotacaoModal cotacao={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={handleSave} customers={customers} products={products}/>}
-        {delConf && (
-          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center">
-              <p className="text-2xl mb-2">🗑️</p>
-              <h3 className="font-bold text-gray-900 mb-1">Excluir {delConf.id}?</h3>
-              <p className="text-sm text-gray-500 mb-4">Esta ação não pode ser desfeita.</p>
-              <div className="flex gap-2">
-                <button onClick={()=>setDelConf(null)} className="flex-1 py-2 border border-gray-200 rounded-xl text-sm">Cancelar</button>
-                <button onClick={()=>handleDelete(delConf)} className="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm font-medium">Excluir</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
+  
   return (
     <div className="space-y-4">
       {toast && (
