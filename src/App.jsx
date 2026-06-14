@@ -3611,7 +3611,7 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
 };
 
 // ─── Supplier Detail Panel ────────────────────────────────────────────────
-const SupplierDetailPanel = ({ supplier, finance, purchases, onClose, onEdit, onDelete, onRegisterPurchase }) => {
+const SupplierDetailPanel = ({ supplier, finance, purchases, onUpdatePurchase, onClose, onEdit, onDelete, onRegisterPurchase }) => {
   if (!supplier) return null;
   const [panelTab, setPanelTab] = useState("dados");
   const ss = SUP_STATUS_STYLES[supplier.status] || SUP_STATUS_STYLES["Ativo"];
@@ -3805,80 +3805,149 @@ const SupplierDetailPanel = ({ supplier, finance, purchases, onClose, onEdit, on
         )}
 
         {/* TAB: Financeiro */}
-        {panelTab==="financeiro" && (
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Financial Panel */}
-          <div className="space-y-3">
-            {supPurchases.length > 0 && (
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-green-50 border border-green-100 rounded-xl p-2.5 text-center">
-                  <p className="text-xs text-green-600 font-medium">Pago</p>
-                  <p className="text-sm font-bold text-green-700">{fmt(totalPaid)}</p>
-                  <p className="text-[10px] text-green-500">{paidPc.length} pedido{paidPc.length!==1?"s":""}</p>
+        {panelTab==="financeiro" && (() => {
+          const [payModal, setPayModal] = React.useState(null);
+          const handlePaySave = (updated) => {
+            if (onUpdatePurchase) onUpdatePurchase(updated);
+            setPayModal(null);
+          };
+          return (
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {/* Resumo */}
+              {supPurchases.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-green-50 border border-green-100 rounded-xl p-2.5 text-center">
+                    <p className="text-xs text-green-600 font-medium">Pago</p>
+                    <p className="text-sm font-bold text-green-700">{fmt(totalPaid)}</p>
+                    <p className="text-[10px] text-green-500">{paidPc.length} pedido{paidPc.length!==1?"s":""}</p>
+                  </div>
+                  <div className={`border rounded-xl p-2.5 text-center ${totalOverdue>0?"bg-red-50 border-red-100":"bg-blue-50 border-blue-100"}`}>
+                    <p className={`text-xs font-medium ${totalOverdue>0?"text-red-600":"text-blue-600"}`}>A pagar</p>
+                    <p className={`text-sm font-bold ${totalOverdue>0?"text-red-700":"text-blue-700"}`}>{fmt(totalOpen)}</p>
+                    <p className={`text-[10px] ${totalOverdue>0?"text-red-500":"text-blue-500"}`}>{openPc.length} pedido{openPc.length!==1?"s":""}</p>
+                  </div>
+                  <div className={`border rounded-xl p-2.5 text-center ${totalOverdue>0?"bg-red-100 border-red-200":"bg-gray-50 border-gray-100"}`}>
+                    <p className={`text-xs font-medium ${totalOverdue>0?"text-red-700":"text-gray-500"}`}>Vencido</p>
+                    <p className={`text-sm font-bold ${totalOverdue>0?"text-red-800":"text-gray-400"}`}>{fmt(totalOverdue)}</p>
+                    <p className={`text-[10px] ${totalOverdue>0?"text-red-600":"text-gray-400"}`}>{overduePc.length} pedido{overduePc.length!==1?"s":""}</p>
+                  </div>
                 </div>
-                <div className={`border rounded-xl p-2.5 text-center ${totalOverdue>0?"bg-red-50 border-red-100":"bg-blue-50 border-blue-100"}`}>
-                  <p className={`text-xs font-medium ${totalOverdue>0?"text-red-600":"text-blue-600"}`}>Em aberto</p>
-                  <p className={`text-sm font-bold ${totalOverdue>0?"text-red-700":"text-blue-700"}`}>{fmt(totalOpen)}</p>
-                  <p className={`text-[10px] ${totalOverdue>0?"text-red-500":"text-blue-500"}`}>{openPc.length} pedido{openPc.length!==1?"s":""}</p>
-                </div>
-                <div className={`border rounded-xl p-2.5 text-center ${totalOverdue>0?"bg-red-100 border-red-200":"bg-gray-50 border-gray-100"}`}>
-                  <p className={`text-xs font-medium ${totalOverdue>0?"text-red-700":"text-gray-500"}`}>Vencido</p>
-                  <p className={`text-sm font-bold ${totalOverdue>0?"text-red-800":"text-gray-400"}`}>{fmt(totalOverdue)}</p>
-                  <p className={`text-[10px] ${totalOverdue>0?"text-red-600":"text-gray-400"}`}>{overduePc.length} pedido{overduePc.length!==1?"s":""}</p>
-                </div>
-              </div>
-            )}
+              )}
 
-            {supPurchases.length > 0 && (
-              <div className="space-y-2">
-                {supPurchases.map(pc => {
-                  const fs = getFinStatus(pc);
-                  const due  = pc.dueDate  ? new Date(pc.dueDate +"T12:00:00") : null;
-                  const paid = pc.paidDate ? new Date(pc.paidDate+"T12:00:00") : null;
-                  const issue = new Date(pc.date+"T12:00:00");
-                  const lateDays = paid && due ? diffDays(paid, due) : null;
-                  return (
-                    <div key={pc.id} className={`rounded-xl border p-3 ${fs.bg}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono text-xs font-bold text-indigo-600">{pc.id}</span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${fs.bg} ${fs.text}`}>{fs.icon} {fs.label}</span>
-                            {lateDays!==null && lateDays>0 && (
-                              <span className="text-[10px] text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full font-medium">
-                                ⚠️ Pago com {lateDays}d de atraso
-                              </span>
-                            )}
+              {/* Lista clicável — igual ao cliente */}
+              {supPurchases.length === 0 ? (
+                <div className="text-center py-10 text-gray-400">
+                  <p className="text-3xl mb-2">📋</p>
+                  <p className="text-sm">Nenhum pedido de compra vinculado</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {supPurchases.map(pc => {
+                    const fs = getFinStatus(pc);
+                    const due   = pc.dueDate  ? new Date(pc.dueDate +"T12:00:00") : null;
+                    const paid  = pc.paidDate ? new Date(pc.paidDate+"T12:00:00") : null;
+                    const issue = new Date(pc.date+"T12:00:00");
+                    const lateDays = paid && due ? diffDays(paid, due) : null;
+                    return (
+                      <div key={pc.id} onClick={()=>setPayModal(pc)}
+                        className={`rounded-xl border p-3 cursor-pointer hover:shadow-md transition-all ${fs.bg} ${pc.paidDate?"opacity-75":""}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono text-xs font-bold text-indigo-600">{pc.id}</span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${fs.bg} ${fs.text}`}>{fs.icon} {fs.label}</span>
+                              {lateDays!==null && lateDays>0 && (
+                                <span className="text-[10px] text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full font-medium">
+                                  ⚠️ Pago com {lateDays}d de atraso
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-600 mt-1 truncate">
+                              {(pc.items||[]).map(it=>`${it.description} (${it.qty}${it.unit})`).join(" · ")}
+                            </p>
+                            <div className="flex gap-3 mt-1.5 flex-wrap">
+                              <span className="text-[10px] text-gray-500">📋 {issue.toLocaleDateString("pt-BR")}</span>
+                              {due  && <span className="text-[10px] text-gray-500">📅 Venc: <strong>{due.toLocaleDateString("pt-BR")}</strong></span>}
+                              {paid && <span className="text-[10px] text-green-600">✅ Pago: <strong>{paid.toLocaleDateString("pt-BR")}</strong></span>}
+                              <span className="text-[10px] text-gray-400">💳 {pc.paymentTerms}</span>
+                            </div>
                           </div>
-                          <p className="text-xs text-gray-600 mt-1 truncate">
-                            {pc.items.map(it=>`${it.description} (${it.qty}${it.unit})`).join(" · ")}
-                          </p>
-                          <div className="flex gap-3 mt-1.5 flex-wrap">
-                            <span className="text-[10px] text-gray-500">📋 Emissão: <strong>{issue.toLocaleDateString("pt-BR")}</strong></span>
-                            {due  && <span className="text-[10px] text-gray-500">📅 Vencimento: <strong>{due.toLocaleDateString("pt-BR")}</strong></span>}
-                            {paid && <span className="text-[10px] text-green-600">✅ Pago: <strong>{paid.toLocaleDateString("pt-BR")}</strong></span>}
-                            <span className="text-[10px] text-gray-400">💳 {pc.paymentTerms}</span>
+                          <div className="text-right shrink-0">
+                            <p className="font-bold text-gray-900 text-sm">{fmt(pc.total)}</p>
+                            {!pc.paidDate && <p className="text-[10px] text-indigo-500 mt-1">Clique para pagar</p>}
+                            {pc.paidDate  && <p className="text-[10px] text-green-600 mt-1">✅ Pago</p>}
                           </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="font-bold text-gray-900 text-sm">{fmt(pc.total)}</p>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${PC_STATUS_STYLES[pc.status]?.bg||"bg-gray-100"} ${PC_STATUS_STYLES[pc.status]?.text||"text-gray-600"}`}>{pc.status}</span>
                         </div>
                       </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Modal de pagamento */}
+              {payModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-bold text-gray-900">Registrar Pagamento</h3>
+                      <button onClick={()=>setPayModal(null)} className="text-gray-400 hover:text-gray-600"><Icon name="x"/></button>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-            {supPurchases.length === 0 && (
-              <div className="text-center py-10 text-gray-400">
-                <p className="text-3xl mb-2">📋</p>
-                <p className="text-sm">Nenhum pedido de compra vinculado</p>
-              </div>
-            )}
-          </div>
-        </div>
-        )}
+                    <div className="bg-gray-50 rounded-xl p-3 text-sm">
+                      <p className="font-mono font-bold text-indigo-600 text-xs">{payModal.id}</p>
+                      <p className="text-gray-600 text-xs mt-0.5 truncate">
+                        {(payModal.items||[]).map(it=>it.description).join(", ")}
+                      </p>
+                      <p className="font-bold text-gray-900 text-lg mt-1">{fmt(payModal.total)}</p>
+                    </div>
+                    {(() => {
+                      const todayStr = new Date().toISOString().split("T")[0];
+                      const [markPaid, setMarkPaid] = React.useState(!payModal.paidDate);
+                      const [paidDate, setPaidDate] = React.useState(payModal.paidDate || todayStr);
+                      const [payment,  setPayment]  = React.useState(payModal.paymentTerms || "Pix");
+                      return (
+                        <>
+                          <div className="flex items-center justify-between p-3 bg-green-50 border border-green-100 rounded-xl">
+                            <div>
+                              <p className="text-sm font-semibold text-gray-800">Marcar como pago</p>
+                              <p className="text-xs text-gray-500 mt-0.5">{markPaid ? "Compra será marcada como paga" : "Remover pagamento"}</p>
+                            </div>
+                            <button onClick={()=>setMarkPaid(v=>!v)}
+                              className={`w-12 h-6 rounded-full transition-all ${markPaid?"bg-green-500":"bg-gray-300"} relative`}>
+                              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${markPaid?"right-0.5":"left-0.5"}`}/>
+                            </button>
+                          </div>
+                          {markPaid && (
+                            <>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600 block mb-1">✅ Data de Pagamento</label>
+                                <input type="date" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                  value={paidDate} onChange={e=>setPaidDate(e.target.value)}/>
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-600 block mb-1">💳 Forma de Pagamento</label>
+                                <select className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                  value={payment} onChange={e=>setPayment(e.target.value)}>
+                                  {PAYMENT_METHODS.map(p=><option key={p}>{p}</option>)}
+                                </select>
+                              </div>
+                            </>
+                          )}
+                          <div className="flex gap-2 pt-1">
+                            <button onClick={()=>setPayModal(null)} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+                            <button onClick={()=>handlePaySave({ ...payModal, paidDate: markPaid ? paidDate : "", paymentTerms: payment })}
+                              className="flex-1 px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700">
+                              {markPaid ? "✅ Confirmar Pagamento" : "Salvar"}
+                            </button>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         <div className="p-4 border-t border-gray-100 flex gap-2 shrink-0">
           <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Fechar</button>
@@ -3896,7 +3965,7 @@ const SupplierDetailPanel = ({ supplier, finance, purchases, onClose, onEdit, on
 };
 
 // ─── Supplier Module ──────────────────────────────────────────────────────
-const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchases }) => {
+const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchases, setPurchases }) => {
   const [search, setSearch]             = useState("");
   const [filterCat, setFilterCat]       = useState("Todas");
   const [filterStatus, setFilterStatus] = useState("Todos");
@@ -4065,6 +4134,7 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
       )}
 
       {selected && <SupplierDetailPanel supplier={selectedSupplier} finance={finance} purchases={purchases}
+        onUpdatePurchase={(updated)=>{ if(setPurchases) setPurchases(prev=>prev.map(p=>p.id===updated.id?updated:p)); }}
         onClose={()=>setSelected(null)}
         onEdit={(s)=>{ setModal(s); setSelected(null); }}
         onDelete={(s)=>{ setConfirmDelete(s); setSelected(null); }}
@@ -9431,7 +9501,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases}/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
-      case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases}/>;
+      case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases}/>;
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
       case "empresa":   return <EmpresaModule onSave={(data) => setEmpresaForm(data)}/>;
