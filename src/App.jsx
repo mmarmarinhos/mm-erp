@@ -7452,7 +7452,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
   const [form, setForm] = useState(purchase ? { ...purchase } : {
     supplierId:"", supplierName:"", date:today(), expectedDate:"", receivedDate:"",
     status:"Rascunho", paymentTerms:"30 dias", freight:0, discount:0,
-    dueDate:"", paidDate:"", items:[emptyItem()], notes:"",
+    dueDate:"", items:[emptyItem()], notes:"",
   });
   const set = (k,v) => setForm(f => ({ ...f, [k]:v }));
 
