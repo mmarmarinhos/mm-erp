@@ -8729,6 +8729,17 @@ function ERPApp({ currentUser, onLogout }) {
   const [loading, setLoading]       = useState(true);
   const [active, setActive]         = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("erp_theme") === "dark");
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("erp_theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("erp_theme", "light");
+    }
+  }, [darkMode]);
   const [phQuery, setPhQuery]       = useState("");
   const [phPrice, setPhPrice]       = useState(null);
   const [appToast, setAppToast]     = useState(null);
@@ -8984,6 +8995,11 @@ function ERPApp({ currentUser, onLogout }) {
             {NAV.find(n => n.id === active)?.label}
           </p>
           <div className="flex items-center gap-3 ml-auto">
+            <button onClick={()=>setDarkMode(d=>!d)}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              title={darkMode ? "Tema Claro" : "Tema Escuro"}>
+              {darkMode ? "☀️" : "🌙"}
+            </button>
             <button className="relative text-gray-400 hover:text-gray-600">
               <Icon name="bell" />
               {orders.filter(o => o.status === "Novo").length > 0 && (
@@ -8997,7 +9013,7 @@ function ERPApp({ currentUser, onLogout }) {
         </header>
 
         {/* Page */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className={`flex-1 overflow-y-auto p-4 md:p-6 ${darkMode ? "bg-gray-900" : "bg-gray-50"}`}>
           {renderModule()}
         </main>
       </div>
