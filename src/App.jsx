@@ -3668,7 +3668,7 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
             </div>
             {/* Body */}
             <div className="overflow-y-auto p-5 space-y-4 flex-1">
-              {(() => { const daysLeft = getDaysLeft(detail.validUntil); const converted = detail.status==="Convertida"; return (<>
+              <>
                 {converted && (
                   <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 flex items-center gap-2">
                     <span className="text-purple-600 font-medium text-sm">✅ Convertida no pedido</span>
@@ -3724,7 +3724,7 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
                     ))}
                   </div>
                 )}
-              </>); })()}
+              </>
             </div>
             {/* Footer */}
             <div className="flex gap-2 p-5 border-t border-gray-100 shrink-0 flex-wrap">
