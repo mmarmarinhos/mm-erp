@@ -1461,7 +1461,29 @@ const FinanceModule = ({ finance, setFinance, orders, purchases }) => {
   , [finance, filterMode, period, dateFrom, dateTo]);
 
   const periodActive   = periodTx.filter(t => t.status !== "cancelado");
-  const periodReceitas = periodActive.filter(t => t.type === "receita").reduce((s,t) => s+t.amount, 0);
+  // Receitas dos pedidos pagos no período
+  const paidOrdersInPeriod = (orders||[]).filter(o => {
+    if (!o.paidDate || o.status === "Cancelado") return false;
+    const dateToCheck = o.paidDate;
+    if (filterMode === "todos") return true;
+    if (filterMode === "mes") return dateToCheck.startsWith(period);
+    if (filterMode === "ano") return dateToCheck.startsWith(period.split("-")[0]);
+    if (filterMode === "personalizado") {
+      if (dateFrom && dateToCheck < dateFrom) return false;
+      if (dateTo   && dateToCheck > dateTo)   return false;
+      return true;
+    }
+    if (filterMode === "trimestre") {
+      const [y,m] = period.split("-").map(Number);
+      const months = [m, m===1?12:m-1, m<=2?m+10:m-2].map(x=>String(x).padStart(2,"0"));
+      return months.some(mo => dateToCheck.startsWith(String(y)+"-"+mo));
+    }
+    return true;
+  });
+  const ordersReceitas = paidOrdersInPeriod.reduce((s,o) => s+(o.total||0), 0);
+
+  const periodReceitasManual = periodActive.filter(t => t.type === "receita").reduce((s,t) => s+t.amount, 0);
+  const periodReceitas = periodReceitasManual + ordersReceitas;
   const periodDespesas = periodActive.filter(t => t.type === "despesa").reduce((s,t) => s+t.amount, 0);
   const periodResult   = periodReceitas - periodDespesas;
 
@@ -1608,7 +1630,7 @@ const FinanceModule = ({ finance, setFinance, orders, purchases }) => {
         <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
           <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Receitas</p>
           <p className="text-2xl font-bold text-green-600 mt-1">{fmt(periodReceitas)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{periodActive.filter(t=>t.type==="receita").length} lançamentos</p>
+          <p className="text-xs text-gray-400 mt-0.5">{periodActive.filter(t=>t.type==="receita").length + paidOrdersInPeriod.length} lançamentos</p>
         </div>
         <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
           <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Despesas</p>
