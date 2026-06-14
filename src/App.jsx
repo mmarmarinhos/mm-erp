@@ -8936,7 +8936,15 @@ function ERPApp({ currentUser, onLogout }) {
         const now    = new Date();
         const DAYS   = 30;
         let changed  = 0;
-        const updated = c.map(cli => {
+        // ── Migração: converter segmentos obsoletos para os novos ──
+        const LEGACY_MAP = { "VIP":"Ativo", "Regular":"Ativo", "Novo":"Desenvolvimento" };
+        const migrated = c.map(cli =>
+          LEGACY_MAP[cli.segment] ? { ...cli, segment: LEGACY_MAP[cli.segment] } : cli
+        );
+        const migratedCount = migrated.filter((cli,i) => cli.segment !== c[i].segment).length;
+        if (migratedCount > 0) saveCustomers(migrated);
+
+        const updated = migrated.map(cli => {
           if (cli.segment === "Inativo") return cli; // já inativo
 
           // Busca a data do último pedido deste cliente nos orders
