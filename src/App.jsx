@@ -356,7 +356,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [] }) =
 
   const selectProduct = (i, prod) => {
     setForm(f => {
-      const cpRaw = prod.channelPrices?.[chId(f.channel)];
+      const cpRaw = prod.channelPrices?.[f.channel];
       const channelPrice = cpRaw ? (typeof cpRaw==='object' ? cpRaw.price : cpRaw) : 0;
       const unitPrice = (channelPrice > 0) ? channelPrice : (prod.price||0);
       const itemsList = f.itemsList.map((it,idx) => {
@@ -440,7 +440,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [] }) =
                     const itemsList=(f.itemsList||[]).map(it=>{
                       const prod=products.find(p=>p.id===it._prodId);
                       if(!prod)return it;
-                      const cp=prod.channelPrices?.[chId(newCh)];
+                      const cp=prod.channelPrices?.[newCh];
                       const price=cp?(typeof cp==='object'?cp.price:cp):0;
                       if(!price)return it;
                       const u={...it,unitPrice:price};
@@ -7978,7 +7978,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [] 
   const selectProduct = (i, prod) => {
     setForm(f => {
       // Busca o preço do canal atual, com fallback para preço padrão
-      const cpRaw = prod.channelPrices?.[chId(f.channel)];
+      const cpRaw = prod.channelPrices?.[f.channel];
       const channelPrice = cpRaw ? (typeof cpRaw==='object' ? cpRaw.price : cpRaw) : 0;
       const unitPrice = (channelPrice > 0) ? channelPrice : (prod.price||0);
       const items = f.items.map((it,idx) => {
@@ -8060,7 +8060,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [] 
                     if (!it._prodId) return {...it, [Symbol.for("skip")]:true};
                     const prod = products.find(p=>p.id===it._prodId);
                     if (!prod) return it;
-                    const cpRaw2 = prod.channelPrices?.[chId(newChannel)];
+                    const cpRaw2 = prod.channelPrices?.[newChannel];
                     const channelPrice = cpRaw2 ? (typeof cpRaw2==='object' ? cpRaw2.price : cpRaw2) : 0;
                     if (!channelPrice || channelPrice <= 0) return it;
                     const updated = { ...it, unitPrice: channelPrice };
