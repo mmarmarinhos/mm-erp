@@ -8004,7 +8004,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
             const novoCusto = estoqueAtual > 0
               ? parseFloat(((estoqueAtual * custoAtual + qtd * preco) / (estoqueAtual + qtd)).toFixed(4))
               : preco;
-            return { ...prod, stock: estoqueAtual + qtd, cost: novoCusto };
+            return { ...prod, stock: estoqueAtual + qtd, cost: novoCusto, lastPurchasePrice: preco };
           }
         }
         if (!isReceived && wasReceived) {
