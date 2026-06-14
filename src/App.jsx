@@ -346,10 +346,6 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [] }) =
     setShowCustList(false);
   };
 
-  // Product autocomplete per item
-  const [prodSearch, setProdSearch] = useState({});
-  const [showProdList, setShowProdList] = useState({});
-
   const setItem = (i, k, v) => setForm(f => {
     const itemsList = f.itemsList.map((it,idx) => {
       if (idx!==i) return it;
