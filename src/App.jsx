@@ -6184,7 +6184,7 @@ const TabelaPrecos = ({ products, setProducts }) => {
           <h1 className="text-xl font-bold text-gray-900">Tabela de Preços</h1>
           <p className="text-sm text-gray-500">{products.length} produto{products.length!==1?"s":""} cadastrado{products.length!==1?"s":""}</p>
         </div>
-        <button onClick={()=>{setTSaved(true);setTimeout(()=>setTSaved(false),2500);}}
+        <button onClick={()=>{ setProducts(p=>p); setTSaved(true); setTimeout(()=>setTSaved(false),2500); }}
           className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${tSaved?"bg-green-500 text-white":"bg-indigo-600 text-white hover:bg-indigo-700"}`}>
           {tSaved?"✓ Salvo!":"Salvar Preços"}
         </button>
