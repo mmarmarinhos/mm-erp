@@ -7580,26 +7580,24 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
                       }}
                       onFocus={()=>setShowProdList(s=>({...s,[i]:true}))}
                       placeholder="Produto ou SKU..."/>
-                    {showProdList[i] && (prodSearch[i]||"").length > 0 && (() => {
-                      const q=(prodSearch[i]||"").toLowerCase();
-                      const hits=products.filter(p=>
-                        p.name?.toLowerCase().includes(q)||
-                        p.sku?.toLowerCase().includes(q)
-                      ).slice(0,6);
-                      if(!hits.length) return null;
-                      return (
-                        <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-0.5 max-h-40 overflow-y-auto">
-                          {hits.map(p=>(
-                            <button key={p.id} type="button"
-                              onMouseDown={()=>selectProduct(i,p)}
-                              className="w-full text-left px-3 py-2 hover:bg-indigo-50 border-b border-gray-50 last:border-0">
-                              <p className="text-xs font-semibold text-gray-800">{p.name}</p>
-                              <p className="text-[10px] text-gray-400">SKU: {p.sku||"—"} · Custo: R$ {(p.cost||0).toFixed(2).replace(".",",")}</p>
-                            </button>
-                          ))}
-                        </div>
-                      );
-                    })()}
+                    {showProdList[i] && (prodSearch[i]||"").length > 0 && products.filter(p=>
+                        p.name?.toLowerCase().includes((prodSearch[i]||"").toLowerCase())||
+                        p.sku?.toLowerCase().includes((prodSearch[i]||"").toLowerCase())
+                      ).slice(0,6).length > 0 && (
+                      <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-0.5 max-h-40 overflow-y-auto">
+                        {products.filter(p=>
+                          p.name?.toLowerCase().includes((prodSearch[i]||"").toLowerCase())||
+                          p.sku?.toLowerCase().includes((prodSearch[i]||"").toLowerCase())
+                        ).slice(0,6).map(p=>(
+                          <button key={p.id} type="button"
+                            onMouseDown={()=>selectProduct(i,p)}
+                            className="w-full text-left px-3 py-2 hover:bg-indigo-50 border-b border-gray-50 last:border-0">
+                            <p className="text-xs font-semibold text-gray-800">{p.name}</p>
+                            <p className="text-[10px] text-gray-400">SKU: {p.sku||"—"} · Custo: R$ {(p.cost||0).toFixed(2).replace(".",",")}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <input type="number" min="1"
                     className="col-span-2 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-indigo-300"
