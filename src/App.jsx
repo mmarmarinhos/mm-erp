@@ -437,14 +437,17 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [] }) =
               <select className={inp} value={form.channel} onChange={e=>{
                   const newCh=e.target.value;
                   setForm(f=>{
-                    const items=(f.items||[]).map(it=>{
+                    const itemsList=(f.itemsList||[]).map(it=>{
                       const prod=products.find(p=>p.id===it._prodId);
                       if(!prod)return it;
                       const cp=prod.channelPrices?.[chId(newCh)];
                       const price=cp?(typeof cp==='object'?cp.price:cp):0;
-                      return price>0?{...it,unitPrice:price,total:(price*(it.qty||1))}:it;
+                      if(!price)return it;
+                      const u={...it,unitPrice:price};
+                      u.total=calcItemTotal(u);
+                      return u;
                     });
-                    return {...f,channel:newCh,items};
+                    return {...f,channel:newCh,itemsList};
                   });
                 }}>
                 {CHANNELS.map(c=><option key={c}>{c}</option>)}
