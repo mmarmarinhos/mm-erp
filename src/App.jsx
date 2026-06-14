@@ -7706,9 +7706,123 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
 };
 
 
+// ─── StockEntryModal ──────────────────────────────────────────────────────
+// Vincula itens de compra já "Recebidos" a produtos do catálogo e dá entrada no estoque
+const StockEntryModal = ({ purchase, products = [], onClose, onConfirm }) => {
+  const unlinked = purchase.items.filter(it => !it._prodId);
+  const [links, setLinks] = useState(
+    purchase.items.map(it => ({
+      sku:    it.sku || "",
+      desc:   it.description || "",
+      qty:    it.qty || 0,
+      price:  it.unitPrice || 0,
+      unit:   it.unit || "un",
+      _prodId: it._prodId || null,
+      _prodName: it._prodId ? (products.find(p=>p.id===it._prodId)?.name || "") : "",
+      search: it.sku || it.description || "",
+      showList: false,
+    }))
+  );
+
+  const setLink = (i, partial) =>
+    setLinks(prev => prev.map((l, idx) => idx === i ? { ...l, ...partial } : l));
+
+  const filtProd = (search) =>
+    products.filter(p =>
+      p.name?.toLowerCase().includes(search.toLowerCase()) ||
+      p.sku?.toLowerCase().includes(search.toLowerCase())
+    ).slice(0, 6);
+
+  const selectProd = (i, prod) => {
+    setLink(i, { _prodId: prod.id, _prodName: prod.name, search: prod.name, showList: false });
+  };
+
+  const handleConfirm = () => {
+    // updatedItems = todos os itens com _prodId preenchido onde possível
+    const updatedItems = purchase.items.map((it, i) => ({
+      ...it,
+      _prodId: links[i]._prodId || it._prodId,
+    }));
+    onConfirm(updatedItems);
+  };
+
+  const allLinked = links.every(l => !!l._prodId);
+  const inp = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300";
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="font-semibold text-gray-800">📦 Dar Entrada no Estoque</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Vincule cada item ao produto do catálogo para atualizar estoque e custo médio</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <Icon name="x"/>
+          </button>
+        </div>
+        <div className="overflow-y-auto p-5 space-y-3 flex-1">
+          {links.map((l, i) => (
+            <div key={i} className={`border rounded-xl p-3 space-y-2 ${l._prodId ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-gray-800">{l.desc || l.sku || "Item sem descrição"}</p>
+                  <p className="text-xs text-gray-500">Qtd: {l.qty} {l.unit} · {fmt(l.price)}/un</p>
+                </div>
+                {l._prodId
+                  ? <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full shrink-0">✓ Vinculado</span>
+                  : <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full shrink-0">⚠ Sem vínculo</span>
+                }
+              </div>
+              {l._prodId ? (
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-green-700 font-medium flex-1">→ {l._prodName}</p>
+                  <button onClick={() => setLink(i, { _prodId: null, _prodName: "", search: l.desc || l.sku || "" })}
+                    className="text-xs text-gray-400 hover:text-red-500">Alterar</button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <input className={inp + " text-xs"} placeholder="Buscar produto do catálogo (nome ou SKU)..."
+                    value={l.search}
+                    onChange={e => setLink(i, { search: e.target.value, showList: true })}
+                    onFocus={() => setLink(i, { showList: true })}
+                    onBlur={() => setTimeout(() => setLink(i, { showList: false }), 150)}
+                  />
+                  {l.showList && l.search.length > 0 && filtProd(l.search).length > 0 && (
+                    <div className="absolute z-50 w-full bg-white border border-gray-200 rounded-xl shadow-lg mt-1 max-h-36 overflow-y-auto">
+                      {filtProd(l.search).map(p => (
+                        <button key={p.id} type="button" onMouseDown={() => selectProd(i, p)}
+                          className="w-full text-left px-3 py-2 hover:bg-indigo-50 border-b border-gray-50 last:border-0">
+                          <p className="text-sm font-medium text-gray-800">{p.name}</p>
+                          <p className="text-[10px] text-gray-400">SKU: {p.sku||"—"} · Estoque atual: {p.stock||0} {p.unit||"un"} · Custo: {fmt(p.cost||0)}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="p-5 border-t border-gray-100 shrink-0 flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
+            Cancelar
+          </button>
+          <button onClick={handleConfirm}
+            disabled={!allLinked}
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${allLinked ? "bg-indigo-600 text-white hover:bg-indigo-700" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}>
+            {allLinked ? "✓ Confirmar Entrada" : `Vincule todos os ${links.filter(l=>!l._prodId).length} item(ns) restante(s)`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], setProducts }) => {
-  const [modal,    setModal]    = useState(null);
-  const [detail,   setDetail]   = useState(null);
+  const [modal,      setModal]      = useState(null);
+  const [detail,     setDetail]     = useState(null);
+  const [stockEntry, setStockEntry] = useState(false);
   const [filterStatus, setFilterStatus] = useState("Todos");
   const [search,   setSearch]   = useState("");
   const [delConfirm, setDelConfirm] = useState(null);
@@ -7798,6 +7912,33 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
     setDelConfirm(null); setDetail(null);
   };
 
+  const handleStockEntry = (updatedItems) => {
+    // 1. Atualizar o purchase com os _prodId vinculados
+    const updatedPurchase = { ...detail, items: updatedItems };
+    setPurchases(prev => prev.map(p => p.id === detail.id ? updatedPurchase : p));
+    setDetail(updatedPurchase);
+
+    // 2. Aplicar entrada no estoque e custo médio ponderado para itens recém-vinculados
+    if (setProducts) {
+      setProducts(prev => prev.map(prod => {
+        const newItem = updatedItems.find(it => it._prodId === prod.id);
+        const oldItem = detail.items.find(it => it._prodId === prod.id);
+        // Só processa se o item foi vinculado agora (oldItem não tinha _prodId)
+        if (!newItem || oldItem?._prodId) return prod;
+        const qtd    = newItem.qty || 0;
+        const preco  = newItem.unitPrice || 0;
+        const estAtual = prod.stock || 0;
+        const custoAtual = prod.cost || 0;
+        if (qtd <= 0) return prod;
+        const novoCusto = estAtual > 0
+          ? parseFloat(((estAtual * custoAtual + qtd * preco) / (estAtual + qtd)).toFixed(4))
+          : preco;
+        return { ...prod, stock: estAtual + qtd, cost: novoCusto };
+      }));
+    }
+    setStockEntry(false);
+  };
+
   const filtered = purchases
     .filter(p => filterStatus==="Todos" || p.status===filterStatus)
     .filter(p => !search || p.supplierName.toLowerCase().includes(search.toLowerCase()) || p.id.toLowerCase().includes(search.toLowerCase()))
@@ -7838,6 +7979,15 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
           </div>
           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${st(detail.status).bg} ${st(detail.status).text}`}>{detail.status}</span>
           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${fs.bg} ${fs.text}`}>{fs.icon} {fs.label}</span>
+          {detail.status === "Recebido" && detail.items.some(it => !it._prodId) && (
+            <button onClick={() => setStockEntry(true)}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 flex items-center gap-1.5">
+              📦 Dar Entrada no Estoque
+            </button>
+          )}
+          {detail.status === "Recebido" && detail.items.every(it => !!it._prodId) && (
+            <span className="px-3 py-2 bg-green-50 text-green-700 rounded-xl text-xs font-semibold border border-green-200">✓ Estoque atualizado</span>
+          )}
           <button onClick={()=>setModal(detail)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700">Editar</button>
           <button onClick={()=>setDelConfirm(detail)} className="px-3 py-2 border border-red-200 text-red-500 rounded-xl text-sm hover:bg-red-50">Excluir</button>
         </div>
@@ -7896,6 +8046,14 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
         </div>
 
         {modal && <PurchaseModal purchase={modal} suppliers={suppliers} products={products||[]} onClose={()=>setModal(null)} onSave={handleSave}/>}
+        {stockEntry && detail && (
+          <StockEntryModal
+            purchase={detail}
+            products={products||[]}
+            onClose={() => setStockEntry(false)}
+            onConfirm={handleStockEntry}
+          />
+        )}
         {delConfirm && (
           <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center">
