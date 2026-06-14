@@ -3906,7 +3906,6 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
 
   return (
     <div className="space-y-4">
-      )}
       {toast && <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg">{toast}</div>}
 
       <div className="flex items-start justify-between gap-3">
