@@ -2338,13 +2338,11 @@ const CustomerModal = ({ customer, onClose, onSave, orders = [], customers = [] 
                   value={form.tagsInput} onChange={e=>set("tagsInput",e.target.value)} placeholder="fiel, atacado, B2B..."/>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">⏱ Prazo de Pagamento <span className="text-gray-400 font-normal">(dias)</span></label>
-                <div className="flex items-center gap-2">
-                  <input type="number" min="0" max="365" className="w-28 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    value={form.paymentTerms||""} onChange={e=>set("paymentTerms",e.target.value)} placeholder="0"/>
-                  {Number(form.paymentTerms) > 0 && <span className="text-xs text-indigo-600 font-medium">{form.paymentTerms} dias após a compra</span>}
-                  {!form.paymentTerms && <span className="text-xs text-gray-400">Pagamento imediato</span>}
-                </div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Prazo de Pagamento (dias)</label>
+                <input type="number" min="0" max="365"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  value={form.paymentTerms||""} onChange={e=>set("paymentTerms",e.target.value)} placeholder="Ex: 7, 14, 30..."/>
+              </div>
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Observações</label>
