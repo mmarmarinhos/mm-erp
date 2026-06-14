@@ -2316,12 +2316,12 @@ const CustomerModal = ({ customer, onClose, onSave, orders = [], customers = [] 
                 <EnderecoFields form={form} set={set}
                   inp="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">Prazo de Pgto (dias)</label>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Prazo Pgto (dias)</label>
                   <input type="number" min="0" max="365"
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    value={form.paymentTerms||""} onChange={e=>set("paymentTerms",e.target.value)} placeholder="0 = imediato"/>
+                    value={form.paymentTerms||""} onChange={e=>set("paymentTerms",e.target.value)} placeholder="0"/>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Canal Preferencial</label>
