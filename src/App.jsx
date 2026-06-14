@@ -630,6 +630,110 @@ const StatusDropdown = ({ order, onChange }) => {
 };
 
 // ─── Orders Module ────────────────────────────────────────────────────────
+
+// ─── PDF do Pedido de Venda ───────────────────────────────────────────────
+const gerarPedidoPDF = async (order) => {
+  const empRaw = await window.storage.get(EMPRESA_KEY).catch(()=>null);
+  const emp = empRaw?.value ? JSON.parse(empRaw.value) : {};
+  const empresaNome  = emp.nomeFantasia || emp.razaoSocial || "MM Armarinhos";
+  const empresaCnpj  = emp.cnpj  || "";
+  const empresaTel   = emp.celular || emp.telefone || "";
+  const empresaEmail = emp.email || "";
+  const empresaSite  = emp.site  || "";
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Pedido ${order.id}</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',sans-serif; }
+    body { padding:32px; color:#1e293b; font-size:13px; }
+    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px; padding-bottom:18px; border-bottom:3px solid #6366f1; }
+    .empresa-nome { font-size:20px; font-weight:800; color:#6366f1; }
+    .empresa-info { font-size:11px; color:#64748b; margin-top:4px; line-height:1.7; }
+    .ped-badge { background:#6366f1; color:#fff; font-size:16px; font-weight:700; padding:7px 16px; border-radius:10px; }
+    .ped-sub { font-size:11px; color:#64748b; text-align:right; margin-top:6px; line-height:1.6; }
+    .section { margin-bottom:20px; }
+    .section-title { font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px; }
+    .info-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+    .info-box { background:#f8fafc; border-radius:8px; padding:10px 12px; }
+    .info-label { font-size:10px; color:#94a3b8; text-transform:uppercase; margin-bottom:3px; }
+    .info-val { font-size:13px; font-weight:600; color:#1e293b; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; }
+    th { background:#f1f5f9; text-align:left; padding:9px 10px; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; }
+    td { padding:10px; border-bottom:1px solid #f1f5f9; font-size:12px; }
+    .total-box { display:flex; justify-content:flex-end; margin-top:14px; }
+    .total-inner { background:#f8fafc; border-radius:10px; padding:14px; width:260px; }
+    .total-row { display:flex; justify-content:space-between; padding:3px 0; font-size:12px; color:#64748b; }
+    .total-final { display:flex; justify-content:space-between; padding:10px 0 0; margin-top:8px; border-top:2px solid #6366f1; font-size:17px; font-weight:800; color:#6366f1; }
+    .status-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; background:#e0e7ff; color:#4338ca; }
+    .footer { margin-top:36px; border-top:1px solid #e2e8f0; padding-top:14px; display:flex; justify-content:space-between; font-size:11px; color:#94a3b8; }
+    @media print { body { padding:20px; } }
+  </style></head><body>
+  <div class="header">
+    <div>
+      <div class="empresa-nome">${empresaNome}</div>
+      <div class="empresa-info">
+        \${empresaCnpj  ? \`CNPJ: \${empresaCnpj}<br>\` : ""}
+        \${empresaTel   ? \`Cel: \${empresaTel}<br>\` : ""}
+        \${empresaEmail ? \`E-mail: \${empresaEmail}<br>\` : ""}
+        \${empresaSite  ? \`Site: \${empresaSite}\` : ""}
+      </div>
+    </div>
+    <div>
+      <div class="ped-badge">PEDIDO \${order.id}</div>
+      <div class="ped-sub">
+        Data: \${order.date || "—"}<br>
+        Status: <strong>\${order.status || "—"}</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Cliente</div>
+    <div class="info-grid">
+      <div class="info-box"><div class="info-label">Nome</div><div class="info-val">\${order.customer || "—"}</div></div>
+      <div class="info-box"><div class="info-label">Canal</div><div class="info-val">\${order.channel || "—"}</div></div>
+      <div class="info-box"><div class="info-label">Pagamento</div><div class="info-val">\${order.payment || "—"}</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Itens do Pedido</div>
+    <table>
+      <thead><tr>
+        <th>Descrição</th>
+        <th style="text-align:center">Qtd</th>
+        <th style="text-align:right">Valor Unit.</th>
+        <th style="text-align:right">Total</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td>\${order.items || "—"}</td>
+          <td style="text-align:center">\${order.qty || 1}</td>
+          <td style="text-align:right">R$ \${order.total ? (order.total / (order.qty||1)).toFixed(2).replace(".",",") : "0,00"}</td>
+          <td style="text-align:right"><strong>R$ \${order.total ? order.total.toFixed(2).replace(".",",") : "0,00"}</strong></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="total-box">
+      <div class="total-inner">
+        <div class="total-final"><span>TOTAL</span><span>R$ \${order.total ? order.total.toFixed(2).replace(".",",") : "0,00"}</span></div>
+      </div>
+    </div>
+  </div>
+
+  \${order.notes ? \`<div class="section"><div class="section-title">Observações</div><div style="background:#fafafa;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:12px;color:#64748b;">\${order.notes}</div></div>\` : ""}
+
+  <div class="footer">
+    <span>\${empresaNome} — Pedido gerado em \${new Date().toLocaleDateString("pt-BR")}</span>
+    <span>Documento interno — Para uso da expedição</span>
+  </div>
+  <script>window.onload=()=>{window.print();}</script>
+  </body></html>`;
+
+  const w = window.open("", "_blank", "width=900,height=700");
+  if (w) { w.document.write(html); w.document.close(); }
+};
+
 const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [] }) => {
   const [search, setSearch] = useState("");
   const [filterChannel, setFilterChannel] = useState("Todos");
@@ -908,6 +1012,10 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
               <button onClick={() => { setModal(detailOrder); setDetailOrder(null); }}
                 className="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2">
                 <Icon name="edit" size={14} /> Editar
+              </button>
+              <button onClick={() => gerarPedidoPDF(detailOrder)}
+                className="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-600 text-sm font-medium hover:bg-indigo-100 flex items-center gap-1.5">
+                🖨️ PDF
               </button>
               <button onClick={() => setDetailOrder(null)}
                 className="flex-1 px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
