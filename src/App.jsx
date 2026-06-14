@@ -7644,6 +7644,7 @@ const EmpresaModule = ({ onSave }) => {
 
   const handleSave = async () => {
     await window.storage.set(EMPRESA_KEY, JSON.stringify(form)).catch(()=>{});
+    if (onSave) onSave(form);
     setSaved(true);
     setTimeout(()=>setSaved(false), 2500);
   };
