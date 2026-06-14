@@ -2461,7 +2461,7 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
   const [panelTab, setPanelTab] = useState("dados");
   const [payModal, setPayModal] = useState(null); // order being paid
   const seg = SEG_STYLES[customer.segment] || SEG_STYLES.Novo;
-  const cOrders = orders.filter(o => o.customer.toLowerCase() === customer.name.toLowerCase());
+  const cOrders = orders.filter(o => (o.customer||"").toLowerCase() === (customer.name||"").toLowerCase());
   const statsOrders    = cOrders.filter(o => o.status !== "Cancelado");
   const dynTotalSpent  = statsOrders.reduce((s,o) => s + (o.total||0), 0);
   const dynTotalOrders = statsOrders.length;
