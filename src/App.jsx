@@ -1461,8 +1461,9 @@ const FinPayModal = ({ order, onClose, onSave }) => {
             </select>
           </div>
         </>)}
-        <div className="flex gap-2 pt-1">
+        <div className="flex gap-2 pt-1 flex-wrap">
           <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          {order.paidDate && <button onClick={()=>onSave({...order,paidDate:"",status:order.status==="Entregue"?"Novo":order.status})} className="px-4 py-2.5 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-sm font-semibold hover:bg-amber-100">↩ Voltar Aberto</button>}
           <button onClick={handleSave} className="flex-1 px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700">
             {markPaid ? "✅ Confirmar Pagamento" : "Salvar"}
           </button>
