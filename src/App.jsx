@@ -8112,7 +8112,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [] 
         <div className="flex gap-2 p-5 border-t border-gray-100 shrink-0">
           <button onClick={onClose} className="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
           {!isNew && (
-            <button onClick={()=>gerarCotacaoPDF(form, empresa)}
+            <button onClick={async ()=>{ const emp = await window.storage.get(EMPRESA_KEY).catch(()=>null); gerarCotacaoPDF(form, emp?.value ? JSON.parse(emp.value) : {}); }}
               className="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-600 text-sm font-medium hover:bg-indigo-100 flex items-center gap-1.5 whitespace-nowrap">
               📄 Exportar PDF
             </button>
