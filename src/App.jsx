@@ -1483,7 +1483,7 @@ const FinPagModal = ({ item, onClose, onSave }) => {
   const title = item._type === "lancamento"
     ? (item.description || item.category || "Despesa")
     : (item.supplierName || "Compra");
-  const handleSave = () => onSave({ ...item, paidDate, payment });
+  const handleSave = () => onSave({ ...item, paidDate, payment, status: paidDate ? "pago" : item.status });
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
@@ -1620,7 +1620,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
     setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
   };
 
-  const pending = finance.filter(t => t.status === "pendente");
+  const pending = finance.filter(t => t.status === "pendente" && !t.paidDate);
   const pendingRec  = pending.filter(t => t.type === "receita").reduce((s,t) => s+t.amount, 0);
   const pendingDesp = pending.filter(t => t.type === "despesa").reduce((s,t) => s+t.amount, 0);
 
