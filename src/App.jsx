@@ -7428,65 +7428,115 @@ const UsersModule = ({ currentUser }) => {
 // ─── Purchase Order Modal ────────────────────────────────────────────────
 const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) => {
   const isNew = !purchase;
-  const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, total:0 });
+  const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, discount:0, discountType:"%", total:0, _prodId:null });
+
   const [form, setForm] = useState(purchase ? { ...purchase } : {
     supplierId:"", supplierName:"", date:today(), expectedDate:"", receivedDate:"",
     status:"Rascunho", paymentTerms:"30 dias", freight:0, discount:0,
-    dueDate:"", items:[emptyItem()], notes:"",
+    dueDate:"", nfNumber:"", notes:"", items:[emptyItem()], subtotal:0, total:0,
   });
-  const set = (k,v) => setForm(f => ({ ...f, [k]:v }));
+
+  const calcItemTotal = (it) => {
+    const gross = (it.qty||0)*(it.unitPrice||0);
+    const disc = it.discountType==="%"?gross*((it.discount||0)/100):(it.discount||0);
+    return Math.max(0, gross-disc);
+  };
+
+  const calcTotal = (f) => {
+    const sub = (f.items||[]).reduce((s,it)=>s+(it.total||0),0);
+    return sub + (Number(f.freight)||0) - (Number(f.discount)||0);
+  };
 
   // Supplier autocomplete
-  const [supSearch, setSupSearch]   = useState(purchase?.supplierName||"");
+  const [supSearch, setSupSearch] = useState(purchase?.supplierName||"");
   const [showSupList, setShowSupList] = useState(false);
   const filteredSups = suppliers
-    .filter(s => s.status==="Ativo"||s.status==="Desenvolvimento")
-    .filter(s => s.name.toLowerCase().includes(supSearch.toLowerCase()))
-    .slice(0, 8);
-
+    .filter(s=>s.status==="Ativo"||s.status==="Desenvolvimento")
+    .filter(s=>s.name?.toLowerCase().includes(supSearch.toLowerCase()))
+    .slice(0,8);
   const selectSupplier = (s) => {
     setSupSearch(s.name);
-    setForm(f => ({ ...f, supplierId:s.id, supplierName:s.name, paymentTerms:s.paymentTerms||"30 dias" }));
+    setForm(f=>({...f, supplierId:s.id, supplierName:s.name, paymentTerms:s.paymentTerms?String(s.paymentTerms)+"":f.paymentTerms}));
     setShowSupList(false);
   };
 
+  // SKU/Product autocomplete per item
+  const [skuSearch, setSkuSearch] = useState((purchase?.items||[emptyItem()]).map(it=>it.sku||""));
+  const [showSkuList, setShowSkuList] = useState((purchase?.items||[emptyItem()]).map(()=>false));
+
   const setItem = (i, k, v) => setForm(f => {
     const items = f.items.map((it,idx) => {
-      if (idx !== i) return it;
-      const updated = { ...it, [k]: v };
-      updated.total = parseFloat(((updated.qty||0) * (updated.unitPrice||0)).toFixed(2));
-      return updated;
+      if (idx!==i) return it;
+      const u = { ...it, [k]:v };
+      u.total = calcItemTotal(u);
+      return u;
     });
-    return { ...f, items };
+    const subtotal = items.reduce((s,it)=>s+(it.total||0),0);
+    const updated = { ...f, items, subtotal };
+    updated.total = calcTotal(updated);
+    return updated;
   });
 
-  const addItem    = () => setForm(f => ({ ...f, items:[...f.items, emptyItem()] }));
-  const removeItem = (i) => setForm(f => ({ ...f, items:f.items.filter((_,idx)=>idx!==i) }));
-
-  const subtotal = form.items.reduce((s,it) => s + (it.total||0), 0);
-  const total    = Math.max(0, subtotal - (Number(form.discount)||0) + (Number(form.freight)||0));
-
-  const handleSave = () => {
-    if (!form.supplierName.trim() || form.items.length === 0) return;
-    onSave({ ...form, subtotal, total: parseFloat(total.toFixed(2)) });
+  const selectProduct = (i, prod) => {
+    setForm(f => {
+      const items = f.items.map((it,idx) => {
+        if (idx!==i) return it;
+        const u = { ...it, sku:prod.sku||"", description:prod.name||"", unit:prod.unit||"un", unitPrice:prod.cost||0, _prodId:prod.id };
+        u.total = calcItemTotal(u);
+        return u;
+      });
+      const subtotal = items.reduce((s,it)=>s+(it.total||0),0);
+      const updated = { ...f, items, subtotal };
+      updated.total = calcTotal(updated);
+      return updated;
+    });
+    const ss=[...skuSearch]; ss[i]=prod.sku||prod.name||""; setSkuSearch(ss);
+    const sl=[...showSkuList]; sl[i]=false; setShowSkuList(sl);
   };
 
-  const inp = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300";
+  const addItem = () => {
+    setForm(f=>({...f, items:[...f.items, emptyItem()]}));
+    setSkuSearch(s=>[...s,""]);
+    setShowSkuList(s=>[...s,false]);
+  };
+
+  const removeItem = (i) => {
+    setForm(f=>{
+      const items = f.items.filter((_,idx)=>idx!==i);
+      const subtotal = items.reduce((s,it)=>s+(it.total||0),0);
+      const updated = {...f, items, subtotal};
+      updated.total = calcTotal(updated);
+      return updated;
+    });
+    setSkuSearch(s=>s.filter((_,idx)=>idx!==i));
+    setShowSkuList(s=>s.filter((_,idx)=>idx!==i));
+  };
+
+  const subtotal = (form.items||[]).reduce((s,it)=>s+(it.total||0),0);
+
+  const handleSave = () => {
+    if (!form.supplierName.trim() || (form.items||[]).length===0) return;
+    onSave({ ...form, subtotal, total: parseFloat(calcTotal({...form}).toFixed(2)) });
+  };
+
+  const inp = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300";
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
-          <h2 className="font-bold text-gray-900">{isNew ? "📦 Novo Pedido de Compra" : `Editar ${purchase.id}`}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+          <h2 className="font-semibold text-gray-800">{isNew ? "📦 Novo Pedido de Compra" : `Editar ${purchase.id||""}`}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon name="x"/></button>
         </div>
+
         <div className="overflow-y-auto p-5 space-y-4 flex-1">
+          {/* Fornecedor */}
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 relative">
-              <label className="text-xs font-medium text-gray-600 block mb-1">Fornecedor *</label>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Fornecedor *</label>
               <input className={inp}
                 value={supSearch}
-                onChange={e=>{ setSupSearch(e.target.value); set("supplierName",e.target.value); setShowSupList(true); }}
+                onChange={e=>{ setSupSearch(e.target.value); setForm(f=>({...f,supplierName:e.target.value})); setShowSupList(true); }}
                 onFocus={()=>setShowSupList(true)}
                 onBlur={()=>setTimeout(()=>setShowSupList(false),150)}
                 placeholder="Digite o nome do fornecedor..."/>
@@ -7494,42 +7544,39 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
                 <div className="absolute z-50 w-full bg-white border border-gray-200 rounded-xl shadow-lg mt-1 max-h-48 overflow-y-auto">
                   {filteredSups.map(s=>(
                     <button key={s.id} type="button" onMouseDown={()=>selectSupplier(s)}
-                      className="w-full text-left px-3 py-2.5 hover:bg-indigo-50 transition-colors border-b border-gray-50 last:border-0">
+                      className="w-full text-left px-3 py-2.5 hover:bg-indigo-50 border-b border-gray-50 last:border-0">
                       <p className="text-sm font-medium text-gray-800">{s.name}</p>
-                      <p className="text-[10px] text-gray-400">{s.cnpj||""} {s.city?`· ${s.city}/${s.state}`:""} {s.paymentTerms?`· ${s.paymentTerms}`:""}</p>
+                      <p className="text-[10px] text-gray-400">{s.cnpj||""} {s.paymentTerms?`· Prazo: ${s.paymentTerms} dias`:""}</p>
                     </button>
                   ))}
                 </div>
               )}
-              {supSearch && suppliers.length>0 && !suppliers.find(s=>s.name===supSearch) && (
-                <p className="text-[10px] text-amber-500 mt-1">⚠️ Fornecedor não encontrado no cadastro</p>
-              )}
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">Data do Pedido</label>
-              <input type="date" className={inp} value={form.date} onChange={e=>set("date",e.target.value)}/>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Data do Pedido</label>
+              <input type="date" className={inp} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">Previsão de Entrega</label>
-              <input type="date" className={inp} value={form.expectedDate} onChange={e=>set("expectedDate",e.target.value)}/>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Previsão de Entrega</label>
+              <input type="date" className={inp} value={form.expectedDate||""} onChange={e=>setForm(f=>({...f,expectedDate:e.target.value}))}/>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">Status</label>
-              <select className={inp} value={form.status} onChange={e=>set("status",e.target.value)}>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
+              <select className={inp} value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
                 {PC_STATUS.map(s=><option key={s}>{s}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">Data de Recebimento</label>
-              <input type="date" className={inp} value={form.receivedDate||""} onChange={e=>set("receivedDate",e.target.value)}/>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Condição de Pagamento</label>
+              <input className={inp} value={form.paymentTerms} onChange={e=>setForm(f=>({...f,paymentTerms:e.target.value}))} placeholder="Ex: 30 dias"/>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">Condição de Pagamento</label>
-              <input className={inp} value={form.paymentTerms} onChange={e=>set("paymentTerms",e.target.value)} placeholder="Ex: 30 dias"/>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Vencimento do Boleto</label>
+              <input type="date" className={inp} value={form.dueDate||""} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))}/>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">📅 Vencimento do Boleto</label>
-              <input type="date" className={inp} value={form.dueDate||""} onChange={e=>set("dueDate",e.target.value)}/>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Data de Recebimento</label>
+              <input type="date" className={inp} value={form.receivedDate||""} onChange={e=>setForm(f=>({...f,receivedDate:e.target.value}))}/>
             </div>
           </div>
 
@@ -7540,73 +7587,117 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
               <button onClick={addItem} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Adicionar item</button>
             </div>
             <div className="space-y-2">
-              <div className="grid grid-cols-12 gap-1 text-[10px] font-semibold text-gray-400 uppercase px-1">
-                <span className="col-span-5">Descrição</span>
-                <span className="col-span-2 text-center">Qtd</span>
-                <span className="col-span-1 text-center">Un</span>
-                <span className="col-span-2 text-right">Preço Un.</span>
-                <span className="col-span-2 text-right">Total</span>
-              </div>
-              {form.items.map((it, i) => (
-                <div key={i} className="grid grid-cols-12 gap-1 items-center">
-                  <input className="col-span-5 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                    value={it.description} onChange={e=>setItem(i,"description",e.target.value)} placeholder="Produto"/>
-                  <input type="number" min="1"
-                    className="col-span-2 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                    value={it.qty} onChange={e=>setItem(i,"qty",parseFloat(e.target.value)||0)}/>
-                  <select className="col-span-1 border border-gray-200 rounded-lg px-1 py-1.5 text-xs focus:outline-none"
-                    value={it.unit} onChange={e=>setItem(i,"unit",e.target.value)}>
-                    {INV_UNITS.map(u=><option key={u}>{u}</option>)}
-                  </select>
-                  <input type="number" min="0" step="0.01"
-                    className="col-span-2 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                    value={it.unitPrice} onChange={e=>setItem(i,"unitPrice",parseFloat(e.target.value)||0)}/>
-                  <div className="col-span-2 flex items-center justify-end gap-1">
-                    <span className="text-xs font-medium text-gray-800">{fmt(it.total)}</span>
-                    {form.items.length > 1 && (
-                      <button onClick={()=>removeItem(i)} className="text-red-400 hover:text-red-600 text-xs ml-1">✕</button>
-                    )}
+              {(form.items||[]).map((it,i)=>{
+                const sq = skuSearch[i]||it.sku||"";
+                const filtProd = products.filter(p=>
+                  p.sku?.toLowerCase().includes(sq.toLowerCase())||
+                  p.name?.toLowerCase().includes(sq.toLowerCase())
+                ).slice(0,6);
+                const gross = (it.qty||0)*(it.unitPrice||0);
+                const discAmt = it.discountType==="%"?gross*((it.discount||0)/100):(it.discount||0);
+                return (
+                  <div key={i} className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
+                    <div className="flex gap-2">
+                      <div className="relative w-24 shrink-0">
+                        <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 font-mono"
+                          value={sq}
+                          onChange={e=>{const ss=[...skuSearch];ss[i]=e.target.value;setSkuSearch(ss);setItem(i,"sku",e.target.value);const sl=[...showSkuList];sl[i]=true;setShowSkuList(sl);}}
+                          onFocus={()=>{const sl=[...showSkuList];sl[i]=true;setShowSkuList(sl);}}
+                          onBlur={()=>setTimeout(()=>{const sl=[...showSkuList];sl[i]=false;setShowSkuList(sl);},150)}
+                          placeholder="SKU"/>
+                        {showSkuList[i] && sq.length>0 && filtProd.length>0 && (
+                          <div className="absolute z-50 top-full left-0 w-64 bg-white border border-gray-200 rounded-lg shadow-lg mt-0.5 max-h-40 overflow-y-auto">
+                            {filtProd.map(p=>(
+                              <button key={p.id} type="button" onMouseDown={()=>selectProduct(i,p)}
+                                className="w-full text-left px-2 py-1.5 hover:bg-indigo-50 border-b border-gray-50 last:border-0">
+                                <p className="text-xs font-semibold text-gray-800">{p.name}</p>
+                                <p className="text-[10px] text-gray-400">SKU: {p.sku||"—"} · Custo: {fmt(p.cost||0)}</p>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <input className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                        value={it.description} onChange={e=>setItem(i,"description",e.target.value)} placeholder="Descrição do produto"/>
+                      {(form.items||[]).length>1 && (
+                        <button onClick={()=>removeItem(i)} className="text-gray-400 hover:text-red-500 text-xs shrink-0">✕</button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-5 gap-2 items-center">
+                      <div>
+                        <p className="text-[10px] text-gray-400 mb-0.5">Qtd</p>
+                        <input type="number" min="0" className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs text-center bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                          value={it.qty} onChange={e=>setItem(i,"qty",parseFloat(e.target.value)||0)}/>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-400 mb-0.5">Un</p>
+                        <select className="w-full border border-gray-200 rounded-lg px-1 py-1 text-xs bg-white focus:outline-none"
+                          value={it.unit} onChange={e=>setItem(i,"unit",e.target.value)}>
+                          {INV_UNITS.map(u=><option key={u}>{u}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-400 mb-0.5">Preço Unit.</p>
+                        <input type="number" min="0" step="0.01" className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                          value={it.unitPrice} onChange={e=>setItem(i,"unitPrice",parseFloat(e.target.value)||0)}/>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-400 mb-0.5">Desconto</p>
+                        <div className="flex gap-0.5">
+                          <input type="number" min="0" className="w-full border border-gray-200 rounded-lg px-1 py-1 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                            value={it.discount||0} onChange={e=>setItem(i,"discount",parseFloat(e.target.value)||0)}/>
+                          <select className="border border-gray-200 rounded-lg text-xs bg-white focus:outline-none w-10"
+                            value={it.discountType||"%"} onChange={e=>setItem(i,"discountType",e.target.value)}>
+                            <option>%</option><option>R$</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-gray-400 mb-0.5">Total</p>
+                        <p className="text-xs font-bold text-gray-800">{fmt(it.total||0)}</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
-          {/* Totals */}
-          <div className="grid grid-cols-3 gap-3 bg-gray-50 rounded-xl p-3">
+          {/* Totais */}
+          <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">Frete (R$)</label>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">🚛 Frete (R$)</label>
               <input type="number" min="0" step="0.01" className={inp}
-                value={form.freight} onChange={e=>set("freight",parseFloat(e.target.value)||0)}/>
+                value={form.freight} onChange={e=>setForm(f=>{const u={...f,freight:parseFloat(e.target.value)||0};u.total=calcTotal(u);return u;})}/>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">Desconto (R$)</label>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">💰 Desconto (R$)</label>
               <input type="number" min="0" step="0.01" className={inp}
-                value={form.discount} onChange={e=>set("discount",parseFloat(e.target.value)||0)}/>
+                value={form.discount} onChange={e=>setForm(f=>{const u={...f,discount:parseFloat(e.target.value)||0};u.total=calcTotal(u);return u;})}/>
             </div>
-            <div className="flex flex-col justify-end">
-              <p className="text-xs text-gray-500">Subtotal: {fmt(subtotal)}</p>
-              <p className="text-base font-bold text-indigo-700">Total: {fmt(total)}</p>
+            <div className="flex flex-col justify-end text-right">
+              <p className="text-xs text-gray-400">Subtotal: {fmt(subtotal)}</p>
+              <p className="text-lg font-bold text-indigo-600">Total: {fmt(calcTotal(form))}</p>
             </div>
           </div>
 
+          {/* NF + Observações */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">Número da NF</label>
-              <input className={`${inp} font-mono`}
-                value={form.nfNumero||""} onChange={e=>set("nfNumero",e.target.value)} placeholder="Ex: 000123"/>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Número da NF</label>
+              <input className={inp} value={form.nfNumber||""} onChange={e=>setForm(f=>({...f,nfNumber:e.target.value}))} placeholder="NF-e 000000"/>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">Observações</label>
-              <input className={inp}
-                value={form.notes} onChange={e=>set("notes",e.target.value)} placeholder="Condições especiais..."/>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Observações</label>
+              <input className={inp} value={form.notes||""} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="Observações internas..."/>
             </div>
           </div>
         </div>
-        <div className="flex gap-2 p-5 border-t border-gray-100 shrink-0">
-          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
-          <button onClick={handleSave} className="flex-1 px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">
-            {isNew ? "Criar Pedido" : "Salvar Alterações"}
+
+        <div className="p-5 border-t border-gray-100 flex gap-3 shrink-0">
+          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button onClick={handleSave} className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">
+            {isNew ? "Criar Pedido" : "Salvar"}
           </button>
         </div>
       </div>
@@ -7614,7 +7705,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
   );
 };
 
-// ─── Purchases Module ─────────────────────────────────────────────────────
+
 const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [] }) => {
   const [modal,    setModal]    = useState(null);
   const [detail,   setDetail]   = useState(null);
