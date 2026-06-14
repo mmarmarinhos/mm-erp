@@ -3433,25 +3433,18 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
                 <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                   value={form.name} onChange={e=>set("name",e.target.value)} placeholder="Nome do fornecedor"/>
               </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">CPF / CNPJ</label>
+                <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  value={form.cnpj} onChange={e=>set("cnpj", fmtCpfCnpj(e.target.value))} placeholder="000.000.000-00 ou 00.000.000/0001-00" maxLength={18}/>
+                {cnpjDuplicate && (
+                  <div className="mt-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-start gap-2">
+                    <span className="text-red-500 text-sm shrink-0">⚠️</span>
+                    <p className="text-xs text-red-700">CPF/CNPJ já cadastrado para <strong>{cnpjDuplicate.name}</strong>.</p>
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">CPF / CNPJ</label>
-                  <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    value={form.cnpj} onChange={e=>set("cnpj", fmtCpfCnpj(e.target.value))} placeholder="000.000.000-00 ou 00.000.000/0001-00" maxLength={18}/>
-                  {cnpjDuplicate && (
-                    <div className="mt-1.5 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-start gap-2">
-                      <span className="text-red-500 text-sm shrink-0">⚠️</span>
-                      <p className="text-xs text-red-700">
-                        CPF/CNPJ já cadastrado para <strong>{cnpjDuplicate.name}</strong>. Não é possível duplicar.
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">Contato</label>
-                  <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    value={form.contact} onChange={e=>set("contact",e.target.value)} placeholder="Nome do representante"/>
-                </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Telefone</label>
                   <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
@@ -3462,7 +3455,12 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
                   <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                     value={form.email} onChange={e=>set("email",e.target.value)} placeholder="email@fornecedor.com"/>
                 </div>
-                <div className="col-span-2">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Contato</label>
+                  <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    value={form.contact} onChange={e=>set("contact",e.target.value)} placeholder="Nome do representante"/>
+                </div>
+                <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Website</label>
                   <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                     value={form.website} onChange={e=>set("website",e.target.value)} placeholder="site.com.br"/>
@@ -3489,25 +3487,27 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
                   </select>
                 </div>
               </div>
-              <div className="border-t border-gray-100 pt-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Condições Comerciais</p>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Prazo Pgto. (dias)</label>
-                    <input type="number" min="0" max="365"
-                      className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                      value={form.paymentTerms||""} onChange={e=>set("paymentTerms",e.target.value)} placeholder="0"/>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Ped. Mín (R$)</label>
-                    <input type="number" min="0" className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                      value={form.minOrder} onChange={e=>set("minOrder",e.target.value)} placeholder="0"/>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 mb-1 block">Desconto %</label>
-                    <input type="number" min="0" max="100" className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                      value={form.discount} onChange={e=>set("discount",e.target.value)} placeholder="0"/>
-                  </div>
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl">
+                <label className="text-xs font-bold text-indigo-700 mb-1 block">⏱ Prazo de Pagamento</label>
+                <div className="flex items-center gap-2">
+                  <input type="number" min="0" max="365"
+                    className="w-24 border border-indigo-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                    value={form.paymentTerms||""} onChange={e=>set("paymentTerms",e.target.value)} placeholder="0"/>
+                  <span className="text-sm text-indigo-600 font-medium">
+                    {Number(form.paymentTerms)>0 ? `${form.paymentTerms} dias após a compra` : "Pagamento imediato (à vista)"}
+                  </span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Ped. Mínimo (R$)</label>
+                  <input type="number" min="0" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    value={form.minOrder} onChange={e=>set("minOrder",e.target.value)} placeholder="0"/>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Desconto %</label>
+                  <input type="number" min="0" max="100" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    value={form.discount} onChange={e=>set("discount",e.target.value)} placeholder="0"/>
                 </div>
               </div>
               <div>
