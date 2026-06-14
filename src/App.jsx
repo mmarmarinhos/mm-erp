@@ -1533,6 +1533,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
   const [search, setSearch]   = useState("");
   const [payRec, setPayRec]   = useState(null); // order being marked as paid
   const [payPag, setPayPag]   = useState(null); // expense being marked as paid
+  const [showPaidRec, setShowPaidRec] = useState(false);
 
   // ── Period filter logic ──
   const filterByPeriod = (tx) => {
@@ -1975,7 +1976,6 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
       {tab === "receber" && (() => {
         const today0 = new Date(); today0.setHours(0,0,0,0);
         const diffDays = (a,b) => Math.round((a-b)/86400000);
-        const [showPaidRec, setShowPaidRec] = useState(false);
         const recItems = (orders||[])
           .filter(o => o.status !== "Cancelado" && (showPaidRec ? true : !o.paidDate))
           .map(o => {
