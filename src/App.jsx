@@ -7830,7 +7830,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers }) => {
           </table>
         </div>
 
-        {modal && <PurchaseModal purchase={modal} suppliers={suppliers} onClose={()=>setModal(null)} onSave={handleSave}/>}
+        {modal && <PurchaseModal purchase={modal} suppliers={suppliers} products={products||[]} onClose={()=>setModal(null)} onSave={handleSave}/>}
         {delConfirm && (
           <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center">
@@ -7945,7 +7945,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers }) => {
           );
         })}
       </div>
-      {modal && <PurchaseModal purchase={modal==="new"?null:modal} suppliers={suppliers} onClose={()=>setModal(null)} onSave={handleSave}/>}
+      {modal && <PurchaseModal purchase={modal==="new"?null:modal} suppliers={suppliers} products={products||[]} onClose={()=>setModal(null)} onSave={handleSave}/>}
     </div>
   );
 };
