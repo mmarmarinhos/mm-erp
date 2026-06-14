@@ -1509,6 +1509,11 @@ const FinPagModal = ({ item, onClose, onSave }) => {
         </div>
         <div className="flex gap-2 pt-1">
           <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          {(item.paidDate||item.status==="pago") && (
+            <button onClick={()=>onSave({...item, paidDate:"", status:"pendente"})} className="px-4 py-2.5 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-sm font-semibold hover:bg-amber-100">
+              ↩ Voltar Aberto
+            </button>
+          )}
           <button onClick={handleSave} className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700">
             💸 Confirmar Pagamento
           </button>
