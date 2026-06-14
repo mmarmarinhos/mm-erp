@@ -2318,6 +2318,12 @@ const CustomerModal = ({ customer, onClose, onSave, orders = [], customers = [] 
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Prazo de Pgto (dias)</label>
+                  <input type="number" min="0" max="365"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    value={form.paymentTerms||""} onChange={e=>set("paymentTerms",e.target.value)} placeholder="0 = imediato"/>
+                </div>
+                <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Canal Preferencial</label>
                   <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                     value={form.channel} onChange={e=>set("channel",e.target.value)}>
@@ -2336,12 +2342,6 @@ const CustomerModal = ({ customer, onClose, onSave, orders = [], customers = [] 
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Tags <span className="text-gray-400 font-normal">(separar por vírgula)</span></label>
                 <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                   value={form.tagsInput} onChange={e=>set("tagsInput",e.target.value)} placeholder="fiel, atacado, B2B..."/>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Prazo de Pagamento (dias)</label>
-                <input type="number" min="0" max="365"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  value={form.paymentTerms||""} onChange={e=>set("paymentTerms",e.target.value)} placeholder="Ex: 7, 14, 30..."/>
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Observações</label>
