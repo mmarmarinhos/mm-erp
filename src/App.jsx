@@ -630,7 +630,7 @@ const StatusDropdown = ({ order, onChange }) => {
 };
 
 // ─── Orders Module ────────────────────────────────────────────────────────
-const OrdersModule = ({ orders, setOrders, customers = [], products = [] }) => {
+const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [] }) => {
   const [search, setSearch] = useState("");
   const [filterChannel, setFilterChannel] = useState("Todos");
   const [filterStatus, setFilterStatus] = useState("Todos");
@@ -692,6 +692,14 @@ const OrdersModule = ({ orders, setOrders, customers = [], products = [] }) => {
       setOrders(prev => prev.map(o => o.id === data.id ? data : o));
     } else {
       setOrders(prev => [{ ...data, id: nextId(prev) }, ...prev]);
+    }
+    // Ativar cliente automaticamente quando tiver pedido
+    if (data.customer && setCustomers && data.status !== "Cancelado") {
+      setCustomers(prev => prev.map(c =>
+        c.name?.toLowerCase() === data.customer?.toLowerCase() && c.segment === "Inativo"
+          ? { ...c, segment: "Ativo" }
+          : c
+      ));
     }
     setModal(null);
   };
@@ -8814,7 +8822,7 @@ function ERPApp({ currentUser, onLogout }) {
   const renderModule = () => {
     switch (active) {
       case "dashboard": return <DashboardModule orders={orders} />;
-      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} products={products}/>;
+      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} empresa={form}/>;
       case "sync":      return <SyncModule orders={orders} setOrders={updateOrders}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
