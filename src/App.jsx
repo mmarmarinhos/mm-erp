@@ -76,7 +76,7 @@ const SEED_ORDERS = [];
 
 // ─── Storage Helpers ──────────────────────────────────────────────────────
 // ─── CRM Constants ────────────────────────────────────────────────────────
-const SEGMENTS = ["Ativo","Inativo","Desenvolvimento","VIP","Regular","Novo"];
+const SEGMENTS = ["Ativo","Inativo","Desenvolvimento"];
 const SEG_STYLES = {
   "Ativo":          { bg: "bg-green-100",  text: "text-green-700",  dot: "bg-green-500"  },
   "Inativo":        { bg: "bg-gray-100",   text: "text-gray-500",   dot: "bg-gray-400"   },
