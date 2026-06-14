@@ -8437,7 +8437,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
       {detail && (() => {
         const dL = getDaysLeft(detail.validUntil);
         const cvt = detail.status === "Convertida";
-        const st2 = (s) => COT_STYLES[s] || { bg:"bg-gray-100", text:"text-gray-600", border:"border-gray-200" };
+        const st2 = (s) => COT_STATUS_ST[s] || { bg:"bg-gray-100", text:"text-gray-600" };
         return (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={(e)=>{if(e.target===e.currentTarget)setDetail(null);}}>
             <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl max-h-[92vh] flex flex-col">
