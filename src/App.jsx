@@ -2840,9 +2840,9 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
     .filter(c => !search || [c.name, c.email, c.phone, ...c.tags].some(f => f?.toLowerCase().includes(search.toLowerCase())))
     .sort((a,b) => {
       if (sortBy === "name")         return a.name.localeCompare(b.name);
-      if (sortBy === "totalOrders")  return b.totalOrders - a.totalOrders;
-      if (sortBy === "lastPurchase") return (b.lastPurchase||"").localeCompare(a.lastPurchase||"");
-      return b.totalSpent - a.totalSpent;
+      if (sortBy === "totalOrders")  return getStats(b.name).totalOrders - getStats(a.name).totalOrders;
+      if (sortBy === "lastPurchase") return (getStats(b.name).lastPurchase||"").localeCompare(getStats(a.name).lastPurchase||"");
+      return getStats(b.name).totalSpent - getStats(a.name).totalSpent;
     }), [customers, filterSeg, filterCh, search, sortBy]);
 
   const selectedCustomer = customers.find(c => c.id === selected);
