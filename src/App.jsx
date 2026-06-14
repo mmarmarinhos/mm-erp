@@ -1975,7 +1975,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
       {tab === "receber" && (() => {
         const today0 = new Date(); today0.setHours(0,0,0,0);
         const diffDays = (a,b) => Math.round((a-b)/86400000);
-        const [showPaidRec, setShowPaidRec] = React.useState(false);
+        const [showPaidRec, setShowPaidRec] = useState(false);
         const recItems = (orders||[])
           .filter(o => o.status !== "Cancelado" && (showPaidRec ? true : !o.paidDate))
           .map(o => {
