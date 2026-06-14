@@ -346,6 +346,26 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [] }) =
     setShowCustList(false);
   };
 
+  // Product autocomplete per item
+  const [prodSearch, setProdSearch] = useState({});
+  const [showProdList, setShowProdList] = useState({});
+
+  const selectProduct = (i, prod) => {
+    setForm(f => {
+      const items = f.items.map((it, idx) => idx !== i ? it : {
+        ...it,
+        sku: prod.sku||"",
+        description: prod.name||prod.description||"",
+        unit: prod.unit||"un",
+        unitPrice: prod.cost||0,
+        total: parseFloat(((it.qty||1) * (prod.cost||0)).toFixed(2)),
+      });
+      return { ...f, items };
+    });
+    setProdSearch(s => ({ ...s, [i]: prod.name||"" }));
+    setShowProdList(s => ({ ...s, [i]: false }));
+  };
+
   const setItem = (i, k, v) => setForm(f => {
     const itemsList = f.itemsList.map((it,idx) => {
       if (idx!==i) return it;
@@ -7429,9 +7449,9 @@ const UsersModule = ({ currentUser }) => {
 };
 
 // ─── Purchase Order Modal ────────────────────────────────────────────────
-const PurchaseModal = ({ purchase, suppliers, onClose, onSave }) => {
+const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) => {
   const isNew = !purchase;
-  const emptyItem = () => ({ description:"", qty:1, unit:"un", unitPrice:0, total:0 });
+  const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, total:0 });
   const [form, setForm] = useState(purchase ? { ...purchase } : {
     supplierId:"", supplierName:"", date:today(), expectedDate:"", receivedDate:"",
     status:"Rascunho", paymentTerms:"30 dias", freight:0, discount:0,
@@ -7556,8 +7576,38 @@ const PurchaseModal = ({ purchase, suppliers, onClose, onSave }) => {
               </div>
               {form.items.map((it, i) => (
                 <div key={i} className="grid grid-cols-12 gap-1 items-center">
-                  <input className="col-span-5 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                    value={it.description} onChange={e=>setItem(i,"description",e.target.value)} placeholder="Produto"/>
+                  <div className="col-span-5 relative">
+                    <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                      value={prodSearch[i]??it.description}
+                      onChange={e=>{
+                        const v=e.target.value;
+                        setProdSearch(s=>({...s,[i]:v}));
+                        setItem(i,"description",v);
+                        setShowProdList(s=>({...s,[i]:true}));
+                      }}
+                      onFocus={()=>setShowProdList(s=>({...s,[i]:true}))}
+                      placeholder="Produto ou SKU..."/>
+                    {showProdList[i] && (prodSearch[i]||"").length > 0 && (() => {
+                      const q=(prodSearch[i]||"").toLowerCase();
+                      const hits=products.filter(p=>
+                        p.name?.toLowerCase().includes(q)||
+                        p.sku?.toLowerCase().includes(q)
+                      ).slice(0,6);
+                      if(!hits.length) return null;
+                      return (
+                        <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-0.5 max-h-40 overflow-y-auto">
+                          {hits.map(p=>(
+                            <button key={p.id} type="button"
+                              onMouseDown={()=>selectProduct(i,p)}
+                              className="w-full text-left px-3 py-2 hover:bg-indigo-50 border-b border-gray-50 last:border-0">
+                              <p className="text-xs font-semibold text-gray-800">{p.name}</p>
+                              <p className="text-[10px] text-gray-400">SKU: {p.sku||"—"} · Custo: R$ {(p.cost||0).toFixed(2).replace(".",",")}</p>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
                   <input type="number" min="1"
                     className="col-span-2 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-indigo-300"
                     value={it.qty} onChange={e=>setItem(i,"qty",parseFloat(e.target.value)||0)}/>
