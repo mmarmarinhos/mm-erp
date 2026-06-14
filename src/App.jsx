@@ -2681,7 +2681,8 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
   const segCount = useMemo(() => SEGMENTS.reduce((acc,s) => {
     acc[s] = customers.filter(c => c.segment === s).length; return acc;
   }, {}), [customers]);
-  const totalSpentAll = customers.reduce((s,c) => s+c.totalSpent, 0);
+  const totalSpentAll  = Object.values(customerStats).reduce((s,cs) => s + cs.totalSpent, 0);
+  const totalOrdersAll = Object.values(customerStats).reduce((s,cs) => s + cs.totalOrders, 0);
 
   // Filtered + sorted list
   const filtered = useMemo(() => customers
@@ -2815,7 +2816,7 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
         <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm text-center">
           <p className="text-xs text-gray-400 uppercase tracking-wide">Ticket Médio</p>
           <p className="text-lg font-bold text-gray-800 mt-0.5">
-            {customers.length ? fmt(totalSpentAll / customers.reduce((s,c) => s+c.totalOrders,0)) : "—"}
+            {totalOrdersAll > 0 ? fmt(totalSpentAll / totalOrdersAll) : "—"}
           </p>
         </div>
         <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm text-center">
