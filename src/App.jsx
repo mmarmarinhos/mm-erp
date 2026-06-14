@@ -3425,11 +3425,13 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
           {/* TAB: Dados */}
           {activeTab==="dados" && (
             <div className="p-5 space-y-3">
+              {/* 1. Nome */}
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Razão Social / Nome *</label>
                 <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                   value={form.name} onChange={e=>set("name",e.target.value)} placeholder="Nome do fornecedor"/>
               </div>
+              {/* 2. CPF / CNPJ */}
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">CPF / CNPJ</label>
                 <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
@@ -3441,6 +3443,7 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
                   </div>
                 )}
               </div>
+              {/* 3. Telefone + Email */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Telefone</label>
@@ -3452,6 +3455,9 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
                   <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                     value={form.email} onChange={e=>set("email",e.target.value)} placeholder="email@fornecedor.com"/>
                 </div>
+              </div>
+              {/* 4. Contato + Website */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Contato</label>
                   <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
@@ -3463,11 +3469,25 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
                     value={form.website} onChange={e=>set("website",e.target.value)} placeholder="site.com.br"/>
                 </div>
               </div>
+              {/* 5. Endereço */}
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">📍 Endereço</label>
                 <EnderecoFields form={form} set={set}
                   inp="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
               </div>
+              {/* 6. Prazo de Pagamento — antes de Categoria/Status, igual ao cliente */}
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl">
+                <label className="text-xs font-bold text-indigo-700 mb-1 block">⏱ Prazo de Pagamento</label>
+                <div className="flex items-center gap-2">
+                  <input type="number" min="0" max="365"
+                    className="w-24 border border-indigo-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                    value={form.paymentTerms||""} onChange={e=>set("paymentTerms",e.target.value)} placeholder="0"/>
+                  <span className="text-sm text-indigo-600 font-medium">
+                    {Number(form.paymentTerms)>0 ? `${form.paymentTerms} dias após a compra` : "Pagamento imediato (à vista)"}
+                  </span>
+                </div>
+              </div>
+              {/* 7. Categoria + Status */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Categoria</label>
@@ -3484,17 +3504,7 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
                   </select>
                 </div>
               </div>
-              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl">
-                <label className="text-xs font-bold text-indigo-700 mb-1 block">⏱ Prazo de Pagamento</label>
-                <div className="flex items-center gap-2">
-                  <input type="number" min="0" max="365"
-                    className="w-24 border border-indigo-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
-                    value={form.paymentTerms||""} onChange={e=>set("paymentTerms",e.target.value)} placeholder="0"/>
-                  <span className="text-sm text-indigo-600 font-medium">
-                    {Number(form.paymentTerms)>0 ? `${form.paymentTerms} dias após a compra` : "Pagamento imediato (à vista)"}
-                  </span>
-                </div>
-              </div>
+              {/* 8. Ped. Mínimo + Desconto */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Ped. Mínimo (R$)</label>
@@ -3507,15 +3517,18 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
                     value={form.discount} onChange={e=>set("discount",e.target.value)} placeholder="0"/>
                 </div>
               </div>
+              {/* 9. Avaliação */}
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-2 block">Avaliação</label>
                 <StarRating value={form.rating} onChange={v=>set("rating",v)}/>
               </div>
+              {/* 10. Tags */}
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Tags <span className="text-gray-400 font-normal">(separar por vírgula)</span></label>
                 <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                   value={form.tagsInput} onChange={e=>set("tagsInput",e.target.value)} placeholder="confiável, atacado, industrial..."/>
               </div>
+              {/* 11. Observações */}
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Observações</label>
                 <textarea rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
