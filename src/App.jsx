@@ -2015,14 +2015,14 @@ const FinanceModule = ({ finance, setFinance, orders, purchases }) => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono text-xs font-bold text-indigo-600">{p.id}</span>
-                            <span className="font-medium text-gray-800 text-sm">{p.supplierName}</span>
+                            <span className="font-medium text-gray-800 text-sm">{p._type==="lancamento" ? (p.description||p.category||"Despesa") : p.supplierName}</span>
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${u.bg} ${u.text}`}>{u.icon} {diffLabel}</span>
                           </div>
-                          <p className="text-xs text-gray-500 mt-1 truncate">{p.items.map(it=>`${it.description} (${it.qty}${it.unit})`).join(" · ")}</p>
+                          <p className="text-xs text-gray-500 mt-1 truncate">{p._type==="lancamento" ? (p.description||p.category||"Despesa") : (p.items||[]).map(it=>`${it.description} (${it.qty}${it.unit})`).join(" · ")}</p>
                           <div className="flex gap-3 mt-1 flex-wrap text-[10px] text-gray-400">
                             <span>📋 Emissão: <strong>{p.date}</strong></span>
                             {p.dueDate && <span>📅 Venc.: <strong>{new Date(p.dueDate+"T12:00:00").toLocaleDateString("pt-BR")}</strong></span>}
-                            <span>💳 {p.paymentTerms}</span>
+                            {p.paymentTerms && <span>💳 {p.paymentTerms}</span>}
                           </div>
                         </div>
                         <div className="text-right shrink-0">
