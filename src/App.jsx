@@ -76,11 +76,15 @@ const SEED_ORDERS = [];
 
 // ─── Storage Helpers ──────────────────────────────────────────────────────
 // ─── CRM Constants ────────────────────────────────────────────────────────
-const SEGMENTS = ["Ativo","Inativo","Desenvolvimento"];
+const SEGMENTS = ["Ativo","Inativo","Desenvolvimento","VIP","Regular","Novo"];
 const SEG_STYLES = {
   "Ativo":          { bg: "bg-green-100",  text: "text-green-700",  dot: "bg-green-500"  },
   "Inativo":        { bg: "bg-gray-100",   text: "text-gray-500",   dot: "bg-gray-400"   },
   "Desenvolvimento":{ bg: "bg-blue-100",   text: "text-blue-700",   dot: "bg-blue-500"   },
+  "VIP":            { bg: "bg-yellow-100", text: "text-yellow-700", dot: "bg-yellow-500" },
+  "Regular":        { bg: "bg-indigo-100", text: "text-indigo-700", dot: "bg-indigo-500" },
+  "Novo":           { bg: "bg-purple-100", text: "text-purple-700", dot: "bg-purple-500" },
+  "default":        { bg: "bg-gray-100",   text: "text-gray-500",   dot: "bg-gray-400"   },
 };
 const AVATAR_COLORS = ["bg-indigo-500","bg-purple-500","bg-pink-500","bg-orange-500",
   "bg-teal-500","bg-blue-500","bg-red-400","bg-cyan-500","bg-violet-500","bg-emerald-500"];
@@ -2460,7 +2464,7 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
   if (!customer) return null;
   const [panelTab, setPanelTab] = useState("dados");
   const [payModal, setPayModal] = useState(null); // order being paid
-  const seg = SEG_STYLES[customer.segment] || SEG_STYLES.Novo;
+  const seg = SEG_STYLES[customer.segment] || SEG_STYLES["default"] || { bg:"bg-gray-100", text:"text-gray-500", dot:"bg-gray-400" };
   const cOrders = orders.filter(o => (o.customer||"").toLowerCase() === (customer.name||"").toLowerCase());
   const statsOrders    = cOrders.filter(o => o.status !== "Cancelado");
   const dynTotalSpent  = statsOrders.reduce((s,o) => s + (o.total||0), 0);
@@ -2945,7 +2949,7 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
       {/* Segment overview */}
       <div className="grid grid-cols-4 gap-2">
         {SEGMENTS.map(s => {
-          const st = SEG_STYLES[s];
+          const st = SEG_STYLES[s] || SEG_STYLES["default"];
           return (
             <button key={s} onClick={() => setFilterSeg(filterSeg === s ? "Todos" : s)}
               className={`rounded-xl p-3 text-center border transition-all ${filterSeg === s ? `${st.bg} ${st.border} border` : "bg-white border-gray-100 hover:border-gray-200"}`}>
