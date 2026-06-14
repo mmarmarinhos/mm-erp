@@ -2213,11 +2213,11 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
 const CustomerModal = ({ customer, onClose, onSave, orders = [], customers = [] }) => {
   const isNew = !customer;
   const [activeTab, setActiveTab] = useState("dados");
-  const [form, setForm] = useState(customer ? { ...customer, tagsInput: customer.tags.join(", ") } : {
+  const [form, setForm] = useState(customer ? { ...customer, tagsInput: customer.tags.join(", "), paymentTerms: customer.paymentTerms || "" } : {
     name:"", phone:"", email:"", cpfCnpj:"", city:"", state:"",
     cep:"", rua:"", numero:"", complemento:"", bairro:"",
     channel:"Mercado Livre", segment:"Ativo",
-    totalOrders:0, totalSpent:0, lastPurchase:"", tagsInput:"", notes:""
+    totalOrders:0, totalSpent:0, lastPurchase:"", tagsInput:"", notes:"", paymentTerms:""
   });
   const set = (k,v) => setForm(f => ({ ...f, [k]:v }));
 
