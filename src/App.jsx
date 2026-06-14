@@ -7554,10 +7554,6 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
               <label className="text-xs font-medium text-gray-600 block mb-1">📅 Vencimento do Boleto</label>
               <input type="date" className={inp} value={form.dueDate||""} onChange={e=>set("dueDate",e.target.value)}/>
             </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">✅ Data de Pagamento</label>
-              <input type="date" className={inp} value={form.paidDate||""} onChange={e=>set("paidDate",e.target.value)}/>
-            </div>
           </div>
 
           {/* Items */}
