@@ -2177,7 +2177,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
                         <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                           <p className="font-bold text-red-600 text-base">{fmt(p.total)}</p>
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${PC_STATUS_STYLES[p.status]?.bg||"bg-gray-100"} ${PC_STATUS_STYLES[p.status]?.text||"text-gray-600"}`}>{p.status}</span>
-                          {(p.paidDate||p.status==="pago") ? <span className="text-[10px] text-green-600 font-semibold mt-1">✅ Pago{p.paidDate?" em "+new Date(p.paidDate+"T12:00:00").toLocaleDateString("pt-BR"):""}</span> : <button onClick={()=>setPayPag(p)} className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 mt-1">💸 Pagar</button>}
+                          {(p.paidDate||p.status==="pago") ? (<div className="flex flex-col items-end gap-1 mt-1"><span className="text-[10px] text-green-600 font-semibold">✅ Pago{p.paidDate?" em "+new Date(p.paidDate+"T12:00:00").toLocaleDateString("pt-BR"):""}</span><button onClick={()=>setPayPag(p)} className="text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100">↩ Editar pgto</button></div>) : <button onClick={()=>setPayPag(p)} className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 mt-1">💸 Pagar</button>}
                         </div>
                       </div>
                     </div>
