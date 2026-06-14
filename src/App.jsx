@@ -7549,36 +7549,8 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
               </div>
               {form.items.map((it, i) => (
                 <div key={i} className="grid grid-cols-12 gap-1 items-center">
-                  <div className="col-span-5 relative">
-                    <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                      value={prodSearch[i]??it.description}
-                      onChange={e=>{
-                        const v=e.target.value;
-                        setProdSearch(s=>({...s,[i]:v}));
-                        setItem(i,"description",v);
-                        setShowProdList(s=>({...s,[i]:true}));
-                      }}
-                      onFocus={()=>setShowProdList(s=>({...s,[i]:true}))}
-                      placeholder="Produto ou SKU..."/>
-                    {showProdList[i] && (prodSearch[i]||"").length > 0 && products.filter(p=>
-                        p.name?.toLowerCase().includes((prodSearch[i]||"").toLowerCase())||
-                        p.sku?.toLowerCase().includes((prodSearch[i]||"").toLowerCase())
-                      ).slice(0,6).length > 0 && (
-                      <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg mt-0.5 max-h-40 overflow-y-auto">
-                        {products.filter(p=>
-                          p.name?.toLowerCase().includes((prodSearch[i]||"").toLowerCase())||
-                          p.sku?.toLowerCase().includes((prodSearch[i]||"").toLowerCase())
-                        ).slice(0,6).map(p=>(
-                          <button key={p.id} type="button"
-                            onMouseDown={()=>selectProduct(i,p)}
-                            className="w-full text-left px-3 py-2 hover:bg-indigo-50 border-b border-gray-50 last:border-0">
-                            <p className="text-xs font-semibold text-gray-800">{p.name}</p>
-                            <p className="text-[10px] text-gray-400">SKU: {p.sku||"—"} · Custo: R$ {(p.cost||0).toFixed(2).replace(".",",")}</p>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <input className="col-span-5 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                    value={it.description} onChange={e=>setItem(i,"description",e.target.value)} placeholder="Produto"/>
                   <input type="number" min="1"
                     className="col-span-2 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-1 focus:ring-indigo-300"
                     value={it.qty} onChange={e=>setItem(i,"qty",parseFloat(e.target.value)||0)}/>
