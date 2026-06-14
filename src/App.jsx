@@ -1973,7 +1973,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
             const due = o.dueDate ? new Date(o.dueDate+"T12:00:00") : null;
             if (due) due.setHours(0,0,0,0);
             const diff = due ? diffDays(due, today0) : null;
-            const urgency = diff===null?"open":diff<0?"overdue":diff===0?"today":diff<=3?"soon":"open";
+            const urgency = o.paidDate ? "open" : (diff===null?"open":diff<0?"overdue":diff===0?"today":diff<=3?"soon":"open");
             return { ...o, due, diff, urgency };
           })
           .sort((a,b) => ({overdue:0,today:1,soon:2,open:3}[a.urgency]??3)-({overdue:0,today:1,soon:2,open:3}[b.urgency]??3));
