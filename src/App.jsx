@@ -85,6 +85,7 @@ const SEG_STYLES = {
   "Regular":        { bg: "bg-indigo-100", text: "text-indigo-700", dot: "bg-indigo-500" },
   "Novo":           { bg: "bg-purple-100", text: "text-purple-700", dot: "bg-purple-500" },
   "default":        { bg: "bg-gray-100",   text: "text-gray-500",   dot: "bg-gray-400"   },
+  "default":        { bg: "bg-gray-100",   text: "text-gray-500",   dot: "bg-gray-400"   },
 };
 const AVATAR_COLORS = ["bg-indigo-500","bg-purple-500","bg-pink-500","bg-orange-500",
   "bg-teal-500","bg-blue-500","bg-red-400","bg-cyan-500","bg-violet-500","bg-emerald-500"];
