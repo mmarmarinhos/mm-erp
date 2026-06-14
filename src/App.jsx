@@ -2056,7 +2056,12 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
                         <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                           <p className="font-bold text-green-700 text-base">{fmt(o.total)}</p>
                           <Badge label={o.status} style={STATUS_STYLES[o.status]}/>
-                          {o.paidDate && <span className="text-[10px] text-green-600 font-semibold">✅ Pago em {new Date(o.paidDate+"T12:00:00").toLocaleDateString("pt-BR")}</span>}
+                          {o.paidDate && (
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="text-[10px] text-green-600 font-semibold">✅ Pago em {new Date(o.paidDate+"T12:00:00").toLocaleDateString("pt-BR")}</span>
+                              <button onClick={()=>setPayRec(o)} className="text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100">↩ Editar pgto</button>
+                            </div>
+                          )}
                           {!o.paidDate && <button onClick={()=>setPayRec(o)}
                             className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700">
                             ✅ Pagar
