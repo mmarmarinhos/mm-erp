@@ -2149,6 +2149,15 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
                 })}
               </div>
             )}
+            {payPag && (
+              <FinPagModal item={payPag} onClose={()=>setPayPag(null)}
+                onSave={(updated)=>{
+                  if (updated._type === "lancamento") {
+                    setFinance(prev => prev.map(t => t.id === updated.id ? {...t, status:"pago", paidDate:updated.paidDate, payment:updated.payment} : t));
+                  }
+                  setPayPag(null);
+                }}/>
+            )}
           </div>
         );
       })()}
