@@ -3088,11 +3088,9 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
       const days = lastDate
         ? Math.floor((TODAY - new Date(lastDate + "T12:00:00")) / 86400000)
         : 999;
-      let segment = "Novo";
-      if (days > 90)                                         segment = "Inativo";
-      else if (stats.totalSpent >= 500 || stats.totalOrders >= 7) segment = "VIP";
-      else if (stats.totalOrders >= 2)                           segment = "Regular";
-      else if (stats.totalOrders >= 1)                           segment = "Ativo";
+      let segment = "Desenvolvimento";
+      if (days > 90 || stats.totalOrders === 0) segment = "Inativo";
+      else if (stats.totalOrders >= 1)          segment = "Ativo";
       return { ...c, segment };
     }));
     showToast("✅ Status recalculados!");
