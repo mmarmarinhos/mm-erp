@@ -8438,10 +8438,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
           {!["Convertida","Recusada","Expirada"].includes(detail.status) && (
             <button onClick={()=>setModal(detail)} className="px-3 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200">Editar</button>
           )}
-          <button onClick={()=>gerarCotacaoPDF(detail)}
-            className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-medium hover:bg-indigo-100 flex items-center gap-1.5">
-            📄 PDF
-          </button>
+
           {detail.status==="Aprovada" && (
             <button onClick={()=>handleConvert(detail)}
               className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700">
