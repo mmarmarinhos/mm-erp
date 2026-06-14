@@ -1406,7 +1406,7 @@ const FinTooltip = ({ active, payload, label }) => {
 };
 
 // ─── Finance Module ───────────────────────────────────────────────────────
-const FinanceModule = ({ finance, setFinance, orders, purchases }) => {
+const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) => {
   const [tab, setTab]         = useState("overview");
   const [filterMode, setFilterMode] = useState("mes");  // mes | trimestre | ano | personalizado | todos
   const [period, setPeriod]   = useState(() => {
@@ -1420,6 +1420,7 @@ const FinanceModule = ({ finance, setFinance, orders, purchases }) => {
   const [filterCat, setFilterCat]     = useState("Todas");
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [search, setSearch]   = useState("");
+  const [payRec, setPayRec]   = useState(null); // order being marked as paid
 
   // ── Period filter logic ──
   const filterByPeriod = (tx) => {
@@ -1925,9 +1926,13 @@ const FinanceModule = ({ finance, setFinance, orders, purchases }) => {
                             <span>💳 {o.payment}</span>
                           </div>
                         </div>
-                        <div className="text-right shrink-0">
+                        <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                           <p className="font-bold text-green-700 text-base">{fmt(o.total)}</p>
                           <Badge label={o.status} style={STATUS_STYLES[o.status]}/>
+                          <button onClick={()=>setPayRec(o)}
+                            className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700">
+                            ✅ Pagar
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -8953,7 +8958,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "sync":      return <SyncModule orders={orders} setOrders={updateOrders}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
-      case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} purchases={purchases}/>;
+      case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases}/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases}/>;
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers}/>;
