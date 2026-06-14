@@ -2319,9 +2319,15 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
   const [payModal, setPayModal] = useState(null); // order being paid
   const seg = SEG_STYLES[customer.segment] || SEG_STYLES.Novo;
   const cOrders = orders.filter(o => o.customer.toLowerCase() === customer.name.toLowerCase());
-  const avgTicket = customer.totalOrders > 0 ? customer.totalSpent / customer.totalOrders : 0;
-  const daysSince = customer.lastPurchase
-    ? Math.floor((new Date() - new Date(customer.lastPurchase)) / 86400000)
+  const activeOrders   = cOrders.filter(o => o.status !== "Cancelado");
+  const dynTotalSpent  = activeOrders.reduce((s,o) => s + (o.total||0), 0);
+  const dynTotalOrders = activeOrders.length;
+  const dynLastPurchase = activeOrders.length
+    ? activeOrders.map(o=>o.date).sort().reverse()[0]
+    : null;
+  const avgTicket  = dynTotalOrders > 0 ? dynTotalSpent / dynTotalOrders : 0;
+  const daysSince  = dynLastPurchase
+    ? Math.floor((new Date() - new Date(dynLastPurchase + "T12:00:00")) / 86400000)
     : null;
 
   // Financial data
@@ -2379,8 +2385,8 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
           {/* Key metrics */}
           <div className="grid grid-cols-2 gap-2">
             {[
-              { label:"Total Gasto", value: fmt(customer.totalSpent), color:"text-indigo-700" },
-              { label:"Pedidos",     value: customer.totalOrders,     color:"text-gray-900"   },
+              { label:"Total Gasto", value: fmt(dynTotalSpent),  color:"text-indigo-700" },
+              { label:"Pedidos",     value: dynTotalOrders,          color:"text-gray-900"   },
               { label:"Ticket Médio",value: fmt(avgTicket),           color:"text-gray-900"   },
               { label:"Última Compra", value: daysSince !== null ? `${daysSince}d atrás` : "—", color: daysSince > 60 ? "text-red-500" : "text-gray-900" },
             ].map(m => (
