@@ -1975,8 +1975,9 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
       {tab === "receber" && (() => {
         const today0 = new Date(); today0.setHours(0,0,0,0);
         const diffDays = (a,b) => Math.round((a-b)/86400000);
+        const [showPaidRec, setShowPaidRec] = React.useState(false);
         const recItems = (orders||[])
-          .filter(o => o.status !== "Cancelado" && !o.paidDate)
+          .filter(o => o.status !== "Cancelado" && (showPaidRec ? true : !o.paidDate))
           .map(o => {
             const due = o.dueDate ? new Date(o.dueDate+"T12:00:00") : null;
             if (due) due.setHours(0,0,0,0);
@@ -2012,6 +2013,12 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
                 <p className="text-xs text-gray-400">pedido{recItems.filter(o=>!o.dueDate).length!==1?"s":""}</p>
               </div>
             </div>
+            <div className="flex justify-end">
+              <button onClick={()=>setShowPaidRec(v=>!v)}
+                className={"text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors " + (showPaidRec ? "bg-green-50 border-green-200 text-green-700" : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100")}>
+                {showPaidRec ? "✅ Ocultando pagos" : "👁 Ver pagos também"}
+              </button>
+            </div>
             {recItems.length === 0 ? (
               <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
                 <p className="text-3xl mb-2">✅</p><p className="text-sm text-gray-500">Nenhum recebimento pendente!</p>
@@ -2041,10 +2048,11 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
                         <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                           <p className="font-bold text-green-700 text-base">{fmt(o.total)}</p>
                           <Badge label={o.status} style={STATUS_STYLES[o.status]}/>
-                          <button onClick={()=>setPayRec(o)}
+                          {o.paidDate && <span className="text-[10px] text-green-600 font-semibold">✅ Pago em {new Date(o.paidDate+"T12:00:00").toLocaleDateString("pt-BR")}</span>}
+                          {!o.paidDate && <button onClick={()=>setPayRec(o)}
                             className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700">
                             ✅ Pagar
-                          </button>
+                          </button>}
                         </div>
                       </div>
                     </div>
