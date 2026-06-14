@@ -350,22 +350,6 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [] }) =
   const [prodSearch, setProdSearch] = useState({});
   const [showProdList, setShowProdList] = useState({});
 
-  const selectProduct = (i, prod) => {
-    setForm(f => {
-      const items = f.items.map((it, idx) => idx !== i ? it : {
-        ...it,
-        sku: prod.sku||"",
-        description: prod.name||prod.description||"",
-        unit: prod.unit||"un",
-        unitPrice: prod.cost||0,
-        total: parseFloat(((it.qty||1) * (prod.cost||0)).toFixed(2)),
-      });
-      return { ...f, items };
-    });
-    setProdSearch(s => ({ ...s, [i]: prod.name||"" }));
-    setShowProdList(s => ({ ...s, [i]: false }));
-  };
-
   const setItem = (i, k, v) => setForm(f => {
     const itemsList = f.itemsList.map((it,idx) => {
       if (idx!==i) return it;
