@@ -434,7 +434,19 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [] }) =
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Canal *</label>
-              <select className={inp} value={form.channel} onChange={e=>setForm(f=>({...f,channel:e.target.value}))}>
+              <select className={inp} value={form.channel} onChange={e=>{
+                  const newCh=e.target.value;
+                  setForm(f=>{
+                    const items=(f.items||[]).map(it=>{
+                      const prod=products.find(p=>p.id===it._prodId);
+                      if(!prod)return it;
+                      const cp=prod.channelPrices?.[chId(newCh)];
+                      const price=cp?(typeof cp==='object'?cp.price:cp):0;
+                      return price>0?{...it,unitPrice:price,total:(price*(it.qty||1))}:it;
+                    });
+                    return {...f,channel:newCh,items};
+                  });
+                }}>
                 {CHANNELS.map(c=><option key={c}>{c}</option>)}
               </select>
             </div>
@@ -7963,7 +7975,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [] 
   const selectProduct = (i, prod) => {
     setForm(f => {
       // Busca o preço do canal atual, com fallback para preço padrão
-      const cpRaw = prod.channelPrices?.[f.channel];
+      const cpRaw = prod.channelPrices?.[chId(f.channel)];
       const channelPrice = cpRaw ? (typeof cpRaw==='object' ? cpRaw.price : cpRaw) : 0;
       const unitPrice = (channelPrice > 0) ? channelPrice : (prod.price||0);
       const items = f.items.map((it,idx) => {
