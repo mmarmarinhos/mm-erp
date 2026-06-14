@@ -7757,8 +7757,39 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
   };
 
   const handleSave = (data) => {
+    const oldPurchase = data.id ? purchases.find(p => p.id === data.id) : null;
+    const wasReceived = oldPurchase?.status === "Recebido";
+    const isReceived  = data.status === "Recebido";
+
     if (data.id) setPurchases(prev => prev.map(p => p.id===data.id ? data : p));
     else         setPurchases(prev => [...prev, { ...data, id:nextPcId(prev), createdAt:today() }]);
+
+    if (setProducts && (isReceived || wasReceived)) {
+      setProducts(prev => prev.map(prod => {
+        let estoqueAtual = prod.stock || 0;
+        let custoAtual   = prod.cost  || 0;
+        if (wasReceived && oldPurchase?.items) {
+          const oldItem = oldPurchase.items.find(it => it._prodId===prod.id || (it.sku && it.sku===prod.sku));
+          if (oldItem) estoqueAtual = Math.max(0, estoqueAtual - (oldItem.qty||0));
+        }
+        if (isReceived && data.items) {
+          const newItem = data.items.find(it => it._prodId===prod.id || (it.sku && it.sku===prod.sku));
+          if (newItem && (newItem.qty||0) > 0) {
+            const qtd = newItem.qty || 0;
+            const preco = newItem.unitPrice || 0;
+            const novoCusto = estoqueAtual > 0
+              ? parseFloat(((estoqueAtual * custoAtual + qtd * preco) / (estoqueAtual + qtd)).toFixed(4))
+              : preco;
+            return { ...prod, stock: estoqueAtual + qtd, cost: novoCusto };
+          }
+        }
+        if (!isReceived && wasReceived) {
+          const hasItem = oldPurchase?.items?.find(it => it._prodId===prod.id || (it.sku && it.sku===prod.sku));
+          if (hasItem) return { ...prod, stock: estoqueAtual };
+        }
+        return prod;
+      }));
+    }
     setModal(null); setDetail(null);
   };
 
