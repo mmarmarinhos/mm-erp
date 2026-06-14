@@ -8326,7 +8326,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
 
   const handleSave = (data) => {
     if (data.id) setCotacoes(prev=>prev.map(c=>c.id===data.id?data:c));
-    else         setCotacoes(prev=>[...prev,{...data,id:nextId(prev),createdAt:today()}]);
+    else         setCotacoes(prev=>[{...data,id:nextId(prev),createdAt:today()},...prev]);
     setModal(null);
     if (detail) setDetail(data);
   };
