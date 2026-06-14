@@ -7706,7 +7706,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
 };
 
 
-const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [] }) => {
+const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], setProducts }) => {
   const [modal,    setModal]    = useState(null);
   const [detail,   setDetail]   = useState(null);
   const [filterStatus, setFilterStatus] = useState("Todos");
@@ -9197,7 +9197,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases}/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases}/>;
-      case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products}/>;
+      case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
       case "empresa":   return <EmpresaModule onSave={(data) => setEmpresaForm(data)}/>;
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes}/>;
