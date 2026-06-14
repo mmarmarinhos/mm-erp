@@ -2019,7 +2019,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
                 {recItems.map(o => {
                   const u = urg[o.urgency];
-                  const diffLabel = o.diff===null?"Sem vencimento":o.urgency==="overdue"?`Vencido há ${Math.abs(o.diff)}d`:o.urgency==="today"?"VENCE HOJE":`Vence em ${o.diff}d`;
+                  const diffLabel = o.paidDate ? "Pago" : o.diff===null?"Sem vencimento":o.urgency==="overdue"?`Vencido há ${Math.abs(o.diff)}d`:o.urgency==="today"?"VENCE HOJE":`Vence em ${o.diff}d`;
                   return (
                     <div key={o.id} className={`p-4 ${o.urgency==="overdue"?"bg-red-50/30":""}`}>
                       <div className="flex items-start justify-between gap-3">
