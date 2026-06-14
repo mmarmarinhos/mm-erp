@@ -2729,7 +2729,7 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
               { label:"Total Gasto", value: fmt(dynTotalSpent),  color:"text-indigo-700" },
               { label:"Pedidos",     value: dynTotalOrders,          color:"text-gray-900"   },
               { label:"Ticket Médio",value: fmt(avgTicket),           color:"text-gray-900"   },
-              { label:"Última Compra", value: daysSince !== null ? `${daysSince}d atrás` : "—", color: daysSince > 60 ? "text-red-500" : "text-gray-900" },
+              { label:"Última Compra", value: dynLastPurchase ? new Date(dynLastPurchase+"T12:00:00").toLocaleDateString("pt-BR") : "—", color: daysSince !== null && daysSince > 60 ? "text-red-500" : "text-gray-900" },
             ].map(m => (
               <div key={m.label} className="bg-gray-50 rounded-xl p-3">
                 <p className="text-[10px] text-gray-400 uppercase tracking-wide">{m.label}</p>
