@@ -1534,6 +1534,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
   const [payRec, setPayRec]   = useState(null); // order being marked as paid
   const [payPag, setPayPag]   = useState(null); // expense being marked as paid
   const [showPaidRec, setShowPaidRec] = useState(false);
+  const [showPaidPag, setShowPaidPag] = useState(false);
 
   // ── Period filter logic ──
   const filterByPeriod = (tx) => {
@@ -2074,7 +2075,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
         const diffDays = (a,b) => Math.round((a-b)/86400000);
         // Compras pendentes
         const purchaseItems = (purchases||[])
-          .filter(p => p.status !== "Cancelado" && !p.paidDate)
+          .filter(p => p.status !== "Cancelado" && (showPaidPag ? true : !p.paidDate))
           .map(p => ({
             ...p,
             _type: "compra",
@@ -2082,9 +2083,9 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
             description: p.supplier || p.description || "Compra",
           }));
 
-        // Lançamentos manuais de despesa pendentes
+        // Lançamentos manuais de despesa (pendentes ou pagos se showPaidPag)
         const financeItems = (finance||[])
-          .filter(t => t.type === "despesa" && t.status !== "pago" && t.status !== "cancelado")
+          .filter(t => t.type === "despesa" && t.status !== "cancelado" && (showPaidPag ? true : t.status !== "pago"))
           .map(t => ({
             ...t,
             _type: "lancamento",
@@ -2128,6 +2129,12 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
                 <p className="text-lg font-bold text-gray-400 mt-0.5">{pagItems.filter(p=>!p.dueDate).length}</p>
                 <p className="text-xs text-gray-400">pedido{pagItems.filter(p=>!p.dueDate).length!==1?"s":""}</p>
               </div>
+            </div>
+            <div className="flex justify-end">
+              <button onClick={()=>setShowPaidPag(v=>!v)}
+                className={"text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors " + (showPaidPag ? "bg-red-50 border-red-200 text-red-700" : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100")}>
+                {showPaidPag ? "✅ Ocultando pagos" : "👁 Ver pagos também"}
+              </button>
             </div>
             {pagItems.length === 0 ? (
               <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
