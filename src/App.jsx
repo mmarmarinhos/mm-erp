@@ -1619,19 +1619,21 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
 
   // ── Chart: last 6 months ──
   const chartData = useMemo(() => {
-    const base = new Date(2025, 5, 1); // Jun 2025 as reference
+    const now = new Date();
     return Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(base.getFullYear(), base.getMonth() - (5-i), 1);
+      const d = new Date(now.getFullYear(), now.getMonth() - (5-i), 1);
       const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
       const label = d.toLocaleDateString("pt-BR", { month:"short" }).replace(".","");
       const txs = activeFin.filter(t => t.date.startsWith(key));
+      const ordersRec = (orders||[]).filter(o => o.paidDate && o.paidDate.startsWith(key) && o.status !== "Cancelado");
       return {
         label,
-        receitas: txs.filter(t => t.type==="receita").reduce((s,t) => s+t.amount, 0),
+        receitas: txs.filter(t => t.type==="receita").reduce((s,t) => s+t.amount, 0)
+                + ordersRec.reduce((s,o) => s+(o.total||0), 0),
         despesas: txs.filter(t => t.type==="despesa").reduce((s,t) => s+t.amount, 0),
       };
     });
-  }, [finance]);
+  }, [finance, orders]);
 
   // ── DRE categories for current period ──
   const dreData = useMemo(() => {
