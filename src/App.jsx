@@ -657,73 +657,115 @@ const gerarPedidoPDF = async (order) => {
   const eTel   = emp.celular || emp.telefone || "";
   const eEmail = emp.email  || "";
   const eSite  = emp.site   || "";
-  const total    = order.total || 0;
-  const qty      = order.qty   || 1;
-  const unitVal  = (total / qty).toFixed(2).replace(".", ",");
-  const totalVal = total.toFixed(2).replace(".", ",");
-  const hoje     = new Date().toLocaleDateString("pt-BR");
+  const hoje   = new Date().toLocaleDateString("pt-BR");
 
-  const infoEmp = (eCnpj  ? "CNPJ: "   + eCnpj  + "<br>" : "")
-                + (eTel   ? "Cel: "     + eTel   + "<br>" : "")
-                + (eEmail ? "E-mail: "  + eEmail + "<br>" : "")
-                + (eSite  ? "Site: "    + eSite           : "");
+  // Itens
+  const items = order.itemsList || (order.items && typeof order.items !== "string" ? order.items : null) || [];
+  const hasItems = items.length > 0;
 
-  const notesHTML = order.notes
-    ? "<div class='section'><div class='section-title'>Observacoes</div>"
-      + "<div style='background:#fafafa;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:12px;color:#64748b;'>"
-      + order.notes + "</div></div>"
+  var rows = "";
+  var subtotal = 0;
+  if (hasItems) {
+    items.forEach(function(it) {
+      var sku   = it.sku || "-";
+      var desc  = it.description || it.desc || it.sku || "-";
+      var qty   = it.qty || 1;
+      var un    = it.unit || "un";
+      var price = (it.unitPrice || 0).toFixed(2).replace(".", ",");
+      var gross = (it.unitPrice || 0) * qty;
+      var disc  = it.discountType === "%" ? gross * ((it.discount || 0) / 100) : (it.discount || 0);
+      var tot   = it.total || (gross - disc);
+      subtotal += tot;
+      var discStr = it.discount ? (it.discountType === "%" ? it.discount + "%" : "R$ " + it.discount) : "-";
+      rows += "<tr>"
+        + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;font-family:monospace;font-size:11px;color:#6366f1;font-weight:700;'>" + sku + "</td>"
+        + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;'>" + desc + "</td>"
+        + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:center;'>" + qty + "</td>"
+        + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:center;color:#94a3b8;'>" + un + "</td>"
+        + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:right;'>R$ " + price + "</td>"
+        + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:center;color:#94a3b8;'>" + discStr + "</td>"
+        + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:700;'>R$ " + tot.toFixed(2).replace(".",",") + "</td>"
+        + "</tr>";
+    });
+  } else {
+    var legacyDesc = typeof order.items === "string" ? order.items : "-";
+    var legacyTot  = order.total || 0;
+    subtotal = legacyTot;
+    rows += "<tr>"
+      + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;color:#94a3b8;'>-</td>"
+      + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;' colspan='4'>" + legacyDesc + "</td>"
+      + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:center;'>-</td>"
+      + "<td style='padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:700;'>R$ " + legacyTot.toFixed(2).replace(".",",") + "</td>"
+      + "</tr>";
+  }
+  var total = order.total || subtotal;
+
+  var infoEmp = (eCnpj  ? "CNPJ: "  + eCnpj  + "<br>" : "")
+              + (eTel   ? "Cel: "    + eTel   + "<br>" : "")
+              + (eEmail ? "E-mail: " + eEmail + "<br>" : "")
+              + (eSite  ? "Site: "   + eSite           : "");
+
+  var notesHTML = order.notes
+    ? "<div style='background:#fafafa;border:1px solid #e2e8f0;border-radius:10px;padding:14px;font-size:12px;color:#64748b;line-height:1.6;margin-bottom:20px;'>"
+      + order.notes + "</div>"
     : "";
 
-  const css = "<style>"
+  var css = "<style>"
     + "* {margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif;}"
     + "body {padding:32px;color:#1e293b;font-size:13px;}"
     + ".hdr {display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:18px;border-bottom:3px solid #6366f1;}"
-    + ".enome {font-size:20px;font-weight:800;color:#6366f1;}"
+    + ".enome {font-size:22px;font-weight:800;color:#6366f1;}"
     + ".einfo {font-size:11px;color:#64748b;margin-top:4px;line-height:1.7;}"
-    + ".badge {background:#6366f1;color:#fff;font-size:16px;font-weight:700;padding:7px 16px;border-radius:10px;}"
+    + ".badge {background:#6366f1;color:#fff;font-size:18px;font-weight:700;padding:8px 18px;border-radius:10px;}"
     + ".bsub {font-size:11px;color:#64748b;text-align:right;margin-top:6px;line-height:1.6;}"
-    + ".sec {margin-bottom:20px;}"
+    + ".sec {margin-bottom:24px;}"
     + ".stitle {font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}"
-    + ".grid3 {display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}"
-    + ".ibox {background:#f8fafc;border-radius:8px;padding:10px 12px;}"
+    + ".grid {display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;}"
+    + ".ibox {background:#f8fafc;border-radius:8px;padding:10px 12px;border:1px solid #e2e8f0;}"
     + ".ilabel {font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px;}"
     + ".ival {font-size:13px;font-weight:600;color:#1e293b;}"
-    + "table {width:100%;border-collapse:collapse;margin-top:8px;}"
-    + "th {background:#f1f5f9;text-align:left;padding:9px 10px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;}"
-    + "td {padding:10px;border-bottom:1px solid #f1f5f9;font-size:12px;}"
-    + ".tbox {display:flex;justify-content:flex-end;margin-top:14px;}"
-    + ".tinner {background:#f8fafc;border-radius:10px;padding:14px;width:260px;}"
-    + ".tfinal {display:flex;justify-content:space-between;padding:10px 0 0;margin-top:8px;border-top:2px solid #6366f1;font-size:17px;font-weight:800;color:#6366f1;}"
-    + ".ftr {margin-top:36px;border-top:1px solid #e2e8f0;padding-top:14px;display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;}"
+    + "table {width:100%;border-collapse:collapse;}"
+    + "th {background:#f8fafc;text-align:left;padding:9px 8px;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;}"
+    + ".tbox {display:flex;justify-content:flex-end;margin-top:16px;}"
+    + ".tinner {background:#f8fafc;border-radius:10px;padding:16px;width:280px;}"
+    + ".trow {display:flex;justify-content:space-between;padding:4px 0;font-size:12px;color:#64748b;}"
+    + ".tfinal {display:flex;justify-content:space-between;padding:10px 0 0;margin-top:8px;border-top:2px solid #6366f1;font-size:18px;font-weight:800;color:#6366f1;}"
+    + ".aprov {margin-top:32px;border-top:2px dashed #e2e8f0;padding-top:24px;}"
+    + ".sig-row {display:flex;gap:32px;}"
+    + ".sig-box {flex:1;border-top:1px solid #94a3b8;padding-top:8px;font-size:11px;color:#64748b;}"
+    + ".ftr {margin-top:40px;border-top:1px solid #e2e8f0;padding-top:16px;display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;}"
     + "@media print {body {padding:20px;}}"
     + "</style>";
 
-  const body = "<div class='hdr'>"
+  var body = "<div class='hdr'>"
     + "<div><div class='enome'>" + eNome + "</div><div class='einfo'>" + infoEmp + "</div></div>"
-    + "<div><div class='badge'>PEDIDO " + order.id + "</div>"
-    + "<div class='bsub'>Data: " + (order.date || "-") + "<br>Status: <b>" + (order.status || "-") + "</b></div></div>"
+    + "<div><div class='badge'>PEDIDO " + (order.id||"") + "</div>"
+    + "<div class='bsub'>Data: " + (order.date||"-") + "<br>Status: <b>" + (order.status||"-") + "</b></div></div>"
     + "</div>"
-    + "<div class='sec'><div class='stitle'>Cliente</div><div class='grid3'>"
-    + "<div class='ibox'><div class='ilabel'>Nome</div><div class='ival'>" + (order.customer || "-") + "</div></div>"
-    + "<div class='ibox'><div class='ilabel'>Canal</div><div class='ival'>" + (order.channel || "-") + "</div></div>"
-    + "<div class='ibox'><div class='ilabel'>Pagamento</div><div class='ival'>" + (order.payment || "-") + "</div></div>"
+    + "<div class='sec'><div class='stitle'>Cliente</div><div class='grid'>"
+    + "<div class='ibox'><div class='ilabel'>Nome</div><div class='ival'>" + (order.customer||"-") + "</div></div>"
+    + "<div class='ibox'><div class='ilabel'>Canal</div><div class='ival'>" + (order.channel||"-") + "</div></div>"
+    + "<div class='ibox'><div class='ilabel'>Pagamento</div><div class='ival'>" + (order.payment||"-") + "</div></div>"
     + "</div></div>"
     + "<div class='sec'><div class='stitle'>Itens do Pedido</div>"
-    + "<table><thead><tr><th>Descricao</th><th style='text-align:center'>Qtd</th><th style='text-align:right'>Valor Unit.</th><th style='text-align:right'>Total</th></tr></thead>"
-    + "<tbody><tr>"
-    + "<td>" + (order.items || "-") + "</td>"
-    + "<td style='text-align:center'>" + qty + "</td>"
-    + "<td style='text-align:right'>R$ " + unitVal + "</td>"
-    + "<td style='text-align:right'><b>R$ " + totalVal + "</b></td>"
-    + "</tr></tbody></table>"
-    + "<div class='tbox'><div class='tinner'><div class='tfinal'><span>TOTAL</span><span>R$ " + totalVal + "</span></div></div></div>"
-    + "</div>"
+    + "<table><thead><tr>"
+    + "<th>SKU</th><th>Descricao</th><th style='text-align:center'>Qtd</th><th style='text-align:center'>Un</th><th style='text-align:right'>Preco Unit.</th><th style='text-align:center'>Desc.</th><th style='text-align:right'>Total</th>"
+    + "</tr></thead><tbody>" + rows + "</tbody></table>"
+    + "<div class='tbox'><div class='tinner'>"
+    + "<div class='trow'><span>Subtotal</span><span>R$ " + subtotal.toFixed(2).replace(".",",") + "</span></div>"
+    + "<div class='tfinal'><span>TOTAL</span><span>R$ " + total.toFixed(2).replace(".",",") + "</span></div>"
+    + "</div></div></div>"
     + notesHTML
+    + "<div class='aprov'><p style='font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:16px;'>Aprovacao</p>"
+    + "<div class='sig-row'>"
+    + "<div class='sig-box'>( ) Aprovado &nbsp;&nbsp; ( ) Reprovado<br><br>Assinatura: ___________________</div>"
+    + "<div class='sig-box'>Nome: ___________________<br><br>Data: ___/___/______</div>"
+    + "</div></div>"
     + "<div class='ftr'><span>" + eNome + " - Pedido gerado em " + hoje + "</span><span>Documento interno - Para uso da expedicao</span></div>"
     + "<script>window.onload=function(){window.print();}<" + "/script>";
 
-  const html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Pedido " + order.id + "</title>" + css + "</head><body>" + body + "</body></html>";
-  const w = window.open("", "_blank", "width=900,height=700");
+  var html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Pedido " + (order.id||"") + "</title>" + css + "</head><body>" + body + "</body></html>";
+  var w = window.open("", "_blank", "width=900,height=700");
   if (w) { w.document.write(html); w.document.close(); }
 };
 
