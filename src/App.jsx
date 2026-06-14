@@ -7497,7 +7497,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
-          <h2 className="font-bold text-gray-900">{isNew ? "Novo Pedido de Compra" : `Editar ${purchase.id}`}</h2>
+          <h2 className="font-bold text-gray-900">{isNew ? "📦 Novo Pedido de Compra" : `Editar ${purchase.id}`}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
         <div className="overflow-y-auto p-5 space-y-4 flex-1">
