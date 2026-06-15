@@ -5285,6 +5285,13 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
+                          {/* Toggle Ativo/Inativo */}
+                          <button
+                            onClick={()=>setProducts(prev=>prev.map(x=>x.id===p.id?{...x,status:x.status==="Ativo"?"Inativo":"Ativo"}:x))}
+                            title={p.status==="Ativo"?"Desativar produto":"Ativar produto"}
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all ${p.status==="Ativo"?"bg-green-50 text-green-600 border-green-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200":"bg-gray-100 text-gray-400 border-gray-200 hover:bg-green-50 hover:text-green-600 hover:border-green-200"}`}>
+                            {p.status==="Ativo"?"● Ativo":"○ Inativo"}
+                          </button>
                           {onPriceHunt && (
                             <button onClick={()=>onPriceHunt(p.name,p.price)} title="Pesquisar preços (PriceHunt)"
                               className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors text-xs">🔍</button>
