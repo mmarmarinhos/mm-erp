@@ -5002,8 +5002,9 @@ const ProductDetailPanel = ({ product, movements, onClose, onEdit, onDelete, onM
 // ─── Inventory Module ─────────────────────────────────────────────────────
 const InventoryModule = ({ products, setProducts, movements, setMovements, suppliers, onPriceHunt }) => {
   const [search, setSearch]           = useState("");
-  const [filterCat, setFilterCat]     = useState("Todas");
-  const [filterStock, setFilterStock] = useState("Todos");
+  const [filterCat,    setFilterCat]    = useState("Todas");
+  const [filterStock,  setFilterStock]  = useState("Todos");
+  const [filterStatus, setFilterStatus] = useState("Todos");
   const [selected, setSelected]       = useState(null);
   const [modal, setModal]             = useState(null);
   const [moveModal, setMoveModal]     = useState(null);
@@ -5066,9 +5067,10 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
       if (filterStock === "Zerado") return p.stock === 0;
       return true;
     })
+    .filter(p => filterStatus === "Todos" || p.status === filterStatus)
     .filter(p => !search || [p.name,p.sku,p.category,p.supplierName,...p.tags].some(f=>f?.toLowerCase().includes(search.toLowerCase())))
     .filter(p => filterByDate(p.createdAt||""))
-  , [products, filterCat, filterStock, search, filterMode, period, dateFrom, dateTo]);
+  , [products, filterCat, filterStock, filterStatus, search, filterMode, period, dateFrom, dateTo]);
 
   const selectedProduct = products.find(p=>p.id===selected);
 
@@ -5187,6 +5189,12 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
         <select className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none bg-white"
           value={filterStock} onChange={e=>setFilterStock(e.target.value)}>
           <option>Todos</option><option>Normal</option><option>Baixo</option><option>Zerado</option>
+        </select>
+        <select className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none bg-white"
+          value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}>
+          <option value="Todos">Todos</option>
+          <option value="Ativo">● Ativo</option>
+          <option value="Inativo">○ Inativo</option>
         </select>
       </div>
 
