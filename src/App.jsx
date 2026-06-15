@@ -6562,134 +6562,11 @@ const TabelaPrecos = ({ products, setProducts }) => {
           <p className="text-xs text-gray-400 mt-1">Cadastre produtos no módulo Estoque primeiro</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-1">
           {filtered.map(p => {
             const cost = Number(p.cost)||0;
             return (
-              <div key={p.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3 mb-4">
-                  <div>
-                    <p className="font-semibold text-gray-800">
-                      {p.sku && <span className="font-mono text-gray-400 font-normal mr-2">{p.sku}</span>}
-                      {p.name}
-                    </p>
-                  </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${p.status==="Ativo"?"bg-green-100 text-green-700":"bg-gray-100 text-gray-500"}`}>{p.status}</span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {CHANNELS.map(ch => {
-                    const d = getData(p, ch);
-                    const custoBase = cost * (d.qtd||1);
-                    const lucro = d.price>0 ? d.price*(1-d.taxaPerc/100) - custoBase - d.freight - d.otherCosts : 0;
-                    const mc = d.margin>30?"text-green-600":d.margin>15?"text-amber-500":d.margin>0?"text-red-500":"text-gray-400";
-                    return (
-                      <div key={ch} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                        <div className="mb-2.5">
-                          <Badge label={ch} style={CHANNEL_STYLES[ch]||{bg:"bg-gray-100",text:"text-gray-600"}}/>
-                        </div>
-
-                        {/* Quantidade × Custo */}
-                        <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-2.5 mb-2.5">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1">
-                              <label className="text-[10px] font-semibold text-indigo-400 uppercase block mb-1">📦 Quantidade</label>
-                              <input type="number" min="1" step="1"
-                                className="w-full border border-indigo-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-center font-bold"
-                                value={d.qtd||1}
-                                onChange={e=>setField(p.id, ch, "qtd", e.target.value)}/>
-                            </div>
-                            <div className="text-indigo-300 font-bold text-sm mt-4">×</div>
-                            <div className="flex-1">
-                              <label className="text-[10px] font-semibold text-indigo-400 uppercase block mb-1">Custo Médio Unit.</label>
-                              <div className="border border-indigo-100 rounded-lg px-2 py-1.5 text-xs bg-indigo-50 text-center text-indigo-600 font-medium">
-                                {fmt(cost)}
-                              </div>
-                            </div>
-                            <div className="text-indigo-300 font-bold text-sm mt-4">=</div>
-                            <div className="flex-1">
-                              <label className="text-[10px] font-semibold text-indigo-400 uppercase block mb-1">Custo Total</label>
-                              <div className="border border-indigo-200 rounded-lg px-2 py-1.5 text-xs bg-white text-center text-indigo-700 font-bold">
-                                {fmt(custoBase)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Row 1: Preço + Margem */}
-                        <div className="grid grid-cols-2 gap-2 mb-2">
-                          <div>
-                            <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1">💰 Preço Venda</label>
-                            <div className="flex items-center gap-0.5">
-                              <span className="text-[10px] text-gray-400">R$</span>
-                              <input type="number" min="0" step="0.01"
-                                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
-                                value={d.price ?? ""} placeholder="0,00"
-                                onChange={e=>setField(p.id, ch, "price", e.target.value)}/>
-                            </div>
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1">📈 Margem</label>
-                            <div className="flex items-center gap-0.5">
-                              <input type="number" min="0" max="99" step="0.1"
-                                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
-                                value={d.margin ?? ""} placeholder="0"
-                                onChange={e=>setField(p.id, ch, "margin", e.target.value)}/>
-                              <span className="text-[10px] text-gray-400">%</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Row 2: Frete + Taxa + Outros */}
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1">🚚 Frete</label>
-                            <div className="flex items-center gap-0.5">
-                              <span className="text-[10px] text-gray-400">R$</span>
-                              <input type="number" min="0" step="0.01"
-                                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
-                                value={d.freight ?? ""} placeholder="0"
-                                onChange={e=>setField(p.id, ch, "freight", e.target.value)}/>
-                            </div>
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1">🏪 Taxa Canal</label>
-                            <div className="flex items-center gap-0.5">
-                              <input type="number" min="0" max="99" step="0.01"
-                                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
-                                value={d.taxaPerc ?? ""} placeholder="0"
-                                onChange={e=>setField(p.id, ch, "taxaPerc", e.target.value)}/>
-                              <span className="text-[10px] text-gray-400">%</span>
-                            </div>
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1">➕ Outros</label>
-                            <div className="flex items-center gap-0.5">
-                              <span className="text-[10px] text-gray-400">R$</span>
-                              <input type="number" min="0" step="0.01"
-                                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
-                                value={d.otherCosts ?? ""} placeholder="0"
-                                onChange={e=>setField(p.id, ch, "otherCosts", e.target.value)}/>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Summary */}
-                        {d.price>0 && (
-                          <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-gray-200">
-                            <span className={`text-[10px] font-bold ${mc}`}>
-                              {d.margin>0?`${d.margin}% margem`:"sem margem"}
-                            </span>
-                            <span className="text-[10px] text-gray-400">
-                              lucro: <strong className={mc}>{fmt(lucro)}</strong>
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <PriceTableRow key={p.id} p={p} cost={cost} getData={getData} setField={setField} CHANNELS={CHANNELS} CHANNEL_STYLES={CHANNEL_STYLES} fmt={fmt}/>
             );
           })}
         </div>
@@ -6697,6 +6574,146 @@ const TabelaPrecos = ({ products, setProducts }) => {
     </div>
   );
 };
+
+// ─── PriceTableRow — linha colapsável da tabela de preços ────────────────────
+const PriceTableRow = ({ p, cost, getData, setField, CHANNELS, CHANNEL_STYLES, fmt }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`bg-white border rounded-xl shadow-sm overflow-hidden transition-all ${open?"border-indigo-200":"border-gray-100"}`}>
+      {/* Linha compacta clicável */}
+      <button onClick={()=>setOpen(v=>!v)}
+        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left">
+        <span className={`text-xs shrink-0 transition-transform ${open?"rotate-90":"rotate-0"}`}>▶</span>
+        <div className="flex-1 min-w-0">
+          <span className="font-mono text-[11px] text-gray-400 mr-2">{p.sku}</span>
+          <span className="font-medium text-sm text-gray-800">{p.name}</span>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Resumo de canais com preço */}
+          <div className="hidden md:flex items-center gap-2">
+            {CHANNELS.map(ch => {
+              const d = getData(p, ch);
+              const mc = d.margin>30?"text-green-600":d.margin>15?"text-amber-500":d.margin>0?"text-red-500":"text-gray-300";
+              return d.price>0 ? (
+                <div key={ch} className="text-center">
+                  <p className="text-[9px] text-gray-400 uppercase">{ch.split(" ")[0]}</p>
+                  <p className={`text-[10px] font-bold ${mc}`}>{fmt(d.price)}</p>
+                </div>
+              ) : (
+                <div key={ch} className="text-center">
+                  <p className="text-[9px] text-gray-400 uppercase">{ch.split(" ")[0]}</p>
+                  <p className="text-[10px] text-gray-300">—</p>
+                </div>
+              );
+            })}
+          </div>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${p.status==="Ativo"?"bg-green-100 text-green-700":"bg-red-100 text-red-500"}`}>{p.status}</span>
+          <span className="text-[10px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded">CMU: {cost>0?fmt(cost):"—"}</span>
+        </div>
+      </button>
+
+      {/* Detalhe expansível */}
+      {open && (
+        <div className="border-t border-gray-100 p-3 bg-gray-50/50">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {CHANNELS.map(ch => {
+              const d = getData(p, ch);
+              const custoBase = cost * (d.qtd||1);
+              const lucro = d.price>0 ? d.price*(1-d.taxaPerc/100) - custoBase - d.freight - d.otherCosts : 0;
+              const mc = d.margin>30?"text-green-600":d.margin>15?"text-amber-500":d.margin>0?"text-red-500":"text-gray-400";
+              return (
+                <div key={ch} className="bg-white rounded-xl p-3 border border-gray-100">
+                  <div className="mb-2.5">
+                    <Badge label={ch} style={CHANNEL_STYLES[ch]||{bg:"bg-gray-100",text:"text-gray-600"}}/>
+                  </div>
+                  {/* Qtd × Custo */}
+                  <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <label className="text-[10px] font-semibold text-indigo-400 uppercase block mb-1">📦 Qtd</label>
+                        <input type="number" min="1" step="1"
+                          className="w-full border border-indigo-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-center font-bold"
+                          value={d.qtd||1} onChange={e=>setField(p.id, ch, "qtd", e.target.value)}/>
+                      </div>
+                      <div className="text-indigo-300 font-bold text-sm mt-4">×</div>
+                      <div className="flex-1">
+                        <label className="text-[10px] font-semibold text-indigo-400 uppercase block mb-1">Custo Médio Unit.</label>
+                        <div className="border border-indigo-100 rounded-lg px-2 py-1 text-xs bg-indigo-50 text-center text-indigo-600 font-medium">{fmt(cost)}</div>
+                      </div>
+                      <div className="text-indigo-300 font-bold text-sm mt-4">=</div>
+                      <div className="flex-1">
+                        <label className="text-[10px] font-semibold text-indigo-400 uppercase block mb-1">Custo Total</label>
+                        <div className="border border-indigo-200 rounded-lg px-2 py-1 text-xs bg-white text-center text-indigo-700 font-bold">{fmt(custoBase)}</div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Preço + Margem */}
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <div>
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1">💰 Preço Venda</label>
+                      <div className="flex items-center gap-0.5">
+                        <span className="text-[10px] text-gray-400">R$</span>
+                        <input type="number" min="0" step="0.01"
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
+                          value={d.price??""} placeholder="0,00" onChange={e=>setField(p.id, ch, "price", e.target.value)}/>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1">📈 Margem</label>
+                      <div className="flex items-center gap-0.5">
+                        <input type="number" min="0" max="99" step="0.1"
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
+                          value={d.margin??""} placeholder="0" onChange={e=>setField(p.id, ch, "margin", e.target.value)}/>
+                        <span className="text-[10px] text-gray-400">%</span>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Frete + Taxa + Outros */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1">🚚 Frete</label>
+                      <div className="flex items-center gap-0.5">
+                        <span className="text-[10px] text-gray-400">R$</span>
+                        <input type="number" min="0" step="0.01"
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
+                          value={d.freight??""} placeholder="0" onChange={e=>setField(p.id, ch, "freight", e.target.value)}/>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1">🏪 Taxa</label>
+                      <div className="flex items-center gap-0.5">
+                        <input type="number" min="0" max="99" step="0.01"
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
+                          value={d.taxaPerc??""} placeholder="0" onChange={e=>setField(p.id, ch, "taxaPerc", e.target.value)}/>
+                        <span className="text-[10px] text-gray-400">%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1">➕ Outros</label>
+                      <div className="flex items-center gap-0.5">
+                        <span className="text-[10px] text-gray-400">R$</span>
+                        <input type="number" min="0" step="0.01"
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
+                          value={d.otherCosts??""} placeholder="0" onChange={e=>setField(p.id, ch, "otherCosts", e.target.value)}/>
+                      </div>
+                    </div>
+                  </div>
+                  {d.price>0 && (
+                    <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-gray-200">
+                      <span className={`text-[10px] font-bold ${mc}`}>{d.margin>0?`${d.margin}% margem`:"sem margem"}</span>
+                      <span className="text-[10px] text-gray-400">lucro: <strong className={mc}>{fmt(lucro)}</strong></span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 const PricingModule = ({ products, setProducts, onPriceHunt }) => {
   const [activeTab,   setActiveTab]   = useState("tabela");
