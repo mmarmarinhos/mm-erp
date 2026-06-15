@@ -6475,13 +6475,15 @@ const CanaisVendaTab = () => {
 };
 
 const TabelaPrecos = ({ products, setProducts }) => {
-  const [tSearch, setTSearch] = useState("");
-  const [tSaved,  setTSaved]  = useState(false);
+  const [tSearch,       setTSearch]       = useState("");
+  const [tSaved,        setTSaved]        = useState(false);
+  const [tFilterStatus, setTFilterStatus] = useState("Todos");
 
   const filtered = products.filter(p =>
-    !tSearch ||
+    (tFilterStatus === "Todos" || p.status === tFilterStatus) &&
+    (!tSearch ||
     p.name.toLowerCase().includes(tSearch.toLowerCase()) ||
-    (p.sku||"").toLowerCase().includes(tSearch.toLowerCase())
+    (p.sku||"").toLowerCase().includes(tSearch.toLowerCase()))
   );
 
   // channelPrices[ch] = { price, margin, freight, taxaPerc, otherCosts, qtd }
