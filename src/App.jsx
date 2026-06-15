@@ -5294,16 +5294,16 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
                           </button>
                           {onPriceHunt && (
                             <button onClick={()=>onPriceHunt(p.name,p.price)} title="Pesquisar preços (PriceHunt)"
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors text-xs">🔍</button>
+                              className="p-1.5 rounded-lg text-purple-500 hover:text-purple-700 hover:bg-purple-50 transition-colors text-xs">🔍</button>
                           )}
                           <button onClick={()=>{setMoveModal(p);}} title="Entrada"
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors font-bold text-xs">↑</button>
+                            className="p-1.5 rounded-lg text-green-500 hover:text-green-700 hover:bg-green-50 transition-colors font-bold text-xs">↑</button>
                           <button onClick={()=>{setMoveModal(p);}} title="Saída"
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors font-bold text-xs">↓</button>
-                          <button onClick={()=>setModal(p)} className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                            className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors font-bold text-xs">↓</button>
+                          <button onClick={()=>setModal(p)} className="p-1.5 rounded-lg text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors">
                             <Icon name="edit" size={13}/>
                           </button>
-                          <button onClick={()=>setConfirmDelete(p)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                          <button onClick={()=>setConfirmDelete(p)} className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors">
                             <Icon name="trash" size={13}/>
                           </button>
                         </div>
