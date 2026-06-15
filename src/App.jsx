@@ -6557,7 +6557,7 @@ const TabelaPrecos = ({ products, setProducts }) => {
                     <p className="font-semibold text-gray-800">{p.name}</p>
                     <div className="flex gap-2 mt-0.5 flex-wrap">
                       {p.sku && <span className="text-[10px] font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{p.sku}</span>}
-                      {cost>0 && <span className="text-[10px] text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded">Custo Médio Unitário: <strong>{fmt(cost)}</strong></span>}
+                      
                     </div>
                   </div>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${p.status==="Ativo"?"bg-green-100 text-green-700":"bg-gray-100 text-gray-500"}`}>{p.status}</span>
