@@ -4213,12 +4213,14 @@ const ReportsModule = ({ orders, finance, customers, suppliers }) => {
   , [orders, filterMode, period, dateFrom, dateTo]);
 
   // KPIs
-  const totalReceitas  = activeFin.filter(f=>f.type==="receita").reduce((s,f)=>s+f.amount,0);
+  const receitasFin    = activeFin.filter(f=>f.type==="receita").reduce((s,f)=>s+f.amount,0);
   const totalDespesas  = activeFin.filter(f=>f.type==="despesa").reduce((s,f)=>s+f.amount,0);
+  const totalPedidos   = periodOrders.length;
+  const receitasOrders = periodOrders.filter(o=>o.status!=="Cancelado").reduce((s,o)=>s+o.total,0);
+  // Receita total = pedidos do período + lançamentos financeiros de receita (sem dupla contagem)
+  const totalReceitas  = receitasOrders + receitasFin;
   const resultado      = totalReceitas - totalDespesas;
   const margem         = totalReceitas > 0 ? resultado/totalReceitas*100 : 0;
-  const totalPedidos   = periodOrders.length;
-  const receitasOrders = periodOrders.reduce((s,o)=>s+o.total,0);
   const ticketMedio    = totalPedidos > 0 ? receitasOrders/totalPedidos : 0;
 
   // Monthly trend — last 6 months from today
@@ -4228,9 +4230,11 @@ const ReportsModule = ({ orders, finance, customers, suppliers }) => {
       const d = new Date(base.getFullYear(), base.getMonth()-(5-i), 1);
       const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
       const txs = finance.filter(f=>f.status!=="cancelado"&&f.date.startsWith(key));
+      const ordMes = orders.filter(o=>o.status!=="Cancelado"&&(o.date||"").startsWith(key));
       return {
         label: d.toLocaleDateString("pt-BR",{month:"short"}).replace(".",""),
-        receitas: txs.filter(f=>f.type==="receita").reduce((s,f)=>s+f.amount,0),
+        receitas: txs.filter(f=>f.type==="receita").reduce((s,f)=>s+f.amount,0)
+                + ordMes.reduce((s,o)=>s+o.total,0),
         despesas: txs.filter(f=>f.type==="despesa").reduce((s,f)=>s+f.amount,0),
       };
     });
@@ -4340,7 +4344,7 @@ const ReportsModule = ({ orders, finance, customers, suppliers }) => {
         <div className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label:"Receitas",     value:fmt(totalReceitas),                          sub:`${activeFin.filter(f=>f.type==="receita").length} lançamentos`, color:"text-green-600", bg:"bg-white" },
+              { label:"Receitas",     value:fmt(totalReceitas),                          sub:`${totalPedidos} pedido${totalPedidos!==1?"s":""} + ${activeFin.filter(f=>f.type==="receita").length} lanç.`, color:"text-green-600", bg:"bg-white" },
               { label:"Resultado",    value:fmt(resultado),                              sub:`Margem: ${margem.toFixed(1)}%`,                                 color:resultado>=0?"text-indigo-700":"text-red-500", bg:resultado>=0?"bg-indigo-50":"bg-red-50" },
               { label:"Pedidos",      value:totalPedidos,                                sub:"no período",                                                    color:"text-gray-900",  bg:"bg-white" },
               { label:"Ticket Médio", value:ticketMedio>0?fmt(ticketMedio):"—",          sub:"por pedido",                                                    color:"text-gray-900",  bg:"bg-white" },
