@@ -9036,7 +9036,7 @@ const gerarCotacaoPDF = (cotacao, empresaRaw) => {
   if (w) { w.document.write(html); w.document.close(); }
 };
 
-const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [], products = [], empresa = {} }) => {
+const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [], products = [], setProducts, movements = [], setMovements, empresa = {} }) => {
   const [modal,    setModal]    = useState(null);
   const [detail,   setDetail]   = useState(null);
   const [filter,   setFilter]   = useState("Todos");
@@ -9116,6 +9116,36 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
     setOrders(prev=>[...prev,newOrder]);
     setCotacoes(prev=>prev.map(c=>c.id===cot.id ? {...c,status:"Convertida",orderId:newOrderId} : c));
     if (detail?.id===cot.id) setDetail({...cot,status:"Convertida",orderId:newOrderId});
+
+    // ── Baixa no estoque e registro de movimentação ──────────────────────
+    const itensVinculados = (cot.items||[]).filter(it=>it._prodId);
+    if (setProducts && itensVinculados.length > 0) {
+      setProducts(prev => prev.map(prod => {
+        const it = itensVinculados.find(i=>i._prodId===prod.id);
+        if (!it) return prod;
+        const novoEstoque = Math.max(0, (prod.stock||0) - (it.qty||0));
+        return { ...prod, stock: novoEstoque };
+      }));
+    }
+    if (setMovements && itensVinculados.length > 0) {
+      setMovements(prev => {
+        const base = prev;
+        const novos = itensVinculados.map((it, i) => {
+          const n = base.map(x=>parseInt(x.id.replace("MOV-",""))||0);
+          return {
+            id: `MOV-${String(Math.max(0,...n,0)+i+1).padStart(3,"0")}`,
+            productId: it._prodId,
+            type: "saida",
+            qty: it.qty||0,
+            date: today(),
+            reason: "Venda",
+            notes: `Pedido ${newOrderId} · ${cot.customer||""}`.trim(),
+          };
+        });
+        return [...base, ...novos];
+      });
+    }
+
     showToast(`✅ Cotação convertida em pedido ${newOrderId}!`);
   };
 
@@ -9573,7 +9603,7 @@ function ERPApp({ currentUser, onLogout }) {
     switch (active) {
       case "dashboard": return <DashboardModule orders={orders} />;
       case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products}/>;
-      case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} empresa={form}/>;
+      case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form}/>;
       case "sync":      return <SyncModule orders={orders} setOrders={updateOrders}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
