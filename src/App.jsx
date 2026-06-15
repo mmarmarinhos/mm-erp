@@ -824,6 +824,12 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
     const matchChannel = filterChannel === "Todos" || o.channel === filterChannel;
     const matchStatus  = filterStatus  === "Todos" || o.status  === filterStatus;
     return matchSearch && matchChannel && matchStatus && filterByDate(o);
+  }).sort((a, b) => {
+    const da = new Date(a.date + "T12:00:00");
+    const db = new Date(b.date + "T12:00:00");
+    if (db - da !== 0) return db - da;
+    // Desempate pelo número do pedido (maior = mais recente)
+    return parseInt(b.id.replace(/\D/g,"")) - parseInt(a.id.replace(/\D/g,""));
   });
 
   const totalValue = filtered.reduce((s, o) => s + o.total, 0);
