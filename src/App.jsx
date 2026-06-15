@@ -6601,7 +6601,7 @@ const TabelaPrecos = ({ products, setProducts }) => {
                             </div>
                             <div className="text-indigo-300 font-bold text-sm mt-4">×</div>
                             <div className="flex-1">
-                              <label className="text-[10px] font-semibold text-indigo-400 uppercase block mb-1">Custo Unit.</label>
+                              <label className="text-[10px] font-semibold text-indigo-400 uppercase block mb-1">Custo Médio Unit.</label>
                               <div className="border border-indigo-100 rounded-lg px-2 py-1.5 text-xs bg-indigo-50 text-center text-indigo-600 font-medium">
                                 {fmt(cost)}
                               </div>
