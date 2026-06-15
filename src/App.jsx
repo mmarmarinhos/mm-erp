@@ -7624,8 +7624,19 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
 
   const subtotal = (form.items||[]).reduce((s,it)=>s+(it.total||0),0);
 
+  const [saveError, setSaveError] = useState("");
+
   const handleSave = () => {
     if (!form.supplierName.trim() || (form.items||[]).length===0) return;
+    // Se status = Recebido, todos os itens devem ter _prodId
+    if (form.status === "Recebido") {
+      const unlinked = (form.items||[]).filter(it => !it._prodId);
+      if (unlinked.length > 0) {
+        setSaveError(`${unlinked.length} item(ns) sem vínculo com o catálogo de produtos. Selecione cada produto pelo campo de busca (autocomplete) antes de marcar como Recebido.`);
+        return;
+      }
+    }
+    setSaveError("");
     onSave({ ...form, subtotal, total: parseFloat(calcTotal({...form}).toFixed(2)) });
   };
 
@@ -7804,11 +7815,19 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
           </div>
         </div>
 
-        <div className="p-5 border-t border-gray-100 flex gap-3 shrink-0">
-          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
-          <button onClick={handleSave} className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">
-            {isNew ? "Criar Pedido" : "Salvar"}
-          </button>
+        <div className="p-5 border-t border-gray-100 shrink-0">
+          {saveError && (
+            <div className="mb-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
+              <span className="text-red-500 shrink-0 mt-0.5">⚠️</span>
+              <p className="text-xs text-red-700">{saveError}</p>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+            <button onClick={handleSave} className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">
+              {isNew ? "Criar Pedido" : "Salvar"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
