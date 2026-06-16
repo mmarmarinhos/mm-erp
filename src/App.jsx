@@ -2692,6 +2692,9 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
   const totalPaid     = activeOrders.filter(o=>o.paidDate).reduce((s,o)=>s+o.total,0);
   const totalOpen     = activeOrders.filter(o=>!o.paidDate).reduce((s,o)=>s+o.total,0);
   const totalOverdue  = activeOrders.filter(o=>!o.paidDate&&o.dueDate&&new Date(o.dueDate+"T12:00:00")<today0).reduce((s,o)=>s+o.total,0);
+  const paidOrders    = activeOrders.filter(o => o.paidDate);
+  const openOrders    = activeOrders.filter(o => !o.paidDate);
+  const overdueOrders = openOrders.filter(o => o.dueDate && new Date(o.dueDate+"T12:00:00") < today0);
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 flex items-center justify-center p-4">
@@ -2808,35 +2811,7 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
           )}
 
           {/* Financial Panel */}
-          {(() => {
-            const today0 = new Date(); today0.setHours(0,0,0,0);
-            const diffDays = (a, b) => Math.round((a - b) / 86400000);
-
-            const getFinStatus = (o) => {
-              if (o.status === "Cancelado") return { label:"Cancelado", bg:"bg-gray-100", text:"text-gray-400", icon:"✕" };
-              if (o.paidDate)               return { label:"Pago",      bg:"bg-green-100", text:"text-green-700", icon:"✅" };
-              if (!o.dueDate)               return { label:"Em aberto", bg:"bg-blue-50",   text:"text-blue-600",  icon:"🔵" };
-              const due = new Date(o.dueDate + "T12:00:00"); due.setHours(0,0,0,0);
-              const diff = diffDays(due, today0);
-              if (diff < 0)  return { label:`Vencido há ${Math.abs(diff)}d`, bg:"bg-red-100",   text:"text-red-700",   icon:"🔴" };
-              if (diff === 0)return { label:"Vence hoje",                    bg:"bg-amber-100", text:"text-amber-700", icon:"🟡" };
-              if (diff <= 3) return { label:`Vence em ${diff}d`,             bg:"bg-amber-50",  text:"text-amber-600", icon:"🟠" };
-              return               { label:`Vence em ${diff}d`,              bg:"bg-blue-50",   text:"text-blue-600",  icon:"🔵" };
-            };
-
-            const activeOrders = cOrders.filter(o => o.status !== "Cancelado");
-            const paidOrders   = activeOrders.filter(o => o.paidDate);
-            const openOrders   = activeOrders.filter(o => !o.paidDate);
-            const overdueOrders= openOrders.filter(o => {
-              if (!o.dueDate) return false;
-              const due = new Date(o.dueDate + "T12:00:00"); due.setHours(0,0,0,0);
-              return due < today0;
-            });
-            const totalPaid    = paidOrders.reduce((s,o) => s+o.total, 0);
-            const totalOpen    = openOrders.reduce((s,o) => s+o.total, 0);
-            const totalOverdue = overdueOrders.reduce((s,o) => s+o.total, 0);
-
-            return (
+          {(true) && (
               <div className="space-y-3">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   💰 Financeiro {cOrders.length > 0 && <span className="font-normal text-gray-400">({cOrders.length} pedido{cOrders.length!==1?"s":""})</span>}
@@ -2908,8 +2883,7 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
                   </div>
                 )}
               </div>
-            );
-          })()}
+          )}
         </div>
         )}
 
