@@ -11,7 +11,10 @@ async function getTokens() {
     headers: { Authorization: `Bearer ${VERCEL_API_TOKEN}` },
   });
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error('Falha ao ler tokens do Edge Config');
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Falha ao ler tokens do Edge Config (status ${res.status}): ${errBody}`);
+  }
   const data = await res.json();
   return data.value || null;
 }
