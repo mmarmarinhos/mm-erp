@@ -40,7 +40,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "2.3.6";
+const APP_VERSION = "2.3.7";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -868,7 +868,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
       const movimentos = [];
       items.forEach(it => {
         if (!it._prodId || (it.qty||0) <= 0) return;
-        const prod = products.find(p => p.id === it._prodId);
+        const prod = products.find(p => String(p.id) === String(it._prodId));
         if (!prod) return;
         movimentos.push({
           productId: prod.id,
@@ -882,7 +882,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
 
       if (movimentos.length > 0) {
         setProducts(prev => prev.map(prod => {
-          const it = items.find(i => i._prodId === prod.id);
+          const it = items.find(i => String(i._prodId) === String(prod.id));
           if (!it) return prod;
           return { ...prod, stock: Math.max(0, (prod.stock||0) - (it.qty||0)) };
         }));
