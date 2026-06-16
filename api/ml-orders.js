@@ -13,7 +13,7 @@ async function getTokens() {
   });
   const rawText = await res.text();
 
-  if (res.status === 404) return null;
+  if (res.status === 404 || res.status === 204) return null;
 
   if (!res.ok) {
     throw new Error(`Falha ao ler tokens (status ${res.status}): ${rawText || '(corpo vazio)'} | URL: ${url} | hasToken: ${!!VERCEL_API_TOKEN} | hasTeam: ${!!VERCEL_TEAM_ID} | hasEdgeConfig: ${!!EDGE_CONFIG_ID}`);
