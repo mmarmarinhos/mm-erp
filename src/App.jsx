@@ -6793,7 +6793,214 @@ const PLATFORM_INFO = {
   woocommerce:  { label:"Loja Própria",  emoji:"🔵", color:"text-blue-600",   bg:"bg-blue-50",   border:"border-blue-200"   },
 };
 
+// ─── MLAutomationPanel — Automação de mensagens pós-venda do Mercado Livre ──
+const ML_CONFIG_KEY = "ml_automation_config";
+const ML_LOG_KEY     = "ml_automation_log";
+const ML_DEFAULT_TEMPLATE = "Olá! Tudo bem com o seu pedido? Esperamos que esteja satisfeito(a) com a compra. Se precisar de qualquer coisa, é só chamar! 😊";
+
+const MLAutomationPanel = () => {
+  const [status,   setStatus]   = useState({ loading: true, connected: false });
+  const [config,   setConfig]   = useState({ template: ML_DEFAULT_TEMPLATE, daysDelay: 3, enabled: false });
+  const [log,      setLog]      = useState([]);
+  const [saving,   setSaving]   = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState(null);
+  const [checkError,  setCheckError]  = useState(null);
+
+  const checkStatus = async () => {
+    setStatus(s => ({ ...s, loading: true }));
+    try {
+      const res  = await fetch('/api/ml-orders?action=status');
+      const data = await res.json();
+      if (res.ok) {
+        setStatus({ loading: false, connected: true, user: data.user, expiresAt: data.token_expires_at });
+      } else {
+        setStatus({ loading: false, connected: false, authUrl: data.auth_url });
+      }
+    } catch (e) {
+      setStatus({ loading: false, connected: false, error: "Erro ao verificar conexão" });
+    }
+  };
+
+  useEffect(() => {
+    checkStatus();
+    window.storage.get(ML_CONFIG_KEY).then(r => {
+      if (r?.value) setConfig(JSON.parse(r.value));
+    }).catch(() => {});
+    window.storage.get(ML_LOG_KEY).then(r => {
+      if (r?.value) setLog(JSON.parse(r.value));
+    }).catch(() => {});
+  }, []);
+
+  const handleConnect = () => {
+    if (status.authUrl) window.location.href = status.authUrl;
+  };
+
+  const saveConfig = async (newConfig) => {
+    setSaving(true);
+    setConfig(newConfig);
+    try {
+      await window.storage.set(ML_CONFIG_KEY, JSON.stringify(newConfig));
+    } catch (e) { /* silent */ }
+    setSaving(false);
+  };
+
+  const checkAndSend = async () => {
+    setChecking(true); setCheckError(null); setCheckResult(null);
+    try {
+      const res  = await fetch(`/api/ml-orders?action=delivered_orders&days=${config.daysDelay + 2}`);
+      const data = await res.json();
+      if (!res.ok) { setCheckError(data.error || "Erro ao buscar pedidos"); setChecking(false); return; }
+
+      const orders = data.orders || [];
+      const sentIds = new Set(log.map(l => l.order_id));
+      const now = Date.now();
+      const minDelayMs = config.daysDelay * 24 * 60 * 60 * 1000;
+
+      const eligible = orders.filter(o => {
+        if (sentIds.has(String(o.id))) return false;
+        const deliveredAt = new Date(o.date_last_updated || o.date_closed).getTime();
+        return (now - deliveredAt) >= minDelayMs;
+      });
+
+      const newLogEntries = [];
+      for (const order of eligible) {
+        try {
+          const packId = order.pack_id || order.id;
+          const sendRes = await fetch('/api/ml-orders?action=send_message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pack_id: packId, message: config.template }),
+          });
+          newLogEntries.push({
+            order_id: String(order.id),
+            buyer: order.buyer?.nickname || "Comprador",
+            sent_at: new Date().toISOString(),
+            success: sendRes.ok,
+          });
+        } catch (e) {
+          newLogEntries.push({ order_id: String(order.id), buyer: order.buyer?.nickname || "Comprador", sent_at: new Date().toISOString(), success: false });
+        }
+      }
+
+      const updatedLog = [...newLogEntries, ...log].slice(0, 100);
+      setLog(updatedLog);
+      await window.storage.set(ML_LOG_KEY, JSON.stringify(updatedLog));
+      setCheckResult({ found: orders.length, eligible: eligible.length, sent: newLogEntries.filter(l=>l.success).length });
+
+    } catch (e) {
+      setCheckError("Erro ao processar: " + e.message);
+    }
+    setChecking(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Status de conexão */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-yellow-500 flex items-center justify-center text-xl">🛒</div>
+            <div>
+              <p className="font-semibold text-gray-800">Mercado Livre</p>
+              {status.loading ? (
+                <p className="text-xs text-gray-400">Verificando conexão...</p>
+              ) : status.connected ? (
+                <p className="text-xs text-green-600 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"/> Conectado como <strong>{status.user}</strong>
+                </p>
+              ) : (
+                <p className="text-xs text-gray-400">Não conectado</p>
+              )}
+            </div>
+          </div>
+          {!status.loading && !status.connected && (
+            <button onClick={handleConnect} className="px-4 py-2 bg-yellow-400 text-yellow-900 rounded-xl text-sm font-semibold hover:bg-yellow-500">
+              Conectar Mercado Livre
+            </button>
+          )}
+          {!status.loading && status.connected && (
+            <button onClick={checkStatus} className="text-xs text-gray-400 hover:text-gray-600">Atualizar status</button>
+          )}
+        </div>
+      </div>
+
+      {status.connected && (
+        <>
+          {/* Configuração do template */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-gray-800">Mensagem Automática Pós-Venda</p>
+              <button onClick={() => saveConfig({ ...config, enabled: !config.enabled })}
+                className={`w-12 h-6 rounded-full transition-all relative ${config.enabled ? "bg-green-500" : "bg-gray-300"}`}>
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${config.enabled ? "right-0.5" : "left-0.5"}`}/>
+              </button>
+            </div>
+            <p className="text-xs text-gray-400">
+              {config.enabled ? "Automação ativa — verifique periodicamente para enviar mensagens" : "Automação desativada"}
+            </p>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Enviar após quantos dias da entrega?</label>
+              <input type="number" min="1" max="14"
+                className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                value={config.daysDelay} onChange={e => saveConfig({ ...config, daysDelay: parseInt(e.target.value) || 1 })}/>
+              <span className="text-sm text-gray-500 ml-2">dias</span>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Mensagem</label>
+              <textarea rows={3} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+                value={config.template} onChange={e => saveConfig({ ...config, template: e.target.value })}/>
+            </div>
+            {saving && <p className="text-xs text-gray-400">Salvando...</p>}
+          </div>
+
+          {/* Verificação manual */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+            <button onClick={checkAndSend} disabled={checking}
+              className="w-full py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-yellow-900 rounded-xl font-semibold hover:from-yellow-500 hover:to-yellow-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+              {checking
+                ? <><div className="w-4 h-4 border-2 border-yellow-900/40 border-t-yellow-900 rounded-full animate-spin"/> Verificando pedidos...</>
+                : <><span>🔍</span> Verificar Pedidos Entregues Agora</>
+              }
+            </button>
+            {checkError && <p className="text-xs text-red-600 mt-2">⚠️ {checkError}</p>}
+            {checkResult && (
+              <div className="mt-3 bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700">
+                ✅ {checkResult.found} pedido(s) entregue(s) encontrado(s) · {checkResult.eligible} elegível(eis) · <strong>{checkResult.sent} mensagem(ns) enviada(s)</strong>
+              </div>
+            )}
+          </div>
+
+          {/* Log de mensagens enviadas */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Histórico de Mensagens Enviadas ({log.length})</p>
+            {log.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-6">Nenhuma mensagem enviada ainda</p>
+            ) : (
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {log.map((l, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs py-2 border-b border-gray-50 last:border-0">
+                    <div>
+                      <span className="font-mono text-indigo-600 font-bold">#{l.order_id}</span>
+                      <span className="text-gray-500 ml-2">{l.buyer}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400">{new Date(l.sent_at).toLocaleString("pt-BR")}</span>
+                      <span className={l.success ? "text-green-600" : "text-red-500"}>{l.success ? "✓" : "✕"}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const SyncModule = ({ orders, setOrders }) => {
+  const [moduleTab, setModuleTab] = useState("sync");
   const [backendUrl, setBackendUrl] = useState(() => localStorage.getItem("erp_backend_url") || "");
   const [editingUrl, setEditingUrl] = useState(!localStorage.getItem("erp_backend_url"));
   const [urlInput,   setUrlInput]   = useState(backendUrl);
@@ -6907,11 +7114,27 @@ const SyncModule = ({ orders, setOrders }) => {
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-xl">🔄</div>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Sincronização de Pedidos</h1>
+          <h1 className="text-xl font-bold text-gray-900">Sincronização & Automações</h1>
           <p className="text-sm text-gray-500">Mercado Livre · Shopee · WooCommerce → ERP</p>
         </div>
       </div>
 
+      {/* Seletor de abas */}
+      <div className="flex gap-2 bg-white rounded-2xl border border-gray-100 p-1.5 shadow-sm w-fit">
+        <button onClick={() => setModuleTab("sync")}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${moduleTab==="sync" ? "bg-indigo-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}>
+          🔄 Sincronização
+        </button>
+        <button onClick={() => setModuleTab("automacoes")}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${moduleTab==="automacoes" ? "bg-indigo-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}>
+          🤖 Automações
+        </button>
+      </div>
+
+      {moduleTab === "automacoes" && <MLAutomationPanel/>}
+
+      {moduleTab === "sync" && (
+      <>
       {/* Backend URL config */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
@@ -7062,6 +7285,8 @@ const SyncModule = ({ orders, setOrders }) => {
           </ol>
           <p className="text-xs text-indigo-500 mt-3">📄 Veja o guia completo em <strong>GUIA-SETUP.md</strong> nos arquivos baixados</p>
         </div>
+      )}
+      </>
       )}
     </div>
   );
