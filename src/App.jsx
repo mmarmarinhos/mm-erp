@@ -3952,7 +3952,7 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null), 3000); };
 
   const ativos   = suppliers.filter(s=>s.status==="Ativo").length;
-  const totalBought = suppliers.reduce((s,x)=>s+x.totalPurchased, 0);
+  const totalBought = purchases.filter(p=>p.status!=="Cancelado").reduce((s,p)=>s+(p.total||0), 0);
   const avgRating = suppliers.length ? (suppliers.reduce((s,x)=>s+x.rating,0)/suppliers.length).toFixed(1) : "—";
 
   const filtered = useMemo(() => suppliers
@@ -4137,7 +4137,7 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
 // ─── Reports Module ───────────────────────────────────────────────────────
 const PERIOD_OPTS = { "1m":"1 mês", "3m":"3 meses", "6m":"6 meses", "all":"Todo período" };
 
-const ReportsModule = ({ orders, finance, customers, suppliers }) => {
+const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [] }) => {
   const [tab, setTab]           = useState("resumo");
   const [filterMode, setFilterMode] = useState("todos");
   const [period, setPeriod] = useState(() => {
@@ -4459,8 +4459,16 @@ const ReportsModule = ({ orders, finance, customers, suppliers }) => {
           <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
             <h3 className="font-semibold text-gray-700 text-sm mb-4">Top Fornecedores por Volume Comprado</h3>
             <div className="space-y-2">
-              {[...suppliers].sort((a,b)=>b.totalPurchased-a.totalPurchased).slice(0,5).map((s,i)=>{
-                const maxBought = suppliers.reduce((m,x)=>Math.max(m,x.totalPurchased),0)||1;
+              {(() => {
+                const supTotals = suppliers.map(s => ({
+                  ...s,
+                  _realTotal: purchases.filter(p => p.supplierName === s.name && p.status !== "Cancelado").reduce((sum, p) => sum + (p.total||0), 0)
+                })).filter(s => s._realTotal > 0).sort((a,b) => b._realTotal - a._realTotal).slice(0,5);
+                const maxBought = supTotals.reduce((m,x) => Math.max(m, x._realTotal), 0) || 1;
+                return supTotals;
+              })().map((s,i) => {
+                const maxBought = purchases.filter(p=>p.status!=="Cancelado").reduce((m,p)=>Math.max(m,p.total||0),0)||1;
+                const realTotal = s._realTotal;
                 const pct = s.totalPurchased/maxBought*100;
                 return (
                   <div key={s.id} className="flex items-center gap-3 py-1.5 border-b border-gray-50 last:border-0">
@@ -9616,7 +9624,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "empresa":   return <EmpresaModule onSave={(data) => setEmpresaForm(data)}/>;
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
-      case "reports":   return <ReportsModule orders={orders} finance={finance} customers={customers} suppliers={suppliers}/>;
+      case "reports":   return <ReportsModule orders={orders} finance={finance} customers={customers} suppliers={suppliers} purchases={purchases}/>;
       default: return null;
     }
   };
