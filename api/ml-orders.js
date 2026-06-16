@@ -7,15 +7,23 @@ const VERCEL_API_TOKEN = process.env.VERCEL_API_TOKEN;
 const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID;
 
 async function getTokens() {
-  const res = await fetch(`https://api.vercel.com/v1/edge-config/${EDGE_CONFIG_ID}/item/ml_tokens?teamId=${VERCEL_TEAM_ID}`, {
+  const url = `https://api.vercel.com/v1/edge-config/${EDGE_CONFIG_ID}/item/ml_tokens?teamId=${VERCEL_TEAM_ID}`;
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${VERCEL_API_TOKEN}` },
   });
+  const rawText = await res.text();
+
   if (res.status === 404) return null;
+
   if (!res.ok) {
-    const errBody = await res.text();
-    throw new Error(`Falha ao ler tokens do Edge Config (status ${res.status}): ${errBody}`);
+    throw new Error(`Falha ao ler tokens (status ${res.status}): ${rawText || '(corpo vazio)'} | URL: ${url} | hasToken: ${!!VERCEL_API_TOKEN} | hasTeam: ${!!VERCEL_TEAM_ID} | hasEdgeConfig: ${!!EDGE_CONFIG_ID}`);
   }
-  const data = await res.json();
+
+  if (!rawText) {
+    throw new Error(`Resposta vazia com status ${res.status}. URL: ${url}`);
+  }
+
+  const data = JSON.parse(rawText);
   return data.value || null;
 }
 
