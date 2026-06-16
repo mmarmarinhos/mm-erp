@@ -1,20 +1,35 @@
 // api/ml-orders.js
 // Busca pedidos entregues do ML e retorna para o ERP
-// Também gerencia renovação de tokens
+// Tokens são lidos/atualizados no Vercel Edge Config (sobrevive a reset do banco de dados)
 
-async function getTokens(supabaseUrl, supabaseKey) {
-  const res = await fetch(`${supabaseUrl}/rest/v1/kv_store?key=eq.ml_tokens&select=value`, {
-    headers: {
-      'apikey': supabaseKey,
-      'Authorization': `Bearer ${supabaseKey}`,
-    },
+const EDGE_CONFIG_ID = process.env.ML_EDGE_CONFIG_ID;
+const VERCEL_API_TOKEN = process.env.VERCEL_API_TOKEN;
+
+async function getTokens() {
+  const res = await fetch(`https://api.vercel.com/v1/edge-config/${EDGE_CONFIG_ID}/item/ml_tokens`, {
+    headers: { Authorization: `Bearer ${VERCEL_API_TOKEN}` },
   });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('Falha ao ler tokens do Edge Config');
   const data = await res.json();
-  if (!data || data.length === 0) return null;
-  return JSON.parse(data[0].value);
+  return data.value || null;
 }
 
-async function refreshToken(tokens, supabaseUrl, supabaseKey) {
+async function saveTokens(tokens) {
+  const res = await fetch(`https://api.vercel.com/v1/edge-config/${EDGE_CONFIG_ID}/items`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${VERCEL_API_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      items: [{ operation: 'upsert', key: 'ml_tokens', value: tokens }],
+    }),
+  });
+  if (!res.ok) throw new Error('Falha ao salvar tokens no Edge Config');
+}
+
+async function refreshToken(tokens) {
   const res = await fetch('https://api.mercadolibre.com/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -38,36 +53,26 @@ async function refreshToken(tokens, supabaseUrl, supabaseKey) {
     obtained_at:   Date.now(),
   };
 
-  await fetch(`${supabaseUrl}/rest/v1/kv_store`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': supabaseKey,
-      'Authorization': `Bearer ${supabaseKey}`,
-      'Prefer': 'resolution=merge-duplicates',
-    },
-    body: JSON.stringify({ key: 'ml_tokens', value: JSON.stringify(updated) }),
-  });
-
+  await saveTokens(updated);
   return updated;
 }
 
-export default async function handler(req, res) {
-  const supabaseUrl = process.env.VITE_SUPABASE_URL;
-  const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+function getAuthUrl() {
+  return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${process.env.ML_CLIENT_ID}&redirect_uri=${process.env.ML_REDIRECT_URI}`;
+}
 
+export default async function handler(req, res) {
   try {
-    // Buscar tokens salvos
-    let tokens = await getTokens(supabaseUrl, supabaseKey);
+    let tokens = await getTokens();
 
     if (!tokens) {
       return res.status(401).json({ error: 'ML não conectado', auth_url: getAuthUrl() });
     }
 
-    // Renovar token se expirado (expirar em menos de 1h)
+    // Renovar token se expirado (margem de segurança de 1h)
     const expiresAt = tokens.obtained_at + (tokens.expires_in * 1000);
     if (Date.now() > expiresAt - 3600000) {
-      tokens = await refreshToken(tokens, supabaseUrl, supabaseKey);
+      tokens = await refreshToken(tokens);
     }
 
     const { action } = req.query;
@@ -87,7 +92,7 @@ export default async function handler(req, res) {
 
     // ── Ação: enviar mensagem pós-venda ───────────────────────────────────────
     if (action === 'send_message' && req.method === 'POST') {
-      const { pack_id, order_id, message } = req.body;
+      const { pack_id, message } = req.body;
       const msgRes = await fetch(
         `https://api.mercadolibre.com/messages/packs/${pack_id}/sellers/${tokens.user_id}`,
         {
@@ -124,8 +129,4 @@ export default async function handler(req, res) {
     console.error('Erro em ml-orders:', err);
     return res.status(500).json({ error: err.message });
   }
-}
-
-function getAuthUrl() {
-  return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${process.env.ML_CLIENT_ID}&redirect_uri=${process.env.ML_REDIRECT_URI}`;
 }

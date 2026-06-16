@@ -1,5 +1,29 @@
 // api/ml-callback.js
 // Recebe o código OAuth do ML após autorização e troca pelo access_token + refresh_token
+// Os tokens são salvos no Vercel Edge Config (não no banco de dados Supabase)
+// Isso garante que zerar o banco de dados NÃO afeta a conexão com o Mercado Livre,
+// e diferente de Environment Variables, o Edge Config não precisa de redeploy.
+
+async function saveTokensToEdgeConfig(tokens) {
+  const edgeConfigId = process.env.ML_EDGE_CONFIG_ID;
+  const apiToken     = process.env.VERCEL_API_TOKEN;
+
+  const res = await fetch(`https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${apiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      items: [{ operation: 'upsert', key: 'ml_tokens', value: tokens }],
+    }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Falha ao salvar tokens no Edge Config: ${errBody}`);
+  }
+}
 
 export default async function handler(req, res) {
   const { code, error } = req.query;
@@ -32,32 +56,17 @@ export default async function handler(req, res) {
       return res.redirect(`/?ml_error=${encodeURIComponent(data.message || 'Erro ao autenticar')}`);
     }
 
-    // Salvar tokens no Supabase (tabela kv_store)
-    const supabaseUrl = process.env.VITE_SUPABASE_URL;
-    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+    const tokens = {
+      access_token:  data.access_token,
+      refresh_token: data.refresh_token,
+      token_type:    data.token_type,
+      expires_in:    data.expires_in,
+      user_id:       data.user_id,
+      obtained_at:   Date.now(),
+    };
 
-    await fetch(`${supabaseUrl}/rest/v1/kv_store`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Prefer': 'resolution=merge-duplicates',
-      },
-      body: JSON.stringify({
-        key: 'ml_tokens',
-        value: JSON.stringify({
-          access_token:  data.access_token,
-          refresh_token: data.refresh_token,
-          token_type:    data.token_type,
-          expires_in:    data.expires_in,
-          user_id:       data.user_id,
-          obtained_at:   Date.now(),
-        }),
-      }),
-    });
+    await saveTokensToEdgeConfig(tokens);
 
-    // Redirecionar para o ERP com sucesso
     return res.redirect('/?ml_connected=true');
 
   } catch (err) {
@@ -65,3 +74,4 @@ export default async function handler(req, res) {
     return res.redirect(`/?ml_error=${encodeURIComponent('Erro interno ao autenticar')}`);
   }
 }
+
