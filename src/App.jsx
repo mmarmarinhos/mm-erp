@@ -34,6 +34,14 @@ const Icon = ({ name, size = 18, className = "" }) => {
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────
+
+// ─── Versão do Sistema ────────────────────────────────────────────────────────
+// Formato: MAJOR.MINOR.PATCH
+// MAJOR → mudança estrutural grande
+// MINOR → nova funcionalidade
+// PATCH → correção de bug ou ajuste visual
+const APP_VERSION = "2.1.0";
+
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
 const chId = (ch) => CHANNEL_TO_ID[ch] || ch;
@@ -9678,7 +9686,7 @@ function ERPApp({ currentUser, onLogout }) {
             </svg>
             Sair do sistema
           </button>
-          <p className="text-[10px] text-gray-300 text-center pb-2">ERP v2.0 • MM ERP</p>
+          <p className="text-[10px] text-gray-300 text-center pb-2">MM ERP v{APP_VERSION}</p>
         </div>
       </aside>
 
