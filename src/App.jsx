@@ -8059,6 +8059,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
     else         setPurchases(prev => [...prev, { ...data, id:nextPcId(prev), createdAt:today() }]);
 
     if (setProducts && (isReceived || wasReceived)) {
+      const movimentos = [];
       setProducts(prev => prev.map(prod => {
         let estoqueAtual = prod.stock || 0;
         let custoAtual   = prod.cost  || 0;
@@ -8074,6 +8075,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
             const novoCusto = estoqueAtual > 0
               ? parseFloat(((estoqueAtual * custoAtual + qtd * preco) / (estoqueAtual + qtd)).toFixed(4))
               : preco;
+            movimentos.push({ productId: prod.id, type: "entrada", qty: qtd, date: data.date || today(), reason: "Entrada por compra", notes: `Pedido ${data.id||"novo"} · ${data.supplierName||""}`.trim() });
             return { ...prod, stock: estoqueAtual + qtd, cost: novoCusto, lastPurchasePrice: preco };
           }
         }
@@ -8083,6 +8085,16 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
         }
         return prod;
       }));
+      // Registrar movimentos após atualizar produtos
+      if (setMovements && movimentos.length > 0) {
+        setMovements(prev => {
+          const base = prev;
+          return [...base, ...movimentos.map((m, i) => {
+            const n = base.map(x => parseInt(x.id.replace("MOV-",""))||0);
+            return { ...m, id: `MOV-${String(Math.max(0,...n,0)+i+1).padStart(3,"0")}` };
+          })];
+        });
+      }
     }
     setModal(null); setDetail(null);
   };
