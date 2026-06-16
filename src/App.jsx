@@ -4215,15 +4215,20 @@ const ReportsModule = ({ orders, finance, customers, suppliers }) => {
   }, [finance]);
 
   // Revenue by channel (from finance categories)
-  const channelRevData = useMemo(() => [
-    { label:"Mercado Livre", cat:"Vendas ML",            color:"#f59e0b" },
-    { label:"Shopee",        cat:"Vendas Shopee",         color:"#f97316" },
-    { label:"WhatsApp",      cat:"Vendas WhatsApp",       color:"#22c55e" },
-    { label:"Loja Própria",  cat:"Vendas Loja Própria",   color:"#6366f1" },
-  ].map(c => ({
-    ...c, value: activeFin.filter(f=>f.type==="receita"&&f.category===c.cat).reduce((s,f)=>s+f.amount,0)
-  })).filter(c=>c.value>0).sort((a,b)=>b.value-a.value)
-  , [activeFin]);
+  const channelRevData = useMemo(() => {
+    const CHANNEL_COLORS = {
+      "Mercado Livre": "#f59e0b",
+      "Shopee":        "#f97316",
+      "WhatsApp":      "#22c55e",
+      "Loja Própria":  "#6366f1",
+      "Outro":         "#8b5cf6",
+    };
+    return CHANNELS.map(ch => ({
+      label: ch,
+      color: CHANNEL_COLORS[ch] || "#6b7280",
+      value: periodOrders.filter(o => o.channel === ch && o.status !== "Cancelado").reduce((s,o) => s + o.total, 0),
+    })).filter(c => c.value > 0).sort((a,b) => b.value - a.value);
+  }, [periodOrders]);
 
   // Orders by channel
   const ordersByChannel = useMemo(() => CHANNELS.map(c => ({
@@ -4385,7 +4390,7 @@ const ReportsModule = ({ orders, finance, customers, suppliers }) => {
             {/* Revenue by channel */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
               <h3 className="font-semibold text-gray-700 text-sm mb-1">Receita por Canal</h3>
-              <p className="text-xs text-gray-400 mb-4">Baseado nos repasses financeiros</p>
+              <p className="text-xs text-gray-400 mb-4">Baseado nos pedidos do período</p>
               {channelRevData.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-8">Sem dados no período</p>
               ) : (
