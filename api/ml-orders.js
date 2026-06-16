@@ -4,9 +4,10 @@
 
 const EDGE_CONFIG_ID = process.env.ML_EDGE_CONFIG_ID;
 const VERCEL_API_TOKEN = process.env.VERCEL_API_TOKEN;
+const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID;
 
 async function getTokens() {
-  const res = await fetch(`https://api.vercel.com/v1/edge-config/${EDGE_CONFIG_ID}/item/ml_tokens`, {
+  const res = await fetch(`https://api.vercel.com/v1/edge-config/${EDGE_CONFIG_ID}/item/ml_tokens?teamId=${VERCEL_TEAM_ID}`, {
     headers: { Authorization: `Bearer ${VERCEL_API_TOKEN}` },
   });
   if (res.status === 404) return null;
@@ -16,7 +17,7 @@ async function getTokens() {
 }
 
 async function saveTokens(tokens) {
-  const res = await fetch(`https://api.vercel.com/v1/edge-config/${EDGE_CONFIG_ID}/items`, {
+  const res = await fetch(`https://api.vercel.com/v1/edge-config/${EDGE_CONFIG_ID}/items?teamId=${VERCEL_TEAM_ID}`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${VERCEL_API_TOKEN}`,

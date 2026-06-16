@@ -7,8 +7,9 @@
 async function saveTokensToEdgeConfig(tokens) {
   const edgeConfigId = process.env.ML_EDGE_CONFIG_ID;
   const apiToken     = process.env.VERCEL_API_TOKEN;
+  const teamId       = process.env.VERCEL_TEAM_ID;
 
-  const res = await fetch(`https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`, {
+  const res = await fetch(`https://api.vercel.com/v1/edge-config/${edgeConfigId}/items?teamId=${teamId}`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${apiToken}`,
