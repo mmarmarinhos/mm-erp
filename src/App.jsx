@@ -40,7 +40,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "2.3.5";
+const APP_VERSION = "2.3.6";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -779,7 +779,7 @@ const gerarPedidoPDF = async (order) => {
   if (w) { w.document.write(html); w.document.close(); }
 };
 
-const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [] }) => {
+const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements }) => {
   const [search, setSearch] = useState("");
   const [filterChannel, setFilterChannel] = useState("Todos");
   const [filterStatus, setFilterStatus] = useState("Todos");
@@ -843,11 +843,15 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
   const totalValue = filtered.reduce((s, o) => s + o.total, 0);
 
   const handleSave = (data) => {
+    const orderId = data.id || nextId(orders);
+    const savedOrder = data.id ? data : { ...data, id: orderId };
+
     if (data.id) {
       setOrders(prev => prev.map(o => o.id === data.id ? data : o));
     } else {
-      setOrders(prev => [{ ...data, id: nextId(prev) }, ...prev]);
+      setOrders(prev => [savedOrder, ...prev]);
     }
+
     // Ativar cliente automaticamente quando tiver pedido
     if (data.customer && setCustomers && data.status !== "Cancelado") {
       setCustomers(prev => prev.map(c =>
@@ -856,6 +860,45 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
           : c
       ));
     }
+
+    // Dar baixa no estoque para novos pedidos (não cancelados)
+    const isNewOrder = !data.id;
+    const items = data.itemsList || [];
+    if (isNewOrder && setProducts && data.status !== "Cancelado" && items.length > 0) {
+      const movimentos = [];
+      items.forEach(it => {
+        if (!it._prodId || (it.qty||0) <= 0) return;
+        const prod = products.find(p => p.id === it._prodId);
+        if (!prod) return;
+        movimentos.push({
+          productId: prod.id,
+          type: "saida",
+          qty: it.qty || 0,
+          date: data.date || today(),
+          reason: "Venda",
+          notes: `Pedido ${orderId} · ${data.customer||""}`.trim(),
+        });
+      });
+
+      if (movimentos.length > 0) {
+        setProducts(prev => prev.map(prod => {
+          const it = items.find(i => i._prodId === prod.id);
+          if (!it) return prod;
+          return { ...prod, stock: Math.max(0, (prod.stock||0) - (it.qty||0)) };
+        }));
+
+        if (setMovements) {
+          setMovements(prev => {
+            const n = prev.map(x => parseInt(x.id.replace("MOV-",""))||0);
+            const base = Math.max(0, ...n, 0);
+            return [...prev, ...movimentos.map((m, i) => ({
+              ...m, id: `MOV-${String(base + i + 1).padStart(3,"0")}`
+            }))];
+          });
+        }
+      }
+    }
+
     setModal(null);
   };
 
@@ -9861,7 +9904,7 @@ function ERPApp({ currentUser, onLogout }) {
   const renderModule = () => {
     switch (active) {
       case "dashboard": return <DashboardModule orders={orders} />;
-      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products}/>;
+      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form}/>;
       case "sync":      return <SyncModule orders={orders} setOrders={updateOrders}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
