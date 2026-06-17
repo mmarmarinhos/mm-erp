@@ -7343,7 +7343,6 @@ const MLAutomationPanel = () => {
 };
 
 const SyncModule = ({ orders, setOrders }) => {
-  const [moduleTab, setModuleTab] = useState("sync");
   const [backendUrl, setBackendUrl] = useState(() => localStorage.getItem("erp_backend_url") || "");
   const [editingUrl, setEditingUrl] = useState(!localStorage.getItem("erp_backend_url"));
   const [urlInput,   setUrlInput]   = useState(backendUrl);
@@ -7457,27 +7456,11 @@ const SyncModule = ({ orders, setOrders }) => {
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-xl">🔄</div>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Sincronização & Automações</h1>
+          <h1 className="text-xl font-bold text-gray-900">Sincronização</h1>
           <p className="text-sm text-gray-500">Mercado Livre · Shopee · WooCommerce → ERP</p>
         </div>
       </div>
 
-      {/* Seletor de abas */}
-      <div className="flex gap-2 bg-white rounded-2xl border border-gray-100 p-1.5 shadow-sm w-fit">
-        <button onClick={() => setModuleTab("sync")}
-          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${moduleTab==="sync" ? "bg-indigo-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}>
-          🔄 Sincronização
-        </button>
-        <button onClick={() => setModuleTab("automacoes")}
-          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${moduleTab==="automacoes" ? "bg-indigo-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}>
-          🤖 Automações
-        </button>
-      </div>
-
-      {moduleTab === "automacoes" && <MLAutomationPanel/>}
-
-      {moduleTab === "sync" && (
-      <>
       {/* Backend URL config */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
@@ -7628,8 +7611,6 @@ const SyncModule = ({ orders, setOrders }) => {
           </ol>
           <p className="text-xs text-indigo-500 mt-3">📄 Veja o guia completo em <strong>GUIA-SETUP.md</strong> nos arquivos baixados</p>
         </div>
-      )}
-      </>
       )}
     </div>
   );
@@ -10088,7 +10069,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa }) => {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-2xl p-1.5 flex-wrap">
-        {[["empresa","🏢 Empresa"],["canais","💳 Canais"],["alertas","🔔 Alertas"],["sync","🔗 Sincronização"]].map(([id,label])=>(
+        {[["empresa","🏢 Empresa"],["canais","💳 Canais"],["alertas","🔔 Alertas"],["sync","🔗 Sincronização"],["automacao","🤖 Automação"]].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${tab===id?"bg-white text-gray-900 shadow-sm":"text-gray-500 hover:text-gray-700"}`}>
             {label}
@@ -10444,6 +10425,16 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa }) => {
             className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
             💾 Salvar Sincronização
           </button>
+        </div>
+      )}
+
+      {/* ══ TAB: AUTOMAÇÃO ══════════════════════════════════════════════ */}
+      {tab==="automacao" && (
+        <div className="space-y-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-xs text-yellow-800 leading-relaxed">
+            🤖 Mensagens automáticas pós-venda enviadas via Mercado Livre, com base em pedidos entregues.
+          </div>
+          <MLAutomationPanel/>
         </div>
       )}
     </div>
