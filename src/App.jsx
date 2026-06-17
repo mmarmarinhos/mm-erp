@@ -24,6 +24,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
     truck: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />,
     arrowUp: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />,
     arrowDown: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />,
+    settings: <><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></>,
     eye: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />,
   };
   return (
@@ -9003,6 +9004,42 @@ const CANAIS_DEFAULT = [
   { canal:"Telefone",      taxaPerc:0,  taxaFixa:0,  prazoRepasse:0,  ativo:true },
 ];
 
+// ─── Params Storage ───────────────────────────────────────────────────────
+const PARAMS_KEY = "erp-mmarmarinhos-params";
+const PARAMS_DEFAULT = {
+  canais: {
+    "Mercado Livre": { comissao: 12,  gateway: 3.5, ativo: true, sla: 3 },
+    "Shopee":        { comissao: 14,  gateway: 2.0, ativo: true, sla: 2 },
+    "WhatsApp":      { comissao: 0,   gateway: 0,   ativo: true, sla: 2 },
+    "Loja Própria":  { comissao: 0,   gateway: 2.5, ativo: true, sla: 3 },
+  },
+  alertas: { diasInatividade: 30, emailAlertas: "" },
+  sincronizacao: {
+    ml:     { accessToken: "", clientId: "", refreshToken: "", autoImport: false },
+    shopee: { partnerId: "",  partnerKey: "", shopId: "",     autoImport: false },
+    backendUrl: "",
+  },
+};
+async function loadParams() {
+  try {
+    const r = await window.storage.get(PARAMS_KEY);
+    if (r?.value) {
+      const saved = JSON.parse(r.value);
+      return {
+        ...PARAMS_DEFAULT,
+        ...saved,
+        canais: { ...PARAMS_DEFAULT.canais, ...(saved.canais||{}) },
+        alertas: { ...PARAMS_DEFAULT.alertas, ...(saved.alertas||{}) },
+        sincronizacao: { ...PARAMS_DEFAULT.sincronizacao, ...(saved.sincronizacao||{}) },
+      };
+    }
+  } catch(_) {}
+  return { ...PARAMS_DEFAULT };
+}
+async function saveParams(p) {
+  try { await window.storage.set(PARAMS_KEY, JSON.stringify(p)); } catch(_) {}
+}
+
 const EMPRESA_KEY = "erp_empresa_dados";
 const EMPRESA_EMPTY = {
   razaoSocial:"", nomeFantasia:"", cnpj:"", ie:"", im:"",
@@ -9980,6 +10017,440 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
   );
 };
 
+// ─── Params Module ────────────────────────────────────────────────────────
+const CHANNEL_EMOJI_MAP = { "Mercado Livre":"🛒","Shopee":"🛍️","WhatsApp":"💬","Loja Própria":"🏪" };
+const CHANNEL_DOT_COLOR = { "Mercado Livre":"bg-yellow-500","Shopee":"bg-orange-500","WhatsApp":"bg-green-500","Loja Própria":"bg-blue-500" };
+
+const ParamsModule = ({ params, setParams, onSaveEmpresa }) => {
+  const [tab, setTab]       = useState("empresa");
+  const [toast, setToast]   = useState(null);
+  const [revealed, setRevealed] = useState({});
+
+  // Empresa tab — usa EMPRESA_KEY (mesma chave que EmpresaModule)
+  const [empresa, setEmpresa]     = useState(EMPRESA_EMPTY);
+  const [empLoading, setEmpLoading] = useState(true);
+
+  // Params locais editáveis
+  const [canais,  setCanais]  = useState(params?.canais        || PARAMS_DEFAULT.canais);
+  const [alertas, setAlertas] = useState(params?.alertas       || PARAMS_DEFAULT.alertas);
+  const [sync,    setSync]    = useState(params?.sincronizacao || PARAMS_DEFAULT.sincronizacao);
+
+  useEffect(() => {
+    if (params) {
+      setCanais(params.canais        || PARAMS_DEFAULT.canais);
+      setAlertas(params.alertas      || PARAMS_DEFAULT.alertas);
+      setSync(params.sincronizacao   || PARAMS_DEFAULT.sincronizacao);
+    }
+  }, [params]);
+
+  useEffect(() => {
+    window.storage.get(EMPRESA_KEY).catch(()=>null).then(r => {
+      if (r?.value) setEmpresa(prev => ({...prev,...JSON.parse(r.value)}));
+      setEmpLoading(false);
+    });
+  }, []);
+
+  const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null), 2500); };
+  const setE = (k,v) => setEmpresa(f=>({...f,[k]:v}));
+  const setC = (ch,k,v) => setCanais(prev=>({...prev,[ch]:{...prev[ch],[k]:v}}));
+  const setA = (k,v) => setAlertas(prev=>({...prev,[k]:v}));
+  const setS = (plat,k,v) => setSync(prev =>
+    k==="backendUrl" ? {...prev,backendUrl:v} : {...prev,[plat]:{...prev[plat],[k]:v}}
+  );
+
+  const handleSaveEmpresa = async () => {
+    await window.storage.set(EMPRESA_KEY, JSON.stringify(empresa)).catch(()=>{});
+    if (onSaveEmpresa) onSaveEmpresa(empresa);
+    showToast("✅ Dados da empresa salvos!");
+  };
+
+  const mergeAndSave = async (patch) => {
+    const next = { ...(params||PARAMS_DEFAULT), ...patch };
+    await saveParams(next);
+    setParams(next);
+  };
+
+  const inp = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white";
+
+  return (
+    <div className="space-y-4">
+      {toast && <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg animate-pulse">{toast}</div>}
+
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center shrink-0 shadow-md">
+          <Icon name="settings" size={18} className="text-white"/>
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Parâmetros do Sistema</h1>
+          <p className="text-sm text-gray-500">Configurações gerais da MM Armarinhos</p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 rounded-2xl p-1.5 flex-wrap">
+        {[["empresa","🏢 Empresa"],["canais","💳 Canais"],["alertas","🔔 Alertas"],["sync","🔗 Sincronização"]].map(([id,label])=>(
+          <button key={id} onClick={()=>setTab(id)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${tab===id?"bg-white text-gray-900 shadow-sm":"text-gray-500 hover:text-gray-700"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ══ TAB: EMPRESA ══════════════════════════════════════════════ */}
+      {tab==="empresa" && (
+        empLoading
+          ? <div className="flex items-center justify-center py-16"><div className="w-7 h-7 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"/></div>
+          : <div className="space-y-4">
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">🏛 Identificação</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div><label className="text-xs font-medium text-gray-600 block mb-1">Razão Social</label>
+                    <input className={inp} value={empresa.razaoSocial||""} onChange={e=>setE("razaoSocial",e.target.value)} placeholder="MM Armarinhos Ltda"/></div>
+                  <div><label className="text-xs font-medium text-gray-600 block mb-1">Nome Fantasia</label>
+                    <input className={inp} value={empresa.nomeFantasia||""} onChange={e=>setE("nomeFantasia",e.target.value)} placeholder="MM Armarinhos"/></div>
+                  <div><label className="text-xs font-medium text-gray-600 block mb-1">CNPJ</label>
+                    <input className={`${inp} font-mono`} value={empresa.cnpj||""} onChange={e=>setE("cnpj",e.target.value)} placeholder="00.000.000/0001-00"/></div>
+                  <div><label className="text-xs font-medium text-gray-600 block mb-1">Inscrição Estadual</label>
+                    <input className={`${inp} font-mono`} value={empresa.ie||""} onChange={e=>setE("ie",e.target.value)} placeholder="000.000.000.000"/></div>
+                  <div><label className="text-xs font-medium text-gray-600 block mb-1">Regime Tributário</label>
+                    <select className={inp} value={empresa.regime||"Simples Nacional"} onChange={e=>setE("regime",e.target.value)}>
+                      {REGIMES.map(r=><option key={r}>{r}</option>)}
+                    </select></div>
+                  <div><label className="text-xs font-medium text-gray-600 block mb-1">Responsável</label>
+                    <input className={inp} value={empresa.responsavel||""} onChange={e=>setE("responsavel",e.target.value)} placeholder="Nome do responsável"/></div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">📍 Endereço</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div><label className="text-xs font-medium text-gray-600 block mb-1">CEP</label>
+                    <input className={`${inp} font-mono`} value={empresa.cep||""} onChange={e=>setE("cep",e.target.value)} placeholder="00000-000"/></div>
+                  <div className="col-span-2"><label className="text-xs font-medium text-gray-600 block mb-1">Logradouro</label>
+                    <input className={inp} value={empresa.rua||""} onChange={e=>setE("rua",e.target.value)} placeholder="Rua, Av, etc."/></div>
+                  <div><label className="text-xs font-medium text-gray-600 block mb-1">Número</label>
+                    <input className={inp} value={empresa.numero||""} onChange={e=>setE("numero",e.target.value)} placeholder="123"/></div>
+                  <div><label className="text-xs font-medium text-gray-600 block mb-1">Bairro</label>
+                    <input className={inp} value={empresa.bairro||""} onChange={e=>setE("bairro",e.target.value)} placeholder="Bairro"/></div>
+                  <div><label className="text-xs font-medium text-gray-600 block mb-1">Cidade / UF</label>
+                    <div className="flex gap-1">
+                      <input className={inp} value={empresa.cidade||""} onChange={e=>setE("cidade",e.target.value)} placeholder="Cidade"/>
+                      <input className="w-14 border border-gray-200 rounded-xl px-2 py-2.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-300" value={empresa.estado||""} onChange={e=>setE("estado",e.target.value.toUpperCase().slice(0,2))} placeholder="SP"/>
+                    </div></div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">📞 Contato</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div><label className="text-xs font-medium text-gray-600 block mb-1">Telefone</label>
+                    <input className={inp} value={empresa.telefone||""} onChange={e=>setE("telefone",e.target.value)} placeholder="(11) 0000-0000"/></div>
+                  <div><label className="text-xs font-medium text-gray-600 block mb-1">WhatsApp / Celular</label>
+                    <input className={inp} value={empresa.celular||""} onChange={e=>setE("celular",e.target.value)} placeholder="(11) 99999-9999"/></div>
+                  <div><label className="text-xs font-medium text-gray-600 block mb-1">E-mail</label>
+                    <input type="email" className={inp} value={empresa.email||""} onChange={e=>setE("email",e.target.value)} placeholder="contato@mmarmarinhos.com.br"/></div>
+                  <div><label className="text-xs font-medium text-gray-600 block mb-1">Site</label>
+                    <input type="url" className={inp} value={empresa.site||""} onChange={e=>setE("site",e.target.value)} placeholder="https://mmarmarinhos.com.br"/></div>
+                </div>
+              </div>
+
+              <button onClick={handleSaveEmpresa}
+                className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+                💾 Salvar Dados da Empresa
+              </button>
+            </div>
+      )}
+
+      {/* ══ TAB: CANAIS & COMISSÕES ═══════════════════════════════════ */}
+      {tab==="canais" && (
+        <div className="space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 leading-relaxed">
+            💡 Taxas de referência para precificação. O mini-simulador mostra o custo real para um produto de R$ 100.
+          </div>
+          {CHANNELS.map(ch => {
+            const cfg = canais[ch] || PARAMS_DEFAULT.canais[ch] || { comissao:0, gateway:0, ativo:true, sla:3 };
+            const taxa = (cfg.comissao||0) + (cfg.gateway||0);
+            return (
+              <div key={ch} className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-opacity ${!cfg.ativo?"opacity-55":""}`}>
+                <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50">
+                  <div className="flex items-center gap-2.5">
+                    <span className={`w-2.5 h-2.5 rounded-full ${CHANNEL_DOT_COLOR[ch]}`}/>
+                    <span className="font-semibold text-gray-800 text-sm">{CHANNEL_EMOJI_MAP[ch]} {ch}</span>
+                    <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                      total: <b>{taxa.toFixed(1)}%</b>
+                    </span>
+                  </div>
+                  <button onClick={()=>setC(ch,"ativo",!cfg.ativo)}
+                    className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-all ${cfg.ativo?"bg-green-50 text-green-600 border-green-200":"bg-gray-50 text-gray-400 border-gray-200"}`}>
+                    {cfg.ativo?"● Ativo":"○ Inativo"}
+                  </button>
+                </div>
+                <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1.5 font-medium">Comissão marketplace</label>
+                    <div className="flex items-center gap-1">
+                      <input type="number" min="0" max="50" step="0.1"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        value={cfg.comissao||0} onChange={e=>setC(ch,"comissao",parseFloat(e.target.value)||0)}/>
+                      <span className="text-xs text-gray-400">%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1.5 font-medium">Gateway / Pagamento</label>
+                    <div className="flex items-center gap-1">
+                      <input type="number" min="0" max="10" step="0.1"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        value={cfg.gateway||0} onChange={e=>setC(ch,"gateway",parseFloat(e.target.value)||0)}/>
+                      <span className="text-xs text-gray-400">%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1.5 font-medium">SLA postagem (dias úteis)</label>
+                    <input type="number" min="1" max="10"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                      value={cfg.sla||2} onChange={e=>setC(ch,"sla",parseInt(e.target.value)||1)}/>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1.5 font-medium">Simulação (R$ 100,00)</label>
+                    <div className="bg-indigo-50 rounded-xl p-2.5 text-center">
+                      <p className="text-[10px] text-gray-400">taxas totais</p>
+                      <p className="font-bold text-indigo-700 text-lg leading-none mt-0.5">
+                        − R$ {taxa.toFixed(2).replace(".",",")}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">sobram R$ {(100-taxa).toFixed(2).replace(".",",")}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <button onClick={()=>mergeAndSave({canais}).then(()=>showToast("✅ Canais & Comissões salvos!"))}
+            className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+            💾 Salvar Canais & Comissões
+          </button>
+        </div>
+      )}
+
+      {/* ══ TAB: ALERTAS ════════════════════════════════════════════════ */}
+      {tab==="alertas" && (
+        <div className="space-y-4">
+          {/* Inatividade de clientes */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">👥 Clientes</p>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-gray-600">
+                  Inativar cliente após <span className="font-bold text-indigo-700">{alertas.diasInatividade}</span> dias sem compras
+                </label>
+                <span className="text-xs bg-indigo-50 text-indigo-600 px-2.5 py-0.5 rounded-full font-bold">{alertas.diasInatividade}d</span>
+              </div>
+              <input type="range" min="7" max="90" step="1" className="w-full accent-indigo-600"
+                value={alertas.diasInatividade} onChange={e=>setA("diasInatividade",parseInt(e.target.value))}/>
+              <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                <span>7 dias</span><span>30 dias</span><span>90 dias</span>
+              </div>
+              <p className="mt-2 text-xs text-gray-400 bg-gray-50 rounded-xl px-3 py-2">
+                Clientes sem compras há mais de <b>{alertas.diasInatividade} dias</b> são marcados como <b>Inativo</b> automaticamente.
+              </p>
+            </div>
+          </div>
+
+          {/* SLA por canal */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">📬 SLA de Postagem por Canal</p>
+              <p className="text-xs text-gray-400 mt-1">Prazo máximo em dias úteis para postar o pedido (usado no Dashboard)</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {CHANNELS.map(ch=>{
+                const cfg = canais[ch] || PARAMS_DEFAULT.canais[ch];
+                return (
+                  <div key={ch} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                    <span className="text-sm text-gray-700 font-medium">{CHANNEL_EMOJI_MAP[ch]} {ch}</span>
+                    <div className="flex items-center gap-1.5">
+                      <input type="number" min="1" max="10"
+                        className="w-14 border border-gray-200 rounded-lg px-2 py-1.5 text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        value={cfg.sla||2} onChange={e=>setC(ch,"sla",parseInt(e.target.value)||1)}/>
+                      <span className="text-xs text-gray-400">dias</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-gray-400">⚡ Alterar o SLA aqui também atualiza a aba Canais & Comissões.</p>
+          </div>
+
+          {/* Email */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">📧 Notificações</p>
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1.5">E-mail para alertas do sistema</label>
+              <input type="email" className={inp}
+                value={alertas.emailAlertas||""} onChange={e=>setA("emailAlertas",e.target.value)}
+                placeholder="email@mmarmarinhos.com.br"/>
+              <p className="text-xs text-gray-400 mt-1.5">Alertas de estoque crítico, pedidos atrasados e obrigações fiscais.</p>
+            </div>
+          </div>
+
+          <button onClick={()=>mergeAndSave({canais, alertas}).then(()=>showToast("✅ Alertas configurados!"))}
+            className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+            💾 Salvar Alertas
+          </button>
+        </div>
+      )}
+
+      {/* ══ TAB: SINCRONIZAÇÃO ══════════════════════════════════════════ */}
+      {tab==="sync" && (
+        <div className="space-y-4">
+          <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 text-xs text-sky-800 leading-relaxed">
+            🔐 As credenciais são armazenadas localmente no banco de dados do ERP. A chave nunca é transmitida sem HTTPS.
+          </div>
+
+          {/* Backend URL */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span>⚙️</span>
+                <p className="text-sm font-bold text-gray-700">Servidor de Sincronização</p>
+              </div>
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${sync.backendUrl?"bg-green-100 text-green-700":"bg-gray-100 text-gray-400"}`}>
+                {sync.backendUrl?"● Configurado":"○ Não configurado"}
+              </span>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">URL do Backend (Cloudflare Worker)</label>
+              <input className={`${inp} font-mono`}
+                value={sync.backendUrl||""} onChange={e=>setS(null,"backendUrl",e.target.value)}
+                placeholder="https://mma-sync.usuario.workers.dev"/>
+              <p className="text-xs text-gray-400 mt-1">Worker responsável pela comunicação com as APIs dos marketplaces.</p>
+            </div>
+          </div>
+
+          {/* Mercado Livre */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3.5 bg-yellow-50 border-b border-yellow-100">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">🛒</span>
+                <div>
+                  <p className="font-bold text-gray-800 text-sm">Mercado Livre</p>
+                  <p className="text-[11px] text-gray-500">ML for Business API v2</p>
+                </div>
+              </div>
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${sync.ml?.accessToken?"bg-green-100 text-green-700":"bg-gray-100 text-gray-400"}`}>
+                {sync.ml?.accessToken?"● Configurado":"○ Não configurado"}
+              </span>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">App ID / Client ID</label>
+                  <input className={`${inp} font-mono`} value={sync.ml?.clientId||""} onChange={e=>setS("ml","clientId",e.target.value)} placeholder="123456789"/>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Access Token</label>
+                  <div className="flex gap-1">
+                    <input type={revealed.mlToken?"text":"password"} className={`${inp} font-mono`}
+                      value={sync.ml?.accessToken||""} onChange={e=>setS("ml","accessToken",e.target.value)} placeholder="APP_USR-..."/>
+                    <button onClick={()=>setRevealed(r=>({...r,mlToken:!r.mlToken}))}
+                      className="px-3 border border-gray-200 rounded-xl text-gray-400 hover:bg-gray-50 text-xs shrink-0">
+                      {revealed.mlToken?"🙈":"👁️"}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Refresh Token</label>
+                  <div className="flex gap-1">
+                    <input type={revealed.mlRefresh?"text":"password"} className={`${inp} font-mono`}
+                      value={sync.ml?.refreshToken||""} onChange={e=>setS("ml","refreshToken",e.target.value)} placeholder="TG-..."/>
+                    <button onClick={()=>setRevealed(r=>({...r,mlRefresh:!r.mlRefresh}))}
+                      className="px-3 border border-gray-200 rounded-xl text-gray-400 hover:bg-gray-50 text-xs shrink-0">
+                      {revealed.mlRefresh?"🙈":"👁️"}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-col justify-end">
+                  <label className="text-xs font-medium text-gray-600 block mb-1.5">Importação automática de pedidos</label>
+                  <button onClick={()=>setS("ml","autoImport",!sync.ml?.autoImport)}
+                    className={`w-full py-2.5 rounded-xl text-xs font-bold border transition-all ${sync.ml?.autoImport?"bg-green-50 text-green-700 border-green-200":"bg-gray-50 text-gray-400 border-gray-200"}`}>
+                    {sync.ml?.autoImport?"✅ Auto-importar ativo":"○ Auto-importar desativado"}
+                  </button>
+                </div>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 space-y-1">
+                <p className="text-[11px] text-gray-500 font-semibold">Webhook URL — configure no Painel ML Developers</p>
+                <p className="text-[11px] font-mono text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 select-all break-all">
+                  {sync.backendUrl?`${sync.backendUrl}/webhook/ml`:"⚠️ Configure o Backend URL primeiro"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Shopee */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3.5 bg-orange-50 border-b border-orange-100">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">🛍️</span>
+                <div>
+                  <p className="font-bold text-gray-800 text-sm">Shopee</p>
+                  <p className="text-[11px] text-gray-500">Shopee Open Platform API v2</p>
+                </div>
+              </div>
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${sync.shopee?.partnerKey?"bg-green-100 text-green-700":"bg-gray-100 text-gray-400"}`}>
+                {sync.shopee?.partnerKey?"● Configurado":"○ Não configurado"}
+              </span>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Partner ID</label>
+                  <input className={`${inp} font-mono`} value={sync.shopee?.partnerId||""} onChange={e=>setS("shopee","partnerId",e.target.value)} placeholder="1234567"/>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Partner Key</label>
+                  <div className="flex gap-1">
+                    <input type={revealed.shopeeKey?"text":"password"} className={`${inp} font-mono`}
+                      value={sync.shopee?.partnerKey||""} onChange={e=>setS("shopee","partnerKey",e.target.value)} placeholder="••••••••••••••••"/>
+                    <button onClick={()=>setRevealed(r=>({...r,shopeeKey:!r.shopeeKey}))}
+                      className="px-3 border border-gray-200 rounded-xl text-gray-400 hover:bg-gray-50 text-xs shrink-0">
+                      {revealed.shopeeKey?"🙈":"👁️"}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-1">Shop ID</label>
+                  <input className={`${inp} font-mono`} value={sync.shopee?.shopId||""} onChange={e=>setS("shopee","shopId",e.target.value)} placeholder="123456789"/>
+                </div>
+                <div className="flex flex-col justify-end">
+                  <label className="text-xs font-medium text-gray-600 block mb-1.5">Importação automática de pedidos</label>
+                  <button onClick={()=>setS("shopee","autoImport",!sync.shopee?.autoImport)}
+                    className={`w-full py-2.5 rounded-xl text-xs font-bold border transition-all ${sync.shopee?.autoImport?"bg-green-50 text-green-700 border-green-200":"bg-gray-50 text-gray-400 border-gray-200"}`}>
+                    {sync.shopee?.autoImport?"✅ Auto-importar ativo":"○ Auto-importar desativado"}
+                  </button>
+                </div>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-3 space-y-1">
+                <p className="text-[11px] text-gray-500 font-semibold">Webhook URL — configure no Shopee Partner Portal</p>
+                <p className="text-[11px] font-mono text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 select-all break-all">
+                  {sync.backendUrl?`${sync.backendUrl}/webhook/shopee`:"⚠️ Configure o Backend URL primeiro"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <button onClick={()=>{
+            const next={...(params||PARAMS_DEFAULT),sincronizacao:sync};
+            saveParams(next).then(()=>{setParams(next);if(sync.backendUrl)localStorage.setItem("erp_backend_url",sync.backendUrl);showToast("✅ Configurações de sincronização salvas!");});
+          }}
+            className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+            💾 Salvar Sincronização
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Nav Items ────────────────────────────────────────────────────────────
 const NAV = [
   { id: "dashboard",  label: "Dashboard",       icon: "dashboard"  },
@@ -9997,6 +10468,7 @@ const NAV = [
   { id: "sync",       label: "Sincronização",    icon: "truck"      },
   { id: "usuarios",   label: "Usuários",         icon: "crm"        },
   { id: "empresa",    label: "Minha Empresa",    icon: "suppliers"  },
+  { id: "parametros", label: "Parâmetros",       icon: "settings"   },
 ];
 
 // ─── Main App ─────────────────────────────────────────────────────────────
@@ -10019,6 +10491,7 @@ function ERPApp({ currentUser, onLogout }) {
   const [nfes, setNfes]             = useState([]);
   const [purchases, setPurchases]   = useState([]);
   const [cotacoes,  setCotacoes]    = useState([]);
+  const [params,    setParamsState] = useState(PARAMS_DEFAULT);
   const [loading, setLoading]       = useState(true);
   const [active, setActive]         = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -10034,10 +10507,11 @@ function ERPApp({ currentUser, onLogout }) {
   };
 
   useEffect(() => {
-    Promise.all([loadOrders(),loadFinance(),loadCustomers(),loadSuppliers(),loadProducts(),loadMovements(),loadNfes(),loadPurchases(),loadCotacoes(),
+    Promise.all([loadOrders(),loadFinance(),loadCustomers(),loadSuppliers(),loadProducts(),loadMovements(),loadNfes(),loadPurchases(),loadCotacoes(),loadParams(),
       window.storage.get(EMPRESA_KEY).catch(()=>null)])
-      .then(([o,f,c,s,p,m,n,pc,cot,emp]) => {
+      .then(([o,f,c,s,p,m,n,pc,cot,prm,emp]) => {
         setOrders(o);setFinance(f);setSuppliers(s);setProducts(p);setMovements(m);setNfes(n);setPurchases(pc);setCotacoes(cot);
+        if (prm) setParamsState(prm);
         if (emp?.value) setEmpresaForm(JSON.parse(emp.value));
 
         // ── Automação: inativar clientes sem compras há 30+ dias ──
@@ -10181,6 +10655,11 @@ function ERPApp({ currentUser, onLogout }) {
     });
   }, []);
 
+  const updateParams = useCallback((next) => {
+    setParamsState(next);
+    saveParams(next);
+  }, []);
+
   const updateCotacoes = useCallback((updater) => {
     setCotacoes(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
@@ -10214,6 +10693,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
       case "empresa":   return <EmpresaModule onSave={(data) => setEmpresaForm(data)}/>;
+      case "parametros": return <ParamsModule params={params} setParams={updateParams} onSaveEmpresa={(data)=>setEmpresaForm(data)}/>;
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
       case "reports":   return <ReportsModule orders={orders} finance={finance} customers={customers} suppliers={suppliers} purchases={purchases} products={products}/>;
