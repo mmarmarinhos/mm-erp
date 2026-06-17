@@ -2669,6 +2669,15 @@ function fmtCpfCnpj(value) {
     .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
 }
 
+function fmtTelefone(value) {
+  const d = value.replace(/\D/g, "").slice(0, 11);
+  if (d.length === 0) return "";
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0,2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+}
+
 // ─── Endereço com busca de CEP ────────────────────────────────────────────
 const EnderecoFields = ({ form, set, inp }) => {
   const [cepLoading, setCepLoading] = useState(false);
@@ -10105,11 +10114,11 @@ const RepresentanteModal = ({ rep, onClose, onSave }) => {
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">CPF/CNPJ</label>
-              <input className={`${inp} font-mono`} value={form.cpfCnpj} onChange={e=>set("cpfCnpj",e.target.value)} placeholder="000.000.000-00"/>
+              <input className={`${inp} font-mono`} value={form.cpfCnpj} onChange={e=>set("cpfCnpj",fmtCpfCnpj(e.target.value))} placeholder="000.000.000-00" maxLength={18}/>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Telefone</label>
-              <input className={inp} value={form.telefone} onChange={e=>set("telefone",e.target.value)} placeholder="(11) 99999-9999"/>
+              <input className={inp} value={form.telefone} onChange={e=>set("telefone",fmtTelefone(e.target.value))} placeholder="(11) 99999-9999" maxLength={16}/>
             </div>
             <div className="col-span-2">
               <label className="text-xs font-medium text-gray-600 mb-1 block">E-mail</label>
@@ -10233,7 +10242,7 @@ const ContaModal = ({ conta, onClose, onSave }) => {
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">CPF/CNPJ do Titular</label>
-              <input className={`${inp} font-mono`} value={form.cpfCnpjTitular} onChange={e=>set("cpfCnpjTitular",e.target.value)} placeholder="000.000.000-00"/>
+              <input className={`${inp} font-mono`} value={form.cpfCnpjTitular} onChange={e=>set("cpfCnpjTitular",fmtCpfCnpj(e.target.value))} placeholder="000.000.000-00" maxLength={18}/>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Chave PIX (opcional)</label>
