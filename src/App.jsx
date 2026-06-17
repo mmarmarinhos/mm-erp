@@ -7637,7 +7637,7 @@ const SyncModule = ({ orders, setOrders }) => {
 
 // ─── Roles & Permissions ─────────────────────────────────────────────────
 const ALL_MODULES = ["dashboard","orders","cotacao","sync","inventory","pricing","pricehunt",
-                     "finance","fiscal","crm","suppliers","purchases","reports","empresa","parametros"];
+                     "finance","fiscal","crm","suppliers","purchases","reports","parametros"];
 
 const ROLES_DEF = {
   admin:      { label:"Administrador", color:"text-purple-700", bg:"bg-purple-100",  modules:[...ALL_MODULES,"usuarios"] },
@@ -7652,7 +7652,7 @@ const MOD_LABELS = {
   dashboard:"Dashboard", orders:"Pedidos", sync:"Sincronização",
   inventory:"Estoque", pricing:"Tabela de Preços", pricehunt:"PriceHunt",
   finance:"Financeiro", fiscal:"Fiscal", crm:"Clientes",
-  suppliers:"Fornecedores", purchases:"Compras", reports:"Relatórios", usuarios:"Usuários", empresa:"Minha Empresa", parametros:"Parâmetros",
+  suppliers:"Fornecedores", purchases:"Compras", reports:"Relatórios", usuarios:"Usuários", parametros:"Parâmetros",
 };
 
 // ─── Authentication ───────────────────────────────────────────────────────
@@ -7924,7 +7924,7 @@ const AppAuth = ({ children }) => {
       <div className="fixed bottom-4 right-4 z-50">
         <button onClick={()=>{
           const demo = { id:"DEMO", username:"demo", displayName:"Demo Admin", role:"admin",
-            modules:[...ALL_MODULES,"usuarios","empresa"] };
+            modules:[...ALL_MODULES,"usuarios"] };
           setSession(demo); setCurrentUser(demo); setAuthState("authed");
         }} className="bg-gray-900 text-white text-xs px-4 py-2.5 rounded-xl shadow-xl hover:bg-gray-700 transition-colors flex items-center gap-2">
           ⚡ Entrar como Demo
@@ -10466,7 +10466,6 @@ const NAV = [
   { id: "reports",    label: "Relatórios",       icon: "reports"    },
   { id: "sync",       label: "Sincronização",    icon: "truck"      },
   { id: "usuarios",   label: "Usuários",         icon: "crm"        },
-  { id: "empresa",    label: "Minha Empresa",    icon: "suppliers"  },
   { id: "parametros", label: "Parâmetros",       icon: "settings"   },
 ];
 
