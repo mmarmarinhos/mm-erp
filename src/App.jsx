@@ -60,7 +60,7 @@ const CAT_COLORS = {
   "Vendas ML":"#f59e0b","Vendas Shopee":"#f97316","Vendas WhatsApp":"#22c55e",
   "Vendas Loja Própria":"#6366f1","Fornecedores":"#64748b","Taxas de Plataforma":"#ef4444",
   "Marketing":"#8b5cf6","Frete / Logística":"#06b6d4","Salários":"#ec4899",
-  "Aluguel":"#a78bfa","Outros":"#94a3b8",
+  "Aluguel":"#a78bfa","Devoluções / Reembolsos":"#f43f5e","Outros":"#94a3b8",
 };
 
 const SEED_FINANCE = [];
