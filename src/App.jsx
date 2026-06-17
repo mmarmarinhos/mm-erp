@@ -2523,7 +2523,7 @@ const CustomerModal = ({ customer, onClose, onSave, orders = [], customers = [] 
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Telefone</label>
                   <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    value={form.phone} onChange={e=>set("phone",e.target.value)} placeholder="(11) 99999-9999"/>
+                    value={form.phone} onChange={e=>set("phone",fmtTelefone(e.target.value))} placeholder="(11) 99999-9999" maxLength={16}/>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Email</label>
@@ -3653,7 +3653,7 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Telefone</label>
                   <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    value={form.phone} onChange={e=>set("phone",e.target.value)} placeholder="(11) 99999-9999"/>
+                    value={form.phone} onChange={e=>set("phone",fmtTelefone(e.target.value))} placeholder="(11) 99999-9999" maxLength={16}/>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Email</label>
