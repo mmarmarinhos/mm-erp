@@ -2678,6 +2678,10 @@ function fmtTelefone(value) {
   return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
 }
 
+function fmtCepGlobal(value) {
+  return value.replace(/\D/g,"").slice(0,8).replace(/(\d{5})(\d)/,"$1-$2");
+}
+
 // ─── Endereço com busca de CEP ────────────────────────────────────────────
 const EnderecoFields = ({ form, set, inp }) => {
   const [cepLoading, setCepLoading] = useState(false);
@@ -10664,7 +10668,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">Nome Fantasia</label>
                     <input className={inp} value={empresa.nomeFantasia||""} onChange={e=>setE("nomeFantasia",e.target.value)} placeholder="MM Armarinhos"/></div>
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">CNPJ</label>
-                    <input className={`${inp} font-mono`} value={empresa.cnpj||""} onChange={e=>setE("cnpj",e.target.value)} placeholder="00.000.000/0001-00"/></div>
+                    <input className={`${inp} font-mono`} value={empresa.cnpj||""} onChange={e=>setE("cnpj",fmtCpfCnpj(e.target.value))} placeholder="00.000.000/0001-00" maxLength={18}/></div>
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">Inscrição Estadual</label>
                     <input className={`${inp} font-mono`} value={empresa.ie||""} onChange={e=>setE("ie",e.target.value)} placeholder="000.000.000.000"/></div>
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">Regime Tributário</label>
@@ -10680,7 +10684,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">📍 Endereço</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">CEP</label>
-                    <input className={`${inp} font-mono`} value={empresa.cep||""} onChange={e=>setE("cep",e.target.value)} placeholder="00000-000"/></div>
+                    <input className={`${inp} font-mono`} value={empresa.cep||""} onChange={e=>setE("cep",fmtCepGlobal(e.target.value))} placeholder="00000-000" maxLength={9}/></div>
                   <div className="col-span-2"><label className="text-xs font-medium text-gray-600 block mb-1">Logradouro</label>
                     <input className={inp} value={empresa.rua||""} onChange={e=>setE("rua",e.target.value)} placeholder="Rua, Av, etc."/></div>
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">Número</label>
@@ -10699,9 +10703,9 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">📞 Contato</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">Telefone</label>
-                    <input className={inp} value={empresa.telefone||""} onChange={e=>setE("telefone",e.target.value)} placeholder="(11) 0000-0000"/></div>
+                    <input className={inp} value={empresa.telefone||""} onChange={e=>setE("telefone",fmtTelefone(e.target.value))} placeholder="(11) 0000-0000" maxLength={16}/></div>
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">WhatsApp / Celular</label>
-                    <input className={inp} value={empresa.celular||""} onChange={e=>setE("celular",e.target.value)} placeholder="(11) 99999-9999"/></div>
+                    <input className={inp} value={empresa.celular||""} onChange={e=>setE("celular",fmtTelefone(e.target.value))} placeholder="(11) 99999-9999" maxLength={16}/></div>
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">E-mail</label>
                     <input type="email" className={inp} value={empresa.email||""} onChange={e=>setE("email",e.target.value)} placeholder="contato@mmarmarinhos.com.br"/></div>
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">Site</label>
