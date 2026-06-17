@@ -7652,8 +7652,7 @@ const MOD_LABELS = {
   dashboard:"Dashboard", orders:"Pedidos", sync:"Sincronização",
   inventory:"Estoque", pricing:"Tabela de Preços", pricehunt:"PriceHunt",
   finance:"Financeiro", fiscal:"Fiscal", crm:"Clientes",
-  suppliers:"Fornecedores", purchases:"Compras", reports:"Relatórios",
-  usuarios:"Usuários", empresa:"Minha Empresa", parametros:"Parâmetros",
+  suppliers:"Fornecedores", purchases:"Compras", reports:"Relatórios", usuarios:"Usuários", empresa:"Minha Empresa", parametros:"Parâmetros",
 };
 
 // ─── Authentication ───────────────────────────────────────────────────────
