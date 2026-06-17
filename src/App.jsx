@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.1.0";
+const APP_VERSION = "3.2.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -7342,10 +7342,7 @@ const MLAutomationPanel = () => {
   );
 };
 
-const SyncModule = ({ orders, setOrders }) => {
-  const [backendUrl, setBackendUrl] = useState(() => localStorage.getItem("erp_backend_url") || "");
-  const [editingUrl, setEditingUrl] = useState(!localStorage.getItem("erp_backend_url"));
-  const [urlInput,   setUrlInput]   = useState(backendUrl);
+const SyncOperationsPanel = ({ orders, setOrders, backendUrl }) => {
   const [health,     setHealth]     = useState(null);
   const [syncing,    setSyncing]    = useState(false);
   const [syncLog,    setSyncLog]    = useState([]);
@@ -7353,14 +7350,6 @@ const SyncModule = ({ orders, setOrders }) => {
   const [imported,   setImported]   = useState([]);
   const [error,      setError]      = useState(null);
   const [logs,       setLogs]       = useState([]);
-
-  const saveUrl = (url) => {
-    const clean = url.replace(/\/$/, "");
-    setBackendUrl(clean);
-    localStorage.setItem("erp_backend_url", clean);
-    setEditingUrl(false);
-    setHealth(null);
-  };
 
   const checkHealth = async () => {
     if (!backendUrl) return;
@@ -7453,54 +7442,25 @@ const SyncModule = ({ orders, setOrders }) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-xl">🔄</div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Sincronização</h1>
-          <p className="text-sm text-gray-500">Mercado Livre · Shopee · WooCommerce → ERP</p>
-        </div>
-      </div>
-
-      {/* Backend URL config */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Endpoint do Backend</p>
-          {!editingUrl && backendUrl && (
-            <button onClick={()=>{setEditingUrl(true);setUrlInput(backendUrl);}}
-              className="text-xs text-indigo-600 hover:underline">Alterar</button>
+      {/* Status de conexão (URL configurada acima) */}
+      {backendUrl ? (
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex items-center gap-3">
+          <code className="text-xs bg-gray-50 border border-gray-100 px-3 py-2 rounded-xl flex-1 text-gray-600 truncate">{backendUrl}</code>
+          {health ? (
+            <span className="flex items-center gap-1 text-xs text-green-600 font-medium shrink-0">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"/> Conectado
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-xs text-gray-400 shrink-0">
+              <span className="w-2 h-2 bg-gray-300 rounded-full"/> Verificando...
+            </span>
           )}
         </div>
-        {editingUrl ? (
-          <div className="space-y-2">
-            <input className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              value={urlInput} onChange={e=>setUrlInput(e.target.value)}
-              placeholder="https://mma-sync.SEU_USUARIO.workers.dev"/>
-            <div className="flex gap-2">
-              <button onClick={()=>saveUrl(urlInput)}
-                className="flex-1 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700">
-                Salvar e Conectar
-              </button>
-              {backendUrl && <button onClick={()=>setEditingUrl(false)} className="px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>}
-            </div>
-            <p className="text-xs text-gray-400">
-              Não tem backend ainda? Siga o <strong>GUIA-SETUP.md</strong> para criar um em ~20 minutos gratuitamente.
-            </p>
-          </div>
-        ) : backendUrl ? (
-          <div className="flex items-center gap-3">
-            <code className="text-xs bg-gray-50 border border-gray-100 px-3 py-2 rounded-xl flex-1 text-gray-600 truncate">{backendUrl}</code>
-            {health ? (
-              <span className="flex items-center gap-1 text-xs text-green-600 font-medium shrink-0">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"/> Conectado
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-xs text-gray-400 shrink-0">
-                <span className="w-2 h-2 bg-gray-300 rounded-full"/> Verificando...
-              </span>
-            )}
-          </div>
-        ) : null}
-      </div>
+      ) : (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-700">
+          ⚠️ Configure o <strong>Backend URL</strong> acima para habilitar a sincronização.
+        </div>
+      )}
 
       {/* Health / Auth status */}
       {health && (
@@ -7617,20 +7577,20 @@ const SyncModule = ({ orders, setOrders }) => {
 };
 
 // ─── Roles & Permissions ─────────────────────────────────────────────────
-const ALL_MODULES = ["dashboard","orders","cotacao","sync","inventory","pricing","pricehunt",
+const ALL_MODULES = ["dashboard","orders","cotacao","inventory","pricing","pricehunt",
                      "finance","fiscal","crm","suppliers","purchases","reports","parametros"];
 
 const ROLES_DEF = {
   admin:      { label:"Administrador", color:"text-purple-700", bg:"bg-purple-100",  modules:[...ALL_MODULES,"usuarios"] },
   gerente:    { label:"Gerente",       color:"text-blue-700",   bg:"bg-blue-100",    modules:ALL_MODULES },
-  vendedor:   { label:"Vendedor",      color:"text-green-700",  bg:"bg-green-100",   modules:["dashboard","orders","sync","pricing","pricehunt","crm"] },
+  vendedor:   { label:"Vendedor",      color:"text-green-700",  bg:"bg-green-100",   modules:["dashboard","orders","pricing","pricehunt","crm"] },
   estoque:    { label:"Estoque",       color:"text-amber-700",  bg:"bg-amber-100",   modules:["dashboard","inventory","purchases","suppliers"] },
   financeiro: { label:"Financeiro",    color:"text-indigo-700", bg:"bg-indigo-100",  modules:["dashboard","finance","fiscal","reports"] },
   viewer:     { label:"Visualizador",  color:"text-gray-600",   bg:"bg-gray-100",    modules:["dashboard","reports"] },
 };
 
 const MOD_LABELS = {
-  dashboard:"Dashboard", orders:"Pedidos", sync:"Sincronização",
+  dashboard:"Dashboard", orders:"Pedidos",
   inventory:"Estoque", pricing:"Tabela de Preços", pricehunt:"PriceHunt",
   finance:"Financeiro", fiscal:"Fiscal", crm:"Clientes",
   suppliers:"Fornecedores", purchases:"Compras", reports:"Relatórios", usuarios:"Usuários", parametros:"Parâmetros",
@@ -10001,7 +9961,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
 const CHANNEL_EMOJI_MAP = { "Mercado Livre":"🛒","Shopee":"🛍️","WhatsApp":"💬","Loja Própria":"🏪" };
 const CHANNEL_DOT_COLOR = { "Mercado Livre":"bg-yellow-500","Shopee":"bg-orange-500","WhatsApp":"bg-green-500","Loja Própria":"bg-blue-500" };
 
-const ParamsModule = ({ params, setParams, onSaveEmpresa }) => {
+const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) => {
   const [tab, setTab]       = useState("empresa");
   const [toast, setToast]   = useState(null);
   const [revealed, setRevealed] = useState({});
@@ -10425,6 +10385,12 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa }) => {
             className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
             💾 Salvar Sincronização
           </button>
+
+          {/* Operação de sincronização (importar pedidos agora) */}
+          <div className="border-t border-gray-100 pt-4 mt-2">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">🔄 Operação</p>
+            <SyncOperationsPanel orders={orders} setOrders={setOrders} backendUrl={sync.backendUrl}/>
+          </div>
         </div>
       )}
 
@@ -10455,7 +10421,6 @@ const NAV = [
   { id: "pricing",    label: "Tabela de Preços",  icon: "tag"        },
   { id: "pricehunt",  label: "PriceHunt",        icon: "search"     },
   { id: "reports",    label: "Relatórios",       icon: "reports"    },
-  { id: "sync",       label: "Sincronização",    icon: "truck"      },
   { id: "usuarios",   label: "Usuários",         icon: "crm"        },
   { id: "parametros", label: "Parâmetros",       icon: "settings"   },
 ];
@@ -10673,7 +10638,6 @@ function ERPApp({ currentUser, onLogout }) {
       case "dashboard": return <DashboardModule orders={orders} />;
       case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form}/>;
-      case "sync":      return <SyncModule orders={orders} setOrders={updateOrders}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases}/>;
@@ -10682,7 +10646,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
       case "empresa":   return <EmpresaModule onSave={(data) => setEmpresaForm(data)}/>;
-      case "parametros": return <ParamsModule params={params} setParams={updateParams} onSaveEmpresa={(data)=>setEmpresaForm(data)}/>;
+      case "parametros": return <ParamsModule params={params} setParams={updateParams} onSaveEmpresa={(data)=>setEmpresaForm(data)} orders={orders} setOrders={updateOrders}/>;
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
       case "reports":   return <ReportsModule orders={orders} finance={finance} customers={customers} suppliers={suppliers} purchases={purchases} products={products}/>;
