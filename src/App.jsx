@@ -71,7 +71,7 @@ const STATUS_STYLES = {
   "Enviado":       { bg: "bg-purple-100", text: "text-purple-700", dot: "bg-purple-500" },
   "Entregue":      { bg: "bg-green-100",  text: "text-green-700",  dot: "bg-green-500" },
   "Cancelado":     { bg: "bg-red-100",    text: "text-red-700",    dot: "bg-red-500" },
-  "Devolvido":     { bg: "bg-purple-100", text: "text-purple-700", dot: "bg-purple-500" },
+  "Devolvido":     { bg: "bg-rose-100",   text: "text-rose-700",   dot: "bg-rose-500" },
 };
 
 const CHANNEL_STYLES = {
