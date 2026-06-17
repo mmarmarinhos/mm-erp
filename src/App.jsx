@@ -7637,7 +7637,7 @@ const SyncModule = ({ orders, setOrders }) => {
 
 // ─── Roles & Permissions ─────────────────────────────────────────────────
 const ALL_MODULES = ["dashboard","orders","cotacao","sync","inventory","pricing","pricehunt",
-                     "finance","fiscal","crm","suppliers","purchases","reports","empresa"];
+                     "finance","fiscal","crm","suppliers","purchases","reports","empresa","parametros"];
 
 const ROLES_DEF = {
   admin:      { label:"Administrador", color:"text-purple-700", bg:"bg-purple-100",  modules:[...ALL_MODULES,"usuarios"] },
@@ -7652,7 +7652,8 @@ const MOD_LABELS = {
   dashboard:"Dashboard", orders:"Pedidos", sync:"Sincronização",
   inventory:"Estoque", pricing:"Tabela de Preços", pricehunt:"PriceHunt",
   finance:"Financeiro", fiscal:"Fiscal", crm:"Clientes",
-  suppliers:"Fornecedores", purchases:"Compras", reports:"Relatórios", usuarios:"Usuários", empresa:"Minha Empresa",
+  suppliers:"Fornecedores", purchases:"Compras", reports:"Relatórios",
+  usuarios:"Usuários", empresa:"Minha Empresa", parametros:"Parâmetros",
 };
 
 // ─── Authentication ───────────────────────────────────────────────────────
