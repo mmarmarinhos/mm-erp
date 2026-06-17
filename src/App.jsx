@@ -40,17 +40,17 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "2.3.7";
+const APP_VERSION = "3.0.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
 const chId = (ch) => CHANNEL_TO_ID[ch] || ch;
-const ORDER_STATUSES = ["Novo", "Em Separação", "Enviado", "Entregue", "Cancelado"];
+const ORDER_STATUSES = ["Novo", "Em Separação", "Enviado", "Entregue", "Cancelado", "Devolvido"];
 const PAYMENT_METHODS = ["Pix", "Cartão de Crédito", "Boleto", "Mercado Pago", "Dinheiro"];
 
 // ─── Finance Constants ────────────────────────────────────────────────────
 const INCOME_CATS  = ["Vendas ML","Vendas Shopee","Vendas WhatsApp","Vendas Loja Própria","Outros"];
-const EXPENSE_CATS = ["Fornecedores","Taxas de Plataforma","Marketing","Frete / Logística","Salários","Aluguel","Outros"];
+const EXPENSE_CATS = ["Fornecedores","Taxas de Plataforma","Marketing","Frete / Logística","Salários","Aluguel","Devoluções / Reembolsos","Outros"];
 const FSTATUS_STYLES = {
   pago:      { bg:"bg-green-100", text:"text-green-700",  dot:"bg-green-500" },
   pendente:  { bg:"bg-amber-100", text:"text-amber-700",  dot:"bg-amber-500" },
@@ -71,6 +71,7 @@ const STATUS_STYLES = {
   "Enviado":       { bg: "bg-purple-100", text: "text-purple-700", dot: "bg-purple-500" },
   "Entregue":      { bg: "bg-green-100",  text: "text-green-700",  dot: "bg-green-500" },
   "Cancelado":     { bg: "bg-red-100",    text: "text-red-700",    dot: "bg-red-500" },
+  "Devolvido":     { bg: "bg-purple-100", text: "text-purple-700", dot: "bg-purple-500" },
 };
 
 const CHANNEL_STYLES = {
@@ -779,13 +780,14 @@ const gerarPedidoPDF = async (order) => {
   if (w) { w.document.write(html); w.document.close(); }
 };
 
-const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements }) => {
+const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance }) => {
   const [search, setSearch] = useState("");
   const [filterChannel, setFilterChannel] = useState("Todos");
   const [filterStatus, setFilterStatus] = useState("Todos");
   const [modal, setModal] = useState(null);
   const [detailOrder, setDetailOrder] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [devolucaoModal, setDevolucaoModal] = useState(null);
   const [filterMode, setFilterMode] = useState("todos"); // mes | personalizado | todos
   const [period, setPeriod] = useState(() => {
     const n = new Date();
@@ -910,6 +912,57 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
     setOrders(prev => prev.filter(o => o.id !== id));
     setConfirmDelete(null);
     if (detailOrder?.id === id) setDetailOrder(null);
+  };
+
+  const handleDevolucao = (order) => {
+    // 1. Marcar pedido como Devolvido
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "Devolvido" } : o));
+
+    // 2. Restaurar estoque dos itens
+    const items = order.itemsList || [];
+    if (items.length > 0 && setProducts) {
+      setProducts(prev => prev.map(prod => {
+        const it = items.find(i => String(i._prodId) === String(prod.id));
+        if (!it || (it.qty||0) <= 0) return prod;
+        return { ...prod, stock: (prod.stock || 0) + (it.qty || 0) };
+      }));
+      if (setMovements) {
+        setMovements(prev => {
+          const nums = prev.map(m => parseInt(m.id.replace("MOV-",""))||0);
+          const base = Math.max(0, ...nums, 0);
+          const novasMovs = items.filter(i => i._prodId && (i.qty||0) > 0).map((i, idx) => ({
+            id: `MOV-${String(base+idx+1).padStart(3,"0")}`,
+            productId: i._prodId,
+            type: "entrada",
+            qty: i.qty || 0,
+            date: today(),
+            reason: "Devolução de cliente",
+            notes: `Devolução do pedido ${order.id} — ${order.customer}`,
+          }));
+          return [...prev, ...novasMovs];
+        });
+      }
+    }
+
+    // 3. Criar lançamento financeiro de devolução
+    if (setFinance) {
+      setFinance(prev => {
+        const nums = prev.map(t => parseInt(t.id.replace("FIN-",""))||0);
+        const newId = `FIN-${String(Math.max(0,...nums,0)+1).padStart(3,"0")}`;
+        return [{
+          id: newId,
+          type: "despesa",
+          category: "Devoluções / Reembolsos",
+          description: `Devolução pedido ${order.id} — ${order.customer}`,
+          amount: order.total,
+          date: today(),
+          status: "pago",
+          notes: `Estorno do pedido ${order.id} (${order.channel})`,
+        }, ...prev];
+      });
+    }
+
+    setDevolucaoModal(null);
   };
 
   // Stats
@@ -1089,7 +1142,14 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
               <div className="flex justify-between"><span className="text-gray-500">Pagamento</span><span className="font-medium">{detailOrder.payment}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Total</span><span className="font-bold text-green-600 text-base">{fmt(detailOrder.total)}</span></div>
               {detailOrder.tracking && (
-                <div className="flex justify-between"><span className="text-gray-500">Rastreio</span><span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{detailOrder.tracking}</span></div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Rastreio</span>
+                  <a href={`https://rastreamento.correios.com.br/app/index.php?objetos=${detailOrder.tracking}`}
+                     target="_blank" rel="noopener noreferrer"
+                     className="font-mono text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-lg hover:bg-blue-100 flex items-center gap-1 transition-colors border border-blue-100">
+                    📦 {detailOrder.tracking} ↗
+                  </a>
+                </div>
               )}
               <div className="border-t border-gray-100 pt-3">
                 <p className="text-gray-500 text-xs mb-1">Itens</p>
@@ -1102,18 +1162,55 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
                 </div>
               )}
             </div>
-            <div className="flex gap-2 p-5 border-t border-gray-100">
+            <div className="flex gap-2 p-5 border-t border-gray-100 flex-wrap">
               <button onClick={() => { setModal(detailOrder); setDetailOrder(null); }}
-                className="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2">
+                className="flex-1 min-w-[90px] px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2">
                 <Icon name="edit" size={14} /> Editar
               </button>
               <button onClick={() => gerarPedidoPDF(detailOrder)}
                 className="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-600 text-sm font-medium hover:bg-indigo-100 flex items-center gap-1.5">
                 🖨️ PDF
               </button>
+              {["Enviado","Entregue"].includes(detailOrder.status) && (
+                <button onClick={() => { setDevolucaoModal(detailOrder); setDetailOrder(null); }}
+                  className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 text-sm font-medium hover:bg-rose-100 flex items-center gap-1.5">
+                  ↩ Devolver
+                </button>
+              )}
               <button onClick={() => setDetailOrder(null)}
-                className="flex-1 px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+                className="flex-1 min-w-[70px] px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Devolução Modal */}
+      {devolucaoModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center mx-auto mb-3">
+              <span className="text-2xl">↩</span>
+            </div>
+            <h3 className="font-semibold text-gray-900 text-center mb-1">Registrar Devolução?</h3>
+            <p className="text-sm text-gray-500 text-center mb-1">{devolucaoModal.id} — {devolucaoModal.customer}</p>
+            <p className="text-lg font-bold text-rose-600 text-center mb-4">{fmt(devolucaoModal.total)}</p>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-xs text-amber-800 space-y-1.5">
+              <p>✅ Status do pedido → <b>Devolvido</b></p>
+              {(devolucaoModal.itemsList||[]).filter(i=>i._prodId&&i.qty>0).length > 0 && (
+                <p>✅ Estoque será <b>restaurado</b> ({(devolucaoModal.itemsList||[]).filter(i=>i._prodId&&i.qty>0).length} item(s))</p>
+              )}
+              <p>✅ Lançamento de <b>Devolução / Reembolso</b> criado no financeiro</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setDevolucaoModal(null)}
+                className="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button onClick={() => handleDevolucao(devolucaoModal)}
+                className="flex-1 px-4 py-2 rounded-xl bg-rose-500 text-white text-sm font-medium hover:bg-rose-600">
+                Confirmar Devolução
               </button>
             </div>
           </div>
@@ -1349,6 +1446,50 @@ const DashboardModule = ({ orders }) => {
           </div>
         </div>
       </div>
+
+      {/* ── Channel Performance ─────────────────────────────────────── */}
+      {(() => {
+        const chStats = CHANNELS.map(ch => {
+          const chOrds = orders.filter(o => o.channel === ch && o.status !== "Cancelado" && o.status !== "Devolvido");
+          const rev = chOrds.reduce((s,o)=>s+o.total,0);
+          const devolvidos = orders.filter(o => o.channel === ch && o.status === "Devolvido").length;
+          return { ch, count: chOrds.length, rev, ticket: chOrds.length > 0 ? rev/chOrds.length : 0, devolvidos };
+        }).filter(c => c.count > 0 || c.devolvidos > 0);
+        const maxRev = Math.max(...chStats.map(c=>c.rev), 1);
+        if (chStats.length === 0) return null;
+        return (
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-bold text-gray-800 text-sm">📊 Performance por Canal</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Receita, ticket médio e volume por canal de venda</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              {chStats.sort((a,b)=>b.rev-a.rev).map(({ch, count, rev, ticket, devolvidos}) => {
+                const pct = maxRev > 0 ? rev/maxRev*100 : 0;
+                const s = CHANNEL_STYLES[ch]||{bg:"bg-gray-100",text:"text-gray-600"};
+                return (
+                  <div key={ch}>
+                    <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${s.bg} ${s.text}`}>{ch}</span>
+                      <div className="flex gap-3 items-center text-xs">
+                        <span className="text-gray-400">{count} pedido{count!==1?"s":""}</span>
+                        {devolvidos > 0 && <span className="text-purple-500 font-medium">{devolvidos} devol.</span>}
+                        <span className="text-gray-500">TM {ticket>0?fmt(ticket):"—"}</span>
+                        <span className="font-bold text-gray-800">{fmt(rev)}</span>
+                      </div>
+                    </div>
+                    <div className="bg-gray-100 rounded-full h-2.5">
+                      <div className="bg-indigo-500 h-2.5 rounded-full transition-all" style={{width:`${pct}%`}}/>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
@@ -4188,7 +4329,7 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
 // ─── Reports Module ───────────────────────────────────────────────────────
 const PERIOD_OPTS = { "1m":"1 mês", "3m":"3 meses", "6m":"6 meses", "all":"Todo período" };
 
-const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [] }) => {
+const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], products = [] }) => {
   const [tab, setTab]           = useState("resumo");
   const [filterMode, setFilterMode] = useState("todos");
   const [period, setPeriod] = useState(() => {
@@ -4361,7 +4502,7 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [] }
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-        {[["resumo","📊 Resumo"],["vendas","🛒 Vendas"],["financeiro","💰 Financeiro"],["clientes","👥 Clientes"]].map(([id,label]) => (
+        {[["resumo","📊 Resumo"],["vendas","🛒 Vendas"],["financeiro","💰 Financeiro"],["clientes","👥 Clientes"],["produtos","📦 Produtos"]].map(([id,label]) => (
           <button key={id} onClick={()=>setTab(id)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${tab===id?"bg-white text-gray-900 shadow-sm":"text-gray-500 hover:text-gray-700"}`}>
             {label}
@@ -4719,6 +4860,128 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [] }
           </div>
         </div>
       )}
+
+      {/* ─── PRODUTOS ─── */}
+      {tab==="produtos" && (() => {
+        // Build per-product sales stats from order items
+        const prodStats = {};
+        orders.filter(o => o.status !== "Cancelado" && o.status !== "Devolvido" && filterByDate(o.date))
+          .forEach(o => {
+            const items = o.itemsList || [];
+            items.forEach(it => {
+              if (!it._prodId) return;
+              if (!prodStats[it._prodId]) prodStats[it._prodId] = { qtySold:0, revenue:0, orderCount:0 };
+              prodStats[it._prodId].qtySold    += it.qty || 0;
+              prodStats[it._prodId].revenue    += it.total || 0;
+              prodStats[it._prodId].orderCount += 1;
+            });
+          });
+
+        const rows = products
+          .filter(p => p.status !== "Inativo")
+          .map(p => {
+            const s = prodStats[p.id] || { qtySold:0, revenue:0, orderCount:0 };
+            const avgPrice  = s.qtySold > 0 ? s.revenue / s.qtySold : p.price || 0;
+            const cost      = p.cost || 0;
+            const margin    = avgPrice > 0 && cost > 0 ? ((avgPrice - cost) / avgPrice * 100) : null;
+            const stockVal  = (p.stock || 0) * cost;
+            return { ...p, ...s, avgPrice, margin, stockVal };
+          })
+          .sort((a,b) => b.revenue - a.revenue);
+
+        const totalRevenueProd = rows.reduce((s,r)=>s+r.revenue,0);
+        const totalQtySold     = rows.reduce((s,r)=>s+r.qtySold,0);
+        const soldRows         = rows.filter(r=>r.qtySold>0);
+
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label:"SKUs Ativos",      value: products.filter(p=>p.status!=="Inativo").length,   color:"text-gray-900" },
+                { label:"SKUs com Venda",   value: soldRows.length,                                   color:"text-indigo-700"},
+                { label:"Unidades Vendidas",value: totalQtySold.toLocaleString("pt-BR"),              color:"text-gray-900" },
+                { label:"Receita (Itens)",  value: fmt(totalRevenueProd),                             color:"text-green-600"},
+              ].map(k=>(
+                <div key={k.label} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">{k.label}</p>
+                  <p className={`text-xl font-bold mt-1 ${k.color}`}>{k.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="font-semibold text-gray-700 text-sm">Margem por Produto</h3>
+                <span className="text-xs text-gray-400">custo × preço médio de venda</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                      <th className="text-left px-4 py-3">Produto</th>
+                      <th className="text-center px-3 py-3 hidden md:table-cell">Categoria</th>
+                      <th className="text-right px-3 py-3">Custo</th>
+                      <th className="text-right px-3 py-3">Preço Médio</th>
+                      <th className="text-right px-3 py-3">Margem</th>
+                      <th className="text-right px-3 py-3 hidden lg:table-cell">Qtd Vendida</th>
+                      <th className="text-right px-3 py-3">Receita</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {rows.map(p => {
+                      const catColor = INV_CAT_COLORS[p.category]||"#94a3b8";
+                      const marginColor = p.margin === null ? "text-gray-400"
+                        : p.margin >= 40 ? "text-green-600"
+                        : p.margin >= 20 ? "text-amber-600"
+                        : "text-red-500";
+                      const marginBg = p.margin === null ? "bg-gray-100"
+                        : p.margin >= 40 ? "bg-green-100"
+                        : p.margin >= 20 ? "bg-amber-100"
+                        : "bg-red-100";
+                      return (
+                        <tr key={p.id} className={`hover:bg-gray-50/50 ${p.qtySold===0?"opacity-50":""}`}>
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-gray-800 text-sm leading-tight">{p.name}</p>
+                            <p className="font-mono text-[10px] text-gray-400">{p.sku}</p>
+                          </td>
+                          <td className="px-3 py-3 hidden md:table-cell">
+                            <span className="text-xs px-2 py-0.5 rounded-full font-medium text-white" style={{background:catColor}}>{p.category}</span>
+                          </td>
+                          <td className="px-3 py-3 text-right text-xs text-gray-600">
+                            {p.cost > 0 ? fmt(p.cost) : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-3 py-3 text-right text-xs font-medium text-gray-800">
+                            {p.qtySold > 0 ? fmt(p.avgPrice) : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            {p.margin !== null ? (
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${marginBg} ${marginColor}`}>
+                                {p.margin.toFixed(1)}%
+                              </span>
+                            ) : <span className="text-gray-300 text-xs">—</span>}
+                          </td>
+                          <td className="px-3 py-3 text-right text-xs text-gray-600 hidden lg:table-cell">
+                            {p.qtySold > 0 ? `${p.qtySold} ${p.unit||"un"}` : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-3 py-3 text-right text-xs font-bold text-gray-900">
+                            {p.revenue > 0 ? fmt(p.revenue) : <span className="text-gray-300">—</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {rows.length === 0 && (
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">Nenhum produto cadastrado</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
+                <p className="text-[10px] text-gray-400">🟢 Margem ≥ 40% · 🟡 20–40% · 🔴 &lt; 20% · Itens acinzentados = sem vendas no período</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
@@ -4789,12 +5052,12 @@ const StockMovementModal = ({ product, onClose, onSave }) => {
 };
 
 // ─── Product Modal ────────────────────────────────────────────────────────
-const ProductModal = ({ product, suppliers, onClose, onSave }) => {
+const ProductModal = ({ product, suppliers, products: allProducts = [], onClose, onSave }) => {
   const isNew = !product;
   const [form, setForm] = useState(product ? { ...product, tagsInput:product.tags.join(", ") } : {
     name:"", sku:"", category:"Linhas / Fios", supplierId:"", supplierName:"",
     channels:[], price:"", cost:"", stock:"", minStock:"", unit:"un", status:"Ativo",
-    description:"", tagsInput:""
+    description:"", tagsInput:"", parentId:"", variantLabel:""
   });
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const toggleCh = (c) => setForm(f=>({...f, channels: f.channels.includes(c)?f.channels.filter(x=>x!==c):[...f.channels,c]}));
@@ -4884,6 +5147,27 @@ const ProductModal = ({ product, suppliers, onClose, onSave }) => {
                   value={form.status} onChange={e=>set("status",e.target.value)}>
                   <option>Ativo</option><option>Inativo</option><option>Descontinuado</option>
                 </select>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-gray-100 pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">🎨 Grade / Variante <span className="text-gray-300 font-normal normal-case">(opcional)</span></p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Produto Pai</label>
+                <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  value={form.parentId||""} onChange={e=>set("parentId",e.target.value)}>
+                  <option value="">Produto independente</option>
+                  {allProducts.filter(p=>!p.parentId&&p.id!==(product?.id||"")).map(p=>(
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Label da Variante</label>
+                <input className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 ${!form.parentId?"bg-gray-50 text-gray-400":""}`}
+                  value={form.variantLabel||""} onChange={e=>set("variantLabel",e.target.value)}
+                  placeholder="Kit 10 cones, Azul..." disabled={!form.parentId}/>
               </div>
             </div>
           </div>
@@ -5318,8 +5602,17 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
                     <tr key={p.id} className="hover:bg-gray-50/50 transition-colors group">
                       <td className="px-4 py-3">
                         <button onClick={()=>setSelected(p.id)} className="text-left">
-                          <p className="font-medium text-gray-800 hover:text-indigo-600 transition-colors text-sm">{p.name}</p>
-                          <p className="font-mono text-[10px] text-gray-400">{p.sku}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="font-medium text-gray-800 hover:text-indigo-600 transition-colors text-sm">{p.name}</p>
+                            {p.parentId && (
+                              <span className="text-[9px] font-bold bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded-full uppercase tracking-wide">variante</span>
+                            )}
+                          </div>
+                          <p className="font-mono text-[10px] text-gray-400">
+                            {p.sku}
+                            {p.parentId && p.variantLabel && ` · ${p.variantLabel}`}
+                            {p.parentId && !p.variantLabel && ` · ${(products.find(x=>x.id===p.parentId)||{}).name||""}`}
+                          </p>
                         </button>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
@@ -5356,9 +5649,15 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
                             className="p-1.5 rounded-lg text-green-500 hover:text-green-700 hover:bg-green-50 transition-colors font-bold text-xs">↑</button>
                           <button onClick={()=>{setMoveModal(p);}} title="Saída"
                             className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors font-bold text-xs">↓</button>
-                          <button onClick={()=>setModal(p)} className="p-1.5 rounded-lg text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors">
+                          <button onClick={()=>setModal(p)} className="p-1.5 rounded-lg text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors" title="Editar produto">
                             <Icon name="edit" size={13}/>
                           </button>
+                          {!p.parentId && (
+                            <button onClick={()=>setModal({name:"",sku:"",category:p.category,supplierId:p.supplierId,supplierName:p.supplierName,channels:[...p.channels],price:"",cost:p.cost||"",stock:"",minStock:p.minStock||"",unit:p.unit||"un",status:"Ativo",description:"",tags:[],tagsInput:"",parentId:p.id,variantLabel:""})}
+                              className="p-1.5 rounded-lg text-violet-400 hover:text-violet-600 hover:bg-violet-50 transition-colors text-xs font-bold" title="Criar variante deste produto">
+                              +V
+                            </button>
+                          )}
                           <button onClick={()=>setConfirmDelete(p)} className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors">
                             <Icon name="trash" size={13}/>
                           </button>
@@ -5397,7 +5696,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
           </div>
         </div>
       )}
-      {modal && <ProductModal product={modal==="new"?null:modal} suppliers={suppliers} onClose={()=>setModal(null)} onSave={handleSaveProd}/>}
+      {modal && <ProductModal product={modal==="new"?null:modal} suppliers={suppliers} products={products} onClose={()=>setModal(null)} onSave={handleSaveProd}/>}
     </div>
   );
 };
@@ -9904,7 +10203,7 @@ function ERPApp({ currentUser, onLogout }) {
   const renderModule = () => {
     switch (active) {
       case "dashboard": return <DashboardModule orders={orders} />;
-      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements}/>;
+      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form}/>;
       case "sync":      return <SyncModule orders={orders} setOrders={updateOrders}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
@@ -9917,7 +10216,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "empresa":   return <EmpresaModule onSave={(data) => setEmpresaForm(data)}/>;
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
-      case "reports":   return <ReportsModule orders={orders} finance={finance} customers={customers} suppliers={suppliers} purchases={purchases}/>;
+      case "reports":   return <ReportsModule orders={orders} finance={finance} customers={customers} suppliers={suppliers} purchases={purchases} products={products}/>;
       default: return null;
     }
   };
