@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.2.0";
+const APP_VERSION = "3.3.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -297,7 +297,7 @@ const Stat = ({ label, value, sub, color = "text-gray-900" }) => (
 );
 
 // ─── Order Modal ──────────────────────────────────────────────────────────
-const OrderModal = ({ order, onClose, onSave, customers = [], products = [] }) => {
+const OrderModal = ({ order, onClose, onSave, customers = [], products = [], representantes = [], formasPagamento = [] }) => {
   const isNew = !order;
   const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, discount:0, discountType:"%", total:0 });
 
@@ -315,6 +315,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [] }) =
     total:"", date:today(), payment:"Pix",
     dueDate:"", paidDate:"", tracking:"", notes:"", nfNumero:"",
     freight:0, channelFee:0, otherFees:0, subtotal:0,
+    representanteId:"",
     ...(order||{}),
     itemsList: parseItems(order),
   }));
@@ -407,6 +408,13 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [] }) =
   };
 
   const subtotal = form.itemsList?.reduce((s,it)=>s+(it.total||0),0)||0;
+  const grossSubtotal = form.itemsList?.reduce((s,it)=>s+((it.qty||0)*(it.unitPrice||0)),0)||0;
+  const discountPercent = grossSubtotal > 0 ? Math.max(0,(1 - subtotal/grossSubtotal)*100) : 0;
+  const selectedRep = representantes.find(r => r.id === form.representanteId);
+  const comissaoPercent = selectedRep ? comissaoAplicavel(selectedRep, discountPercent) : 0;
+  const comissaoValor = (parseFloat(form.total)||0) * (comissaoPercent/100);
+  const formasAtivas = formasPagamento.filter(f => f.status==="Ativo");
+  const paymentOptions = formasAtivas.length > 0 ? formasAtivas.map(f=>f.nome) : PAYMENT_METHODS;
 
   const handleSave = () => {
     if (!form.customer.trim()) return;
@@ -592,8 +600,21 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [] }) =
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Pagamento</label>
               <select className={inp} value={form.payment} onChange={e=>setForm(f=>({...f,payment:e.target.value}))}>
-                {PAYMENT_METHODS.map(p=><option key={p}>{p}</option>)}
+                {paymentOptions.map(p=><option key={p}>{p}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Representante</label>
+              <select className={inp} value={form.representanteId||""} onChange={e=>setForm(f=>({...f,representanteId:e.target.value}))}>
+                <option value="">— Nenhum —</option>
+                {representantes.filter(r=>r.status==="Ativo").map(r=><option key={r.id} value={r.id}>{r.nome}</option>)}
+              </select>
+              {selectedRep && (
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Comissão estimada: <strong className="text-indigo-600">{comissaoPercent.toFixed(1)}%</strong> = <strong className="text-indigo-600">{fmt(comissaoValor)}</strong>
+                  {discountPercent > 0 && ` (desconto: ${discountPercent.toFixed(1)}%)`}
+                </p>
+              )}
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Emitido em</label>
@@ -781,7 +802,7 @@ const gerarPedidoPDF = async (order) => {
   if (w) { w.document.write(html); w.document.close(); }
 };
 
-const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance }) => {
+const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance, representantes = [], formasPagamento = [] }) => {
   const [search, setSearch] = useState("");
   const [filterChannel, setFilterChannel] = useState("Todos");
   const [filterStatus, setFilterStatus] = useState("Todos");
@@ -1243,6 +1264,8 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
           onSave={handleSave}
           customers={customers}
           products={products}
+          representantes={representantes}
+          formasPagamento={formasPagamento}
         />
       )}
     </div>
@@ -7578,7 +7601,7 @@ const SyncOperationsPanel = ({ orders, setOrders, backendUrl }) => {
 
 // ─── Roles & Permissions ─────────────────────────────────────────────────
 const ALL_MODULES = ["dashboard","orders","cotacao","inventory","pricing","pricehunt",
-                     "finance","fiscal","crm","suppliers","purchases","reports","parametros"];
+                     "finance","fiscal","crm","suppliers","purchases","reports","cadastros","parametros"];
 
 const ROLES_DEF = {
   admin:      { label:"Administrador", color:"text-purple-700", bg:"bg-purple-100",  modules:[...ALL_MODULES,"usuarios"] },
@@ -7593,7 +7616,7 @@ const MOD_LABELS = {
   dashboard:"Dashboard", orders:"Pedidos",
   inventory:"Estoque", pricing:"Tabela de Preços", pricehunt:"PriceHunt",
   finance:"Financeiro", fiscal:"Fiscal", crm:"Clientes",
-  suppliers:"Fornecedores", purchases:"Compras", reports:"Relatórios", usuarios:"Usuários", parametros:"Parâmetros",
+  suppliers:"Fornecedores", purchases:"Compras", reports:"Relatórios", usuarios:"Usuários", cadastros:"Cadastros", parametros:"Parâmetros",
 };
 
 // ─── Authentication ───────────────────────────────────────────────────────
@@ -8944,6 +8967,64 @@ const CANAIS_DEFAULT = [
   { canal:"Telefone",      taxaPerc:0,  taxaFixa:0,  prazoRepasse:0,  ativo:true },
 ];
 
+// ─── Cadastros Storage (Representantes, Contas, Forma de Pagamento) ───────
+const REPR_KEY = "erp-mmarmarinhos-representantes";
+const REPR_STATUS = ["Ativo","Inativo"];
+const REPR_COMISSAO_TIPOS = ["fixa","faixas"];
+const SEED_REPRESENTANTES = [];
+async function loadRepresentantes() {
+  try { const r = await window.storage.get(REPR_KEY); if (r?.value) return JSON.parse(r.value); } catch(_) {}
+  return [...SEED_REPRESENTANTES];
+}
+async function saveRepresentantes(list) {
+  try { await window.storage.set(REPR_KEY, JSON.stringify(list)); } catch(_) {}
+}
+// Retorna a comissão % aplicável a um representante, dado o desconto concedido no pedido
+function comissaoAplicavel(rep, descontoPercent) {
+  if (!rep) return 0;
+  if (rep.tipoComissao === "fixa") return parseFloat(rep.comissaoFixa) || 0;
+  const faixas = (rep.faixas || []).slice().sort((a,b) => (a.ate||0) - (b.ate||0));
+  if (faixas.length === 0) return 0;
+  const d = descontoPercent || 0;
+  for (const f of faixas) {
+    if (d <= (f.ate||0)) return parseFloat(f.comissao) || 0;
+  }
+  return parseFloat(faixas[faixas.length-1].comissao) || 0;
+}
+
+const CONTA_KEY = "erp-mmarmarinhos-contas";
+const CONTA_TIPOS = ["Corrente","Poupança"];
+const BANCOS_BR = [
+  "Banco do Brasil","Itaú","Bradesco","Caixa Econômica Federal","Santander","Nubank",
+  "Inter","Sicoob","Sicredi","BTG Pactual","C6 Bank","PagBank","Mercado Pago",
+  "Banco Original","Safra","Banrisul",
+];
+const SEED_CONTAS = [];
+async function loadContas() {
+  try { const r = await window.storage.get(CONTA_KEY); if (r?.value) return JSON.parse(r.value); } catch(_) {}
+  return [...SEED_CONTAS];
+}
+async function saveContas(list) {
+  try { await window.storage.set(CONTA_KEY, JSON.stringify(list)); } catch(_) {}
+}
+
+const FORMAPAG_KEY = "erp-mmarmarinhos-formas-pagamento";
+const FORMAPAG_STATUS = ["Ativo","Inativo"];
+// Migração: deriva formas de pagamento a partir do PAYMENT_METHODS existente, preservando compatibilidade
+const SEED_FORMASPAGAMENTO = PAYMENT_METHODS.map((nome, i) => ({
+  id: `FPG-${String(i+1).padStart(3,"0")}`, nome, taxa: 0, prazoRecebimento: 0, contaId: "", status: "Ativo",
+}));
+async function loadFormasPagamento() {
+  try {
+    const r = await window.storage.get(FORMAPAG_KEY);
+    if (r?.value) return JSON.parse(r.value);
+  } catch(_) {}
+  return [...SEED_FORMASPAGAMENTO];
+}
+async function saveFormasPagamento(list) {
+  try { await window.storage.set(FORMAPAG_KEY, JSON.stringify(list)); } catch(_) {}
+}
+
 // ─── Params Storage ───────────────────────────────────────────────────────
 const PARAMS_KEY = "erp-mmarmarinhos-params";
 const PARAMS_DEFAULT = {
@@ -9957,6 +10038,509 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
   );
 };
 
+// ─── Cadastros Module ──────────────────────────────────────────────────────
+const nextCadId = (list, prefix) => {
+  const nums = list.map(x => parseInt((x.id||"").replace(`${prefix}-`,"")) || 0);
+  return `${prefix}-${String(Math.max(0,...nums)+1).padStart(3,"0")}`;
+};
+
+// ── Modal: Representante ───────────────────────────────────────────────────
+const RepresentanteModal = ({ rep, onClose, onSave }) => {
+  const [form, setForm] = useState(() => ({
+    nome:"", cpfCnpj:"", telefone:"", email:"", status:"Ativo",
+    tipoComissao:"fixa", comissaoFixa:0,
+    faixas:[{ ate:5, comissao:10 },{ ate:10, comissao:7 },{ ate:20, comissao:4 }],
+    ...(rep||{}),
+  }));
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const setFaixa = (i,k,v) => setForm(f=>{
+    const faixas = f.faixas.map((fx,idx)=> idx===i ? {...fx,[k]:parseFloat(v)||0} : fx);
+    return {...f, faixas};
+  });
+  const addFaixa = () => setForm(f=>({...f, faixas:[...f.faixas, { ate:0, comissao:0 }]}));
+  const removeFaixa = (i) => setForm(f=>({...f, faixas: f.faixas.filter((_,idx)=>idx!==i)}));
+
+  const handleSave = () => {
+    if (!form.nome.trim()) return;
+    const faixasOrdenadas = form.faixas.slice().sort((a,b)=>(a.ate||0)-(b.ate||0));
+    onSave({ ...form, faixas: faixasOrdenadas });
+  };
+
+  const inp = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300";
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+          <h2 className="font-bold text-gray-900">{rep ? "Editar Representante" : "Novo Representante"}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon name="x" size={18}/></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Nome *</label>
+              <input className={inp} value={form.nome} onChange={e=>set("nome",e.target.value)} placeholder="Nome do representante"/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">CPF/CNPJ</label>
+              <input className={`${inp} font-mono`} value={form.cpfCnpj} onChange={e=>set("cpfCnpj",e.target.value)} placeholder="000.000.000-00"/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Telefone</label>
+              <input className={inp} value={form.telefone} onChange={e=>set("telefone",e.target.value)} placeholder="(11) 99999-9999"/>
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600 mb-1 block">E-mail</label>
+              <input type="email" className={inp} value={form.email} onChange={e=>set("email",e.target.value)} placeholder="email@exemplo.com"/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
+              <select className={inp} value={form.status} onChange={e=>set("status",e.target.value)}>
+                {REPR_STATUS.map(s=><option key={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Comissão</p>
+            <div className="flex gap-2">
+              <button onClick={()=>set("tipoComissao","fixa")}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${form.tipoComissao==="fixa"?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-500 border-gray-200"}`}>
+                % Fixa
+              </button>
+              <button onClick={()=>set("tipoComissao","faixas")}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${form.tipoComissao==="faixas"?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-500 border-gray-200"}`}>
+                📊 Faixas por Desconto
+              </button>
+            </div>
+
+            {form.tipoComissao==="fixa" ? (
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Comissão (%)</label>
+                <input type="number" min="0" max="100" step="0.1" className={`${inp} bg-white`}
+                  value={form.comissaoFixa} onChange={e=>set("comissaoFixa",parseFloat(e.target.value)||0)}/>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-[11px] text-gray-400">Quanto maior o desconto dado pelo representante, menor a comissão.</p>
+                {form.faixas.map((fx,i)=>(
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 shrink-0">Até</span>
+                    <input type="number" min="0" max="100" step="0.1"
+                      className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                      value={fx.ate} onChange={e=>setFaixa(i,"ate",e.target.value)}/>
+                    <span className="text-xs text-gray-500 shrink-0">% desconto →</span>
+                    <input type="number" min="0" max="100" step="0.1"
+                      className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                      value={fx.comissao} onChange={e=>setFaixa(i,"comissao",e.target.value)}/>
+                    <span className="text-xs text-gray-500 shrink-0">% comissão</span>
+                    <button onClick={()=>removeFaixa(i)} className="ml-auto text-red-400 hover:text-red-600">
+                      <Icon name="trash" size={14}/>
+                    </button>
+                  </div>
+                ))}
+                <button onClick={addFaixa} className="text-xs text-indigo-600 hover:underline font-medium">+ Adicionar faixa</button>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-2 p-5 border-t border-gray-100 sticky bottom-0 bg-white">
+          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button onClick={handleSave} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+            {rep ? "Salvar Alterações" : "Criar Representante"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Modal: Conta Bancária ──────────────────────────────────────────────────
+const ContaModal = ({ conta, onClose, onSave }) => {
+  const [form, setForm] = useState(() => ({
+    banco:"", agencia:"", conta:"", tipo:"Corrente", titular:"", cpfCnpjTitular:"",
+    pix:"", principal:false, status:"Ativo",
+    ...(conta||{}),
+  }));
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const handleSave = () => {
+    if (!form.banco.trim() || !form.titular.trim()) return;
+    onSave(form);
+  };
+
+  const inp = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300";
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+          <h2 className="font-bold text-gray-900">{conta ? "Editar Conta" : "Nova Conta Bancária"}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon name="x" size={18}/></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Banco *</label>
+              <input className={inp} list="bancos-br" value={form.banco} onChange={e=>set("banco",e.target.value)} placeholder="Selecione ou digite o banco"/>
+              <datalist id="bancos-br">{BANCOS_BR.map(b=><option key={b} value={b}/>)}</datalist>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Agência</label>
+              <input className={`${inp} font-mono`} value={form.agencia} onChange={e=>set("agencia",e.target.value)} placeholder="0000"/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Conta</label>
+              <input className={`${inp} font-mono`} value={form.conta} onChange={e=>set("conta",e.target.value)} placeholder="00000-0"/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Tipo</label>
+              <select className={inp} value={form.tipo} onChange={e=>set("tipo",e.target.value)}>
+                {CONTA_TIPOS.map(t=><option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
+              <select className={inp} value={form.status} onChange={e=>set("status",e.target.value)}>
+                <option>Ativo</option><option>Inativo</option>
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Titular *</label>
+              <input className={inp} value={form.titular} onChange={e=>set("titular",e.target.value)} placeholder="Nome do titular da conta"/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">CPF/CNPJ do Titular</label>
+              <input className={`${inp} font-mono`} value={form.cpfCnpjTitular} onChange={e=>set("cpfCnpjTitular",e.target.value)} placeholder="000.000.000-00"/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Chave PIX (opcional)</label>
+              <input className={inp} value={form.pix} onChange={e=>set("pix",e.target.value)} placeholder="CPF, e-mail, telefone..."/>
+            </div>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer pt-1">
+            <input type="checkbox" checked={!!form.principal} onChange={e=>set("principal",e.target.checked)} className="rounded text-indigo-600"/>
+            <span className="text-sm text-gray-600">Conta principal da empresa</span>
+          </label>
+        </div>
+        <div className="flex gap-2 p-5 border-t border-gray-100 sticky bottom-0 bg-white">
+          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button onClick={handleSave} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+            {conta ? "Salvar Alterações" : "Criar Conta"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Modal: Forma de Pagamento ────────────────────────────────────────────────
+const FormaPagamentoModal = ({ fp, onClose, onSave, contas=[] }) => {
+  const [form, setForm] = useState(() => ({
+    nome:"", taxa:0, prazoRecebimento:0, contaId:"", status:"Ativo",
+    ...(fp||{}),
+  }));
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const handleSave = () => {
+    if (!form.nome.trim()) return;
+    onSave(form);
+  };
+
+  const inp = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300";
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+          <h2 className="font-bold text-gray-900">{fp ? "Editar Forma de Pagamento" : "Nova Forma de Pagamento"}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon name="x" size={18}/></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Nome *</label>
+            <input className={inp} value={form.nome} onChange={e=>set("nome",e.target.value)} placeholder="Ex: Pix, Cartão de Crédito, Depósito..."/>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Taxa (%)</label>
+              <input type="number" min="0" max="100" step="0.01" className={inp} value={form.taxa} onChange={e=>set("taxa",parseFloat(e.target.value)||0)} placeholder="0,00"/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Prazo Recebimento (dias)</label>
+              <input type="number" min="0" className={inp} value={form.prazoRecebimento} onChange={e=>set("prazoRecebimento",parseInt(e.target.value)||0)} placeholder="0"/>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Conta de Recebimento (opcional)</label>
+            <select className={inp} value={form.contaId} onChange={e=>set("contaId",e.target.value)}>
+              <option value="">— Não vincular —</option>
+              {contas.map(c=><option key={c.id} value={c.id}>{c.banco} · {c.titular}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
+            <select className={inp} value={form.status} onChange={e=>set("status",e.target.value)}>
+              {FORMAPAG_STATUS.map(s=><option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="flex gap-2 p-5 border-t border-gray-100 sticky bottom-0 bg-white">
+          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button onClick={handleSave} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+            {fp ? "Salvar Alterações" : "Criar Forma de Pagamento"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setContas, formasPagamento=[], setFormasPagamento }) => {
+  const [tab, setTab]         = useState("representantes");
+  const [search, setSearch]   = useState("");
+  const [modal, setModal]     = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [toast, setToast]     = useState(null);
+
+  const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null), 3000); };
+
+  // ── Representantes ──
+  const filteredReps = useMemo(() => representantes.filter(r =>
+    !search || [r.nome,r.cpfCnpj,r.email].some(f=>f?.toLowerCase().includes(search.toLowerCase()))
+  ), [representantes, search]);
+
+  const saveRep = (data) => {
+    if (data.id) setRepresentantes(prev=>prev.map(r=>r.id===data.id?data:r));
+    else setRepresentantes(prev=>[...prev, {...data, id:nextCadId(prev,"REP")}]);
+    setModal(null);
+    showToast(data.id ? "✅ Representante atualizado!" : "✅ Representante cadastrado!");
+  };
+  const deleteRep = (r) => { setRepresentantes(prev=>prev.filter(x=>x.id!==r.id)); setConfirmDelete(null); showToast("🗑️ Representante removido"); };
+
+  // ── Contas ──
+  const filteredContas = useMemo(() => contas.filter(c =>
+    !search || [c.banco,c.titular,c.agencia,c.conta].some(f=>f?.toLowerCase().includes(search.toLowerCase()))
+  ), [contas, search]);
+
+  const saveConta = (data) => {
+    if (data.id) setContas(prev=>prev.map(c=>c.id===data.id?data:c));
+    else setContas(prev=>[...prev, {...data, id:nextCadId(prev,"CTA")}]);
+    setModal(null);
+    showToast(data.id ? "✅ Conta atualizada!" : "✅ Conta cadastrada!");
+  };
+  const deleteConta = (c) => { setContas(prev=>prev.filter(x=>x.id!==c.id)); setConfirmDelete(null); showToast("🗑️ Conta removida"); };
+
+  // ── Formas de Pagamento ──
+  const filteredFP = useMemo(() => formasPagamento.filter(f =>
+    !search || f.nome?.toLowerCase().includes(search.toLowerCase())
+  ), [formasPagamento, search]);
+
+  const saveFP = (data) => {
+    if (data.id) setFormasPagamento(prev=>prev.map(f=>f.id===data.id?data:f));
+    else setFormasPagamento(prev=>[...prev, {...data, id:nextCadId(prev,"FPG")}]);
+    setModal(null);
+    showToast(data.id ? "✅ Forma de pagamento atualizada!" : "✅ Forma de pagamento cadastrada!");
+  };
+  const deleteFP = (f) => { setFormasPagamento(prev=>prev.filter(x=>x.id!==f.id)); setConfirmDelete(null); showToast("🗑️ Forma de pagamento removida"); };
+
+  const newLabel = { representantes:"Representante", contas:"Conta", formaspagamento:"Forma de Pagamento" }[tab];
+
+  return (
+    <div className="space-y-4">
+      {toast && <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg">{toast}</div>}
+
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Cadastros</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Representantes, contas bancárias e formas de pagamento</p>
+        </div>
+        <button onClick={()=>setModal("new")} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm flex items-center gap-1.5">
+          <Icon name="plus" size={15}/> {newLabel}
+        </button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 rounded-2xl p-1.5 flex-wrap">
+        {[["representantes","🧑‍💼 Representantes"],["contas","🏦 Contas"],["formaspagamento","💳 Forma de Pagamento"]].map(([id,label])=>(
+          <button key={id} onClick={()=>{setTab(id);setSearch("");}}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${tab===id?"bg-white text-gray-900 shadow-sm":"text-gray-500 hover:text-gray-700"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+        <input className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          placeholder="Buscar..." value={search} onChange={e=>setSearch(e.target.value)}/>
+      </div>
+
+      {/* ══ TAB: REPRESENTANTES ══ */}
+      {tab==="representantes" && (
+        filteredReps.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
+            <p className="text-3xl mb-2">🧑‍💼</p>
+            <p className="text-sm text-gray-400">Nenhum representante cadastrado</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="grid grid-cols-12 gap-3 px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+              <span className="col-span-4 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nome</span>
+              <span className="col-span-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Contato</span>
+              <span className="col-span-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Comissão</span>
+              <span className="col-span-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Status</span>
+              <span className="col-span-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Ações</span>
+            </div>
+            {filteredReps.map(r=>(
+              <div key={r.id} className="grid grid-cols-12 gap-3 px-4 py-3 border-b border-gray-50 last:border-0 items-center hover:bg-gray-50/50">
+                <div className="col-span-4">
+                  <p className="text-sm font-medium text-gray-800">{r.nome}</p>
+                  <p className="text-[11px] text-gray-400">{r.cpfCnpj || "—"}</p>
+                </div>
+                <div className="col-span-3 text-xs text-gray-500">
+                  <p>{r.telefone || "—"}</p>
+                  <p className="truncate">{r.email || "—"}</p>
+                </div>
+                <div className="col-span-3 text-xs text-gray-600">
+                  {r.tipoComissao==="fixa"
+                    ? <span className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">{r.comissaoFixa}% fixa</span>
+                    : <span className="bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-medium">{(r.faixas||[]).length} faixa(s)</span>}
+                </div>
+                <div className="col-span-1">
+                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${r.status==="Ativo"?"bg-green-50 text-green-600":"bg-gray-100 text-gray-400"}`}>{r.status}</span>
+                </div>
+                <div className="col-span-1 flex justify-end gap-2">
+                  <button onClick={()=>setModal(r)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>
+                  <button onClick={()=>setConfirmDelete({type:"rep",item:r})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* ══ TAB: CONTAS ══ */}
+      {tab==="contas" && (
+        filteredContas.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
+            <p className="text-3xl mb-2">🏦</p>
+            <p className="text-sm text-gray-400">Nenhuma conta cadastrada</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="grid grid-cols-12 gap-3 px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+              <span className="col-span-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Banco</span>
+              <span className="col-span-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Agência/Conta</span>
+              <span className="col-span-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Titular</span>
+              <span className="col-span-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Status</span>
+              <span className="col-span-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Ações</span>
+            </div>
+            {filteredContas.map(c=>(
+              <div key={c.id} className="grid grid-cols-12 gap-3 px-4 py-3 border-b border-gray-50 last:border-0 items-center hover:bg-gray-50/50">
+                <div className="col-span-3">
+                  <p className="text-sm font-medium text-gray-800">{c.banco}</p>
+                  <p className="text-[11px] text-gray-400">{c.tipo}</p>
+                </div>
+                <div className="col-span-2 text-xs text-gray-500 font-mono">
+                  <p>Ag {c.agencia || "—"}</p>
+                  <p>CC {c.conta || "—"}</p>
+                </div>
+                <div className="col-span-3">
+                  <p className="text-sm text-gray-700">{c.titular}</p>
+                  {c.principal && <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">★ principal</span>}
+                </div>
+                <div className="col-span-2">
+                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${c.status==="Ativo"?"bg-green-50 text-green-600":"bg-gray-100 text-gray-400"}`}>{c.status}</span>
+                </div>
+                <div className="col-span-2 flex justify-end gap-2">
+                  <button onClick={()=>setModal(c)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>
+                  <button onClick={()=>setConfirmDelete({type:"conta",item:c})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* ══ TAB: FORMA DE PAGAMENTO ══ */}
+      {tab==="formaspagamento" && (
+        filteredFP.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
+            <p className="text-3xl mb-2">💳</p>
+            <p className="text-sm text-gray-400">Nenhuma forma de pagamento cadastrada</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="grid grid-cols-12 gap-3 px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+              <span className="col-span-4 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nome</span>
+              <span className="col-span-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Taxa</span>
+              <span className="col-span-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Prazo</span>
+              <span className="col-span-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Status</span>
+              <span className="col-span-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Ações</span>
+            </div>
+            {filteredFP.map(f=>{
+              const conta = contas.find(c=>c.id===f.contaId);
+              return (
+                <div key={f.id} className="grid grid-cols-12 gap-3 px-4 py-3 border-b border-gray-50 last:border-0 items-center hover:bg-gray-50/50">
+                  <div className="col-span-4">
+                    <p className="text-sm font-medium text-gray-800">{f.nome}</p>
+                    {conta && <p className="text-[11px] text-gray-400">→ {conta.banco}</p>}
+                  </div>
+                  <div className="col-span-2 text-xs text-gray-600 text-right font-mono">{(f.taxa||0).toFixed(2)}%</div>
+                  <div className="col-span-2 text-xs text-gray-600 text-right">{f.prazoRecebimento||0}d</div>
+                  <div className="col-span-2">
+                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${f.status==="Ativo"?"bg-green-50 text-green-600":"bg-gray-100 text-gray-400"}`}>{f.status}</span>
+                  </div>
+                  <div className="col-span-2 flex justify-end gap-2">
+                    <button onClick={()=>setModal(f)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>
+                    <button onClick={()=>setConfirmDelete({type:"fp",item:f})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {/* Modais */}
+      {modal && tab==="representantes" && (
+        <RepresentanteModal rep={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={saveRep}/>
+      )}
+      {modal && tab==="contas" && (
+        <ContaModal conta={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={saveConta}/>
+      )}
+      {modal && tab==="formaspagamento" && (
+        <FormaPagamentoModal fp={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={saveFP} contas={contas}/>
+      )}
+
+      {/* Confirmação de exclusão */}
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
+            <p className="font-bold text-gray-900 mb-1">Confirmar exclusão</p>
+            <p className="text-sm text-gray-500 mb-4">
+              {confirmDelete.type==="rep" && `Remover o representante "${confirmDelete.item.nome}"?`}
+              {confirmDelete.type==="conta" && `Remover a conta "${confirmDelete.item.banco} - ${confirmDelete.item.titular}"?`}
+              {confirmDelete.type==="fp" && `Remover a forma de pagamento "${confirmDelete.item.nome}"?`}
+            </p>
+            <div className="flex gap-2">
+              <button onClick={()=>setConfirmDelete(null)} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+              <button onClick={()=>{
+                if (confirmDelete.type==="rep") deleteRep(confirmDelete.item);
+                else if (confirmDelete.type==="conta") deleteConta(confirmDelete.item);
+                else deleteFP(confirmDelete.item);
+              }} className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700">Excluir</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Params Module ────────────────────────────────────────────────────────
 const CHANNEL_EMOJI_MAP = { "Mercado Livre":"🛒","Shopee":"🛍️","WhatsApp":"💬","Loja Própria":"🏪" };
 const CHANNEL_DOT_COLOR = { "Mercado Livre":"bg-yellow-500","Shopee":"bg-orange-500","WhatsApp":"bg-green-500","Loja Própria":"bg-blue-500" };
@@ -10422,6 +11006,7 @@ const NAV = [
   { id: "pricehunt",  label: "PriceHunt",        icon: "search"     },
   { id: "reports",    label: "Relatórios",       icon: "reports"    },
   { id: "usuarios",   label: "Usuários",         icon: "crm"        },
+  { id: "cadastros",  label: "Cadastros",        icon: "tag"        },
   { id: "parametros", label: "Parâmetros",       icon: "settings"   },
 ];
 
@@ -10445,6 +11030,9 @@ function ERPApp({ currentUser, onLogout }) {
   const [nfes, setNfes]             = useState([]);
   const [purchases, setPurchases]   = useState([]);
   const [cotacoes,  setCotacoes]    = useState([]);
+  const [representantes, setRepresentantes_] = useState([]);
+  const [contas,    setContas_]     = useState([]);
+  const [formasPagamento, setFormasPagamento_] = useState([]);
   const [params,    setParamsState] = useState(PARAMS_DEFAULT);
   const [loading, setLoading]       = useState(true);
   const [active, setActive]         = useState("dashboard");
@@ -10462,10 +11050,12 @@ function ERPApp({ currentUser, onLogout }) {
 
   useEffect(() => {
     Promise.all([loadOrders(),loadFinance(),loadCustomers(),loadSuppliers(),loadProducts(),loadMovements(),loadNfes(),loadPurchases(),loadCotacoes(),loadParams(),
+      loadRepresentantes(),loadContas(),loadFormasPagamento(),
       window.storage.get(EMPRESA_KEY).catch(()=>null)])
-      .then(([o,f,c,s,p,m,n,pc,cot,prm,emp]) => {
+      .then(([o,f,c,s,p,m,n,pc,cot,prm,reps,ctas,fps,emp]) => {
         setOrders(o);setFinance(f);setSuppliers(s);setProducts(p);setMovements(m);setNfes(n);setPurchases(pc);setCotacoes(cot);
         if (prm) setParamsState(prm);
+        setRepresentantes_(reps); setContas_(ctas); setFormasPagamento_(fps);
         if (emp?.value) setEmpresaForm(JSON.parse(emp.value));
 
         // ── Automação: inativar clientes sem compras há 30+ dias ──
@@ -10614,6 +11204,30 @@ function ERPApp({ currentUser, onLogout }) {
     saveParams(next);
   }, []);
 
+  const updateRepresentantes = useCallback((updater) => {
+    setRepresentantes_(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      saveRepresentantes(next);
+      return next;
+    });
+  }, []);
+
+  const updateContas = useCallback((updater) => {
+    setContas_(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      saveContas(next);
+      return next;
+    });
+  }, []);
+
+  const updateFormasPagamento = useCallback((updater) => {
+    setFormasPagamento_(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      saveFormasPagamento(next);
+      return next;
+    });
+  }, []);
+
   const updateCotacoes = useCallback((updater) => {
     setCotacoes(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
@@ -10636,7 +11250,7 @@ function ERPApp({ currentUser, onLogout }) {
   const renderModule = () => {
     switch (active) {
       case "dashboard": return <DashboardModule orders={orders} />;
-      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance}/>;
+      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
@@ -10646,6 +11260,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
       case "empresa":   return <EmpresaModule onSave={(data) => setEmpresaForm(data)}/>;
+      case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento}/>;
       case "parametros": return <ParamsModule params={params} setParams={updateParams} onSaveEmpresa={(data)=>setEmpresaForm(data)} orders={orders} setOrders={updateOrders}/>;
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
