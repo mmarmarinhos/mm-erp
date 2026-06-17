@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.0";
+const APP_VERSION = "3.3.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9293,13 +9293,13 @@ async function saveCotacoes(c) {
   try { await window.storage.set(COT_KEY, JSON.stringify(c)); } catch(_){} }
 
 // ─── Cotação Modal ────────────────────────────────────────────────────────
-const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [] }) => {
+const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [], representantes = [], formasPagamento = [] }) => {
   const isNew = !cotacao;
   const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, discount:0, discountType:"%", total:0 });
   const [form, setForm] = useState(cotacao ? { ...cotacao } : {
     customer:"", channel:"WhatsApp", date:today(), validUntil:"",
     status:"Rascunho", payment:"Pix", freight:0, discount:0,
-    items:[emptyItem()], notes:"", orderId:null,
+    items:[emptyItem()], notes:"", orderId:null, representanteId:"",
   });
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
 
@@ -9371,6 +9371,14 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [] 
 
   const subtotal = form.items.reduce((s,it)=>s+(it.total||0),0);
   const total    = Math.max(0, subtotal - (Number(form.discount)||0) + (Number(form.freight)||0));
+  const grossSubtotal = form.items.reduce((s,it)=>s+((it.qty||0)*(it.unitPrice||0)),0);
+  const totalDiscountValue = (grossSubtotal - subtotal) + (Number(form.discount)||0);
+  const discountPercent = grossSubtotal > 0 ? Math.max(0,(totalDiscountValue/grossSubtotal)*100) : 0;
+  const selectedRep = representantes.find(r => r.id === form.representanteId);
+  const comissaoPercent = selectedRep ? comissaoAplicavel(selectedRep, discountPercent) : 0;
+  const comissaoValor = total * (comissaoPercent/100);
+  const formasAtivas = formasPagamento.filter(f => f.status==="Ativo");
+  const paymentOptions = formasAtivas.length > 0 ? formasAtivas.map(f=>f.nome) : PAYMENT_METHODS;
 
   const handleSave = () => {
     if (!form.customer.trim()) return;
@@ -9453,8 +9461,21 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [] 
             <div>
               <label className="text-xs font-medium text-gray-600 block mb-1">Forma de Pagamento</label>
               <select className={inp} value={form.payment} onChange={e=>set("payment",e.target.value)}>
-                {PAYMENT_METHODS.map(p=><option key={p}>{p}</option>)}
+                {paymentOptions.map(p=><option key={p}>{p}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">Representante</label>
+              <select className={inp} value={form.representanteId||""} onChange={e=>set("representanteId",e.target.value)}>
+                <option value="">— Nenhum —</option>
+                {representantes.filter(r=>r.status==="Ativo").map(r=><option key={r.id} value={r.id}>{r.nome}</option>)}
+              </select>
+              {selectedRep && (
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Comissão estimada: <strong className="text-indigo-600">{comissaoPercent.toFixed(1)}%</strong> = <strong className="text-indigo-600">{fmt(comissaoValor)}</strong>
+                  {discountPercent > 0 && ` (desconto: ${discountPercent.toFixed(1)}%)`}
+                </p>
+              )}
             </div>
           </div>
 
@@ -9695,7 +9716,7 @@ const gerarCotacaoPDF = (cotacao, empresaRaw) => {
   if (w) { w.document.write(html); w.document.close(); }
 };
 
-const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [], products = [], setProducts, movements = [], setMovements, empresa = {} }) => {
+const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [], products = [], setProducts, movements = [], setMovements, empresa = {}, representantes = [], formasPagamento = [] }) => {
   const [modal,    setModal]    = useState(null);
   const [detail,   setDetail]   = useState(null);
   const [filter,   setFilter]   = useState("Todos");
@@ -10033,7 +10054,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
         })}
       </div>
 
-      {modal && <CotacaoModal cotacao={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={handleSave} customers={customers} products={products}/>}
+      {modal && <CotacaoModal cotacao={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={handleSave} customers={customers} products={products} representantes={representantes} formasPagamento={formasPagamento}/>}
     </div>
   );
 };
@@ -11251,7 +11272,7 @@ function ERPApp({ currentUser, onLogout }) {
     switch (active) {
       case "dashboard": return <DashboardModule orders={orders} />;
       case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento}/>;
-      case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form}/>;
+      case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases}/>;
