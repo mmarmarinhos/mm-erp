@@ -7900,11 +7900,10 @@ const AppAuth = ({ children }) => {
       if (users.length === 0) { setAuthState("setup"); return; }
       const session = getSession();
       if (session) {
-        // Garante que módulos estão sempre presentes
-        if (!session.modules || session.modules.length === 0) {
-          session.modules = ROLES_DEF[session.role]?.modules || ROLES_DEF.viewer.modules;
-          setSession(session); // atualiza sessão com módulos
-        }
+        // Sempre atualiza módulos pelo role atual (captura novos módulos adicionados ao sistema)
+        const freshModules = session.customModules || ROLES_DEF[session.role]?.modules || ROLES_DEF.viewer.modules;
+        session.modules = freshModules;
+        setSession(session);
         setCurrentUser(session);
         setAuthState("authed");
         return;
