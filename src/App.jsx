@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.20";
+const APP_VERSION = "3.3.21";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -5212,9 +5212,10 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], onClose,
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const toggleCh = (c) => setForm(f=>({...f, channels: f.channels.includes(c)?f.channels.filter(x=>x!==c):[...f.channels,c]}));
   const margin = form.price && form.cost ? ((Number(form.price)-Number(form.cost))/Number(form.price)*100).toFixed(1) : null;
+  const [nameErr, setNameErr] = useState(false);
 
   const handleSave = () => {
-    if (!form.name.trim()) return;
+    if (!form.name.trim()) { setNameErr(true); return; }
     const sup = suppliers.find(s=>s.id===form.supplierId);
     onSave({ ...form, tags:form.tagsInput.split(",").map(t=>t.trim()).filter(Boolean),
       price:Number(form.price)||0, cost:Number(form.cost)||0,
@@ -5234,8 +5235,9 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], onClose,
         <div className="p-5 space-y-3">
           <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">Nome do Produto *</label>
-            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              value={form.name} onChange={e=>set("name",e.target.value)} placeholder="Ex: Linha Bag Sacaria 500m Branca"/>
+            <input className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${nameErr?"border-red-300 focus:ring-red-300":"border-gray-200 focus:ring-indigo-300"}`}
+              value={form.name} onChange={e=>{set("name",e.target.value); if(nameErr) setNameErr(false);}} placeholder="Ex: Linha Bag Sacaria 500m Branca"/>
+            {nameErr && <p className="text-xs text-red-500 mt-1">⚠️ Preencha o nome do produto para salvar</p>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
