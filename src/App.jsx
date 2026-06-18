@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.5";
+const APP_VERSION = "3.3.6";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -866,9 +866,55 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
 
   const totalValue = filtered.reduce((s, o) => s + o.total, 0);
 
+  const ACTIVE_ORDER_STATUSES = ["Novo", "Em Separação", "Enviado", "Entregue"];
+
+  // Quanto estoque este pedido está "segurando" agora, por produto.
+  // Pedidos Cancelado/Devolvido não seguram nada (estoque já foi/não foi baixado).
+  const computeHeldQtyMap = (order) => {
+    const map = {};
+    if (!order || !ACTIVE_ORDER_STATUSES.includes(order.status)) return map;
+    (order.itemsList || []).forEach(it => {
+      if (!it._prodId || (it.qty||0) <= 0) return;
+      const key = String(it._prodId);
+      map[key] = (map[key] || 0) + (it.qty || 0);
+    });
+    return map;
+  };
+
+  // Aplica a diferença (delta>0 baixa estoque, delta<0 devolve) e registra os movimentos.
+  const applyStockDelta = (deltaMap, order, reason) => {
+    const entries = Object.entries(deltaMap).filter(([,d]) => d !== 0);
+    if (!entries.length || !setProducts) return;
+    setProducts(prev => prev.map(prod => {
+      const d = deltaMap[String(prod.id)];
+      if (!d) return prod;
+      return { ...prod, stock: Math.max(0, (prod.stock||0) - d) };
+    }));
+    if (setMovements) {
+      setMovements(prev => {
+        const nums = prev.map(m => parseInt(m.id.replace("MOV-",""))||0);
+        let base = Math.max(0, ...nums, 0);
+        const novasMovs = entries.map(([prodId, d]) => {
+          base += 1;
+          return {
+            id: `MOV-${String(base).padStart(3,"0")}`,
+            productId: prodId,
+            type: d > 0 ? "saida" : "entrada",
+            qty: Math.abs(d),
+            date: today(),
+            reason,
+            notes: `${reason} — Pedido ${order.id} · ${order.customer||""}`.trim(),
+          };
+        });
+        return [...prev, ...novasMovs];
+      });
+    }
+  };
+
   const handleSave = (data) => {
     const orderId = data.id || nextId(orders);
     const savedOrder = data.id ? data : { ...data, id: orderId };
+    const oldOrder = data.id ? orders.find(o => o.id === data.id) : null;
 
     if (data.id) {
       setOrders(prev => prev.map(o => o.id === data.id ? data : o));
@@ -885,48 +931,25 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
       ));
     }
 
-    // Dar baixa no estoque para novos pedidos (não cancelados)
-    const isNewOrder = !data.id;
-    const items = data.itemsList || [];
-    if (isNewOrder && setProducts && data.status !== "Cancelado" && items.length > 0) {
-      const movimentos = [];
-      items.forEach(it => {
-        if (!it._prodId || (it.qty||0) <= 0) return;
-        const prod = products.find(p => String(p.id) === String(it._prodId));
-        if (!prod) return;
-        movimentos.push({
-          productId: prod.id,
-          type: "saida",
-          qty: it.qty || 0,
-          date: data.date || today(),
-          reason: "Venda",
-          notes: `Pedido ${orderId} · ${data.customer||""}`.trim(),
-        });
+    // Reconcilia o estoque comparando o que esse pedido segurava ANTES
+    // (na versão salva) com o que ele segura DEPOIS (na versão nova) — cobre
+    // criação, mudança de quantidade, troca de produto no item e mudança de
+    // status (Cancelado/Devolvido <-> ativo), tudo no mesmo cálculo.
+    if (setProducts) {
+      const oldHeld = computeHeldQtyMap(oldOrder);
+      const newHeld = computeHeldQtyMap(savedOrder);
+      const deltaMap = {};
+      new Set([...Object.keys(oldHeld), ...Object.keys(newHeld)]).forEach(prodId => {
+        const d = (newHeld[prodId]||0) - (oldHeld[prodId]||0);
+        if (d !== 0) deltaMap[prodId] = d;
       });
-
-      if (movimentos.length > 0) {
-        setProducts(prev => prev.map(prod => {
-          const it = items.find(i => String(i._prodId) === String(prod.id));
-          if (!it) return prod;
-          return { ...prod, stock: Math.max(0, (prod.stock||0) - (it.qty||0)) };
-        }));
-
-        if (setMovements) {
-          setMovements(prev => {
-            const n = prev.map(x => parseInt(x.id.replace("MOV-",""))||0);
-            const base = Math.max(0, ...n, 0);
-            return [...prev, ...movimentos.map((m, i) => ({
-              ...m, id: `MOV-${String(base + i + 1).padStart(3,"0")}`
-            }))];
-          });
-        }
+      if (Object.keys(deltaMap).length > 0) {
+        applyStockDelta(deltaMap, savedOrder, oldOrder ? "Edição de pedido" : "Venda");
       }
     }
 
     setModal(null);
   };
-
-  const ACTIVE_ORDER_STATUSES = ["Novo", "Em Separação", "Enviado", "Entregue"];
 
   // Helpers de estoque reaproveitados pelo cancelamento e pela reativação de pedidos
   const restoreStockForOrder = (order, reason) => {
