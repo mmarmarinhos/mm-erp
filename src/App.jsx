@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.9";
+const APP_VERSION = "3.3.10";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -10805,7 +10805,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">CNPJ</label>
                     <input className={`${inp} font-mono`} value={empresa.cnpj||""} onChange={e=>setE("cnpj",fmtCpfCnpj(e.target.value))} placeholder="00.000.000/0001-00" maxLength={18}/></div>
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">Inscrição Estadual</label>
-                    <input className={`${inp} font-mono`} value={empresa.ie||""} onChange={e=>setE("ie",e.target.value)} placeholder="000.000.000.000"/></div>
+                    <input className={`${inp} font-mono`} value={empresa.ie||""} onChange={e=>setE("ie",fmtIE(e.target.value))} placeholder="000.000.000.000" maxLength={15}/></div>
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">Regime Tributário</label>
                     <select className={inp} value={empresa.regime||"Simples Nacional"} onChange={e=>setE("regime",e.target.value)}>
                       {REGIMES.map(r=><option key={r}>{r}</option>)}
