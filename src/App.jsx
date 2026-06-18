@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.10";
+const APP_VERSION = "3.3.11";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -10889,7 +10889,9 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                     <div className="flex items-center gap-1">
                       <input type="number" min="0" max="50" step="0.1"
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                        value={cfg.comissao||0} onChange={e=>setC(ch,"comissao",parseFloat(e.target.value)||0)}/>
+                        value={cfg.comissao===0?"":cfg.comissao}
+                        onChange={e=>setC(ch,"comissao", e.target.value==="" ? "" : parseFloat(e.target.value))}
+                        onBlur={e=>{ if (e.target.value==="") setC(ch,"comissao",0); }}/>
                       <span className="text-xs text-gray-400">%</span>
                     </div>
                   </div>
@@ -10898,7 +10900,9 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                     <div className="flex items-center gap-1">
                       <input type="number" min="0" max="10" step="0.1"
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                        value={cfg.gateway||0} onChange={e=>setC(ch,"gateway",parseFloat(e.target.value)||0)}/>
+                        value={cfg.gateway===0?"":cfg.gateway}
+                        onChange={e=>setC(ch,"gateway", e.target.value==="" ? "" : parseFloat(e.target.value))}
+                        onBlur={e=>{ if (e.target.value==="") setC(ch,"gateway",0); }}/>
                       <span className="text-xs text-gray-400">%</span>
                     </div>
                   </div>
@@ -10906,7 +10910,9 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                     <label className="text-xs text-gray-500 block mb-1.5 font-medium">SLA postagem (dias úteis)</label>
                     <input type="number" min="1" max="10"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                      value={cfg.sla||2} onChange={e=>setC(ch,"sla",parseInt(e.target.value)||1)}/>
+                      value={cfg.sla===0?"":(cfg.sla||2)}
+                      onChange={e=>setC(ch,"sla", e.target.value==="" ? "" : parseInt(e.target.value))}
+                      onBlur={e=>{ if (e.target.value==="") setC(ch,"sla",2); }}/>
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 block mb-1.5 font-medium">Simulação (R$ 100,00)</label>
