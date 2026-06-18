@@ -23,7 +23,7 @@ language sql security definer set search_path = public
 as $$ select count(*)::integer from erp_users; $$;
 
 create or replace function public.verify_login(p_username text, p_password_hash text)
-returns table (id bigint, username text, display_name text, role text)
+returns table (id uuid, username text, display_name text, role text)
 language sql security definer set search_path = public
 as $$
   select id, username, display_name, role
@@ -58,7 +58,7 @@ end;
 $$;
 
 create or replace function public.list_users_safe()
-returns table (id bigint, username text, display_name text, role text,
+returns table (id uuid, username text, display_name text, role text,
                active boolean, last_login timestamptz, created_at timestamptz)
 language sql security definer set search_path = public
 as $$
