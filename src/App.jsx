@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.4.6";
+const APP_VERSION = "3.4.7";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -275,6 +275,11 @@ async function saveFinance(fin) {
 // ─── Helpers ──────────────────────────────────────────────────────────────
 const fmt = (n) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const today = () => new Date().toISOString().split("T")[0];
+const addDaysISO = (dateStr, days) => {
+  const d = dateStr ? new Date(dateStr+"T00:00:00") : new Date();
+  d.setDate(d.getDate()+days);
+  return d.toISOString().split("T")[0];
+};
 const nextId = (orders) => {
   const nums = orders.map(o => parseInt(o.id.replace("PED-", "")) || 0);
   return `PED-${String(Math.max(0, ...nums) + 1).padStart(3, "0")}`;
@@ -9612,7 +9617,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
   const isNew = !cotacao;
   const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, discount:0, discountType:"%", total:0 });
   const [form, setForm] = useState(cotacao ? { ...cotacao } : {
-    customer:"", channel:"WhatsApp", date:today(), validUntil:"",
+    customer:"", channel:"WhatsApp", date:today(), validUntil:addDaysISO(today(),10),
     status:"Rascunho", payment:"Pix", freight:0, discount:0,
     items:[emptyItem()], notes:"", orderId:null, representanteId:"",
   });
@@ -9773,7 +9778,9 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 block mb-1">⏳ Válida até</label>
-              <input type="date" className={inp} value={form.validUntil} onChange={e=>set("validUntil",e.target.value)}/>
+              <div className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500">
+                {form.validUntil ? new Date(form.validUntil+"T00:00:00").toLocaleDateString("pt-BR") : "—"}
+              </div>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 block mb-1">Forma de Pagamento</label>
