@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.3";
+const APP_VERSION = "3.3.4";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9880,6 +9880,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
       status:   "Novo",
       total:    cot.total,
       items:    cot.items.map(it=>`${it.description} x${it.qty}`).join(", "),
+      itemsList: cot.items || [],
       date:     today(),
       payment:  cot.payment,
       tracking: "",
@@ -9895,7 +9896,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
     const itensVinculados = (cot.items||[]).filter(it=>it._prodId);
     if (setProducts && itensVinculados.length > 0) {
       setProducts(prev => prev.map(prod => {
-        const it = itensVinculados.find(i=>i._prodId===prod.id);
+        const it = itensVinculados.find(i=>String(i._prodId)===String(prod.id));
         if (!it) return prod;
         const novoEstoque = Math.max(0, (prod.stock||0) - (it.qty||0));
         return { ...prod, stock: novoEstoque };
