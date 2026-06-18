@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.13";
+const APP_VERSION = "3.3.14";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -10511,7 +10511,7 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-2xl p-1.5 flex-wrap">
-        {[["representantes","🧑‍💼 Representantes"],["contas","🏦 Contas"],["formaspagamento","💳 Forma de Pagamento"]].map(([id,label])=>(
+        {[["representantes","🧑‍💼 Representantes"],["contas","🏦 Bancos e Contas"],["formaspagamento","💳 Forma de Pagamento"]].map(([id,label])=>(
           <button key={id} onClick={()=>{setTab(id);setSearch("");}}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${tab===id?"bg-white text-gray-900 shadow-sm":"text-gray-500 hover:text-gray-700"}`}>
             {label}
@@ -10601,7 +10601,7 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="grid grid-cols-12 gap-3 px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+            <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-2.5 border-b border-gray-100 bg-gray-50">
               <span className="col-span-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Banco</span>
               <span className="col-span-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Agência/Conta</span>
               <span className="col-span-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Titular</span>
@@ -10609,27 +10609,46 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
               <span className="col-span-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Ações</span>
             </div>
             {filteredContas.map(c=>(
-              <div key={c.id} className="grid grid-cols-12 gap-3 px-4 py-3 border-b border-gray-50 last:border-0 items-center hover:bg-gray-50/50">
-                <div className="col-span-3">
-                  <p className="text-sm font-medium text-gray-800">{c.banco}</p>
-                  <p className="text-[11px] text-gray-400">{c.tipo}</p>
+              <Fragment key={c.id}>
+                {/* Linha em tabela — telas md+ */}
+                <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-3 border-b border-gray-50 last:border-0 items-center hover:bg-gray-50/50">
+                  <div className="col-span-3">
+                    <p className="text-sm font-medium text-gray-800">{c.banco}</p>
+                    <p className="text-[11px] text-gray-400">{c.tipo}</p>
+                  </div>
+                  <div className="col-span-2 text-xs text-gray-500 font-mono">
+                    <p>Ag {c.agencia || "—"}</p>
+                    <p>CC {c.conta || "—"}</p>
+                  </div>
+                  <div className="col-span-3">
+                    <p className="text-sm text-gray-700">{c.titular}</p>
+                    {c.principal && <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">★ principal</span>}
+                  </div>
+                  <div className="col-span-2">
+                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${c.status==="Ativo"?"bg-green-50 text-green-600":"bg-gray-100 text-gray-400"}`}>{c.status}</span>
+                  </div>
+                  <div className="col-span-2 flex justify-end gap-2">
+                    <button onClick={()=>setModal(c)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>
+                    <button onClick={()=>setConfirmDelete({type:"conta",item:c})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>
+                  </div>
                 </div>
-                <div className="col-span-2 text-xs text-gray-500 font-mono">
-                  <p>Ag {c.agencia || "—"}</p>
-                  <p>CC {c.conta || "—"}</p>
+                {/* Card — mobile */}
+                <div className="md:hidden flex items-start justify-between gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800">{c.banco} <span className="text-[11px] text-gray-400 font-normal">· {c.tipo}</span></p>
+                    <p className="text-xs text-gray-500 font-mono mt-1">Ag {c.agencia || "—"} · CC {c.conta || "—"}</p>
+                    <p className="text-xs text-gray-600 mt-1">{c.titular}</p>
+                    <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                      {c.principal && <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">★ principal</span>}
+                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${c.status==="Ativo"?"bg-green-50 text-green-600":"bg-gray-100 text-gray-400"}`}>{c.status}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center gap-2.5 shrink-0 pt-0.5">
+                    <button onClick={()=>setModal(c)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={16}/></button>
+                    <button onClick={()=>setConfirmDelete({type:"conta",item:c})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={16}/></button>
+                  </div>
                 </div>
-                <div className="col-span-3">
-                  <p className="text-sm text-gray-700">{c.titular}</p>
-                  {c.principal && <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">★ principal</span>}
-                </div>
-                <div className="col-span-2">
-                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${c.status==="Ativo"?"bg-green-50 text-green-600":"bg-gray-100 text-gray-400"}`}>{c.status}</span>
-                </div>
-                <div className="col-span-2 flex justify-end gap-2">
-                  <button onClick={()=>setModal(c)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>
-                  <button onClick={()=>setConfirmDelete({type:"conta",item:c})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>
-                </div>
-              </div>
+              </Fragment>
             ))}
           </div>
         )
