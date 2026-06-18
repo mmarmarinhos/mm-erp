@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.4.1";
+const APP_VERSION = "3.4.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -5202,7 +5202,7 @@ const StockMovementModal = ({ product, onClose, onSave }) => {
 };
 
 // ─── Product Modal ────────────────────────────────────────────────────────
-const ProductModal = ({ product, suppliers, products: allProducts = [], onClose, onSave }) => {
+const ProductModal = ({ product, suppliers, products: allProducts = [], variantCatalogs = [], onApplyCatalog, onClose, onSave }) => {
   const isNew = !product;
   const [form, setForm] = useState(product ? { ...product, tagsInput:product.tags.join(", ") } : {
     name:"", sku:"", category:"Linhas / Fios", supplierId:"", supplierName:"",
@@ -5322,6 +5322,12 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], onClose,
                   placeholder="Kit 10 cones, Azul..." disabled={!form.parentId}/>
               </div>
             </div>
+            {!isNew && !product?.parentId && variantCatalogs.length>0 && (
+              <button type="button" onClick={()=>onApplyCatalog(product)}
+                className="mt-3 w-full text-xs font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 rounded-lg py-2 transition-colors">
+                🎨 Gerar várias variantes de uma vez (Catálogo de Variante)
+              </button>
+            )}
           </div>
           <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">Tags</label>
@@ -5981,7 +5987,9 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
           </div>
         </div>
       )}
-      {modal && <ProductModal product={modal==="new"?null:modal} suppliers={suppliers} products={products} onClose={()=>setModal(null)} onSave={handleSaveProd}/>}
+      {modal && <ProductModal product={modal==="new"?null:modal} suppliers={suppliers} products={products} variantCatalogs={variantCatalogs}
+        onApplyCatalog={(p)=>{setModal(null); setApplyCatalogProduct(p);}}
+        onClose={()=>setModal(null)} onSave={handleSaveProd}/>}
       {applyCatalogProduct && (
         <ApplyCatalogModal product={applyCatalogProduct} catalogs={variantCatalogs}
           onClose={()=>setApplyCatalogProduct(null)}
