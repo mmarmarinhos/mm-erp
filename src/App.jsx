@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.4.2";
+const APP_VERSION = "3.4.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -508,6 +508,12 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
                           onChange={e=>{const ss=[...skuSearch];ss[i]=e.target.value;setSkuSearch(ss);setItem(i,"sku",e.target.value);const sl=[...showSkuList];sl[i]=true;setShowSkuList(sl);}}
                           onFocus={()=>{const sl=[...showSkuList];sl[i]=true;setShowSkuList(sl);}}
                           onBlur={()=>setTimeout(()=>{const sl=[...showSkuList];sl[i]=false;setShowSkuList(sl);},150)}
+                          onKeyDown={e=>{
+                            if (e.key==="Tab" && showSkuList[i] && filtProd.length>0) {
+                              const exact = filtProd.find(p=>p.sku?.toLowerCase()===sq.toLowerCase());
+                              selectProduct(i, exact||filtProd[0]);
+                            }
+                          }}
                           placeholder="SKU"/>
                         {showSkuList[i] && filtProd.length>0 && sq && (
                           <div className="absolute z-50 left-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 w-64 max-h-48 overflow-y-auto">
@@ -8573,6 +8579,12 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
                           onChange={e=>{const ss=[...skuSearch];ss[i]=e.target.value;setSkuSearch(ss);setItem(i,"sku",e.target.value);const sl=[...showSkuList];sl[i]=true;setShowSkuList(sl);}}
                           onFocus={()=>{const sl=[...showSkuList];sl[i]=true;setShowSkuList(sl);}}
                           onBlur={()=>setTimeout(()=>{const sl=[...showSkuList];sl[i]=false;setShowSkuList(sl);},150)}
+                          onKeyDown={e=>{
+                            if (e.key==="Tab" && showSkuList[i] && filtProd.length>0) {
+                              const exact = filtProd.find(p=>p.sku?.toLowerCase()===sq.toLowerCase());
+                              selectProduct(i, exact||filtProd[0]);
+                            }
+                          }}
                           placeholder="SKU"/>
                         {showSkuList[i] && sq.length>0 && filtProd.length>0 && (
                           <div className="absolute z-50 top-full left-0 w-64 bg-white border border-gray-200 rounded-lg shadow-lg mt-0.5 max-h-40 overflow-y-auto">
@@ -9787,6 +9799,12 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                           onChange={e=>{ const ss=[...skuSearch]; ss[i]=e.target.value; setSkuSearch(ss); setItem(i,"sku",e.target.value); const sl=[...showSkuList]; sl[i]=true; setShowSkuList(sl); }}
                           onFocus={()=>{ const sl=[...showSkuList]; sl[i]=true; setShowSkuList(sl); }}
                           onBlur={()=>setTimeout(()=>{ const sl=[...showSkuList]; sl[i]=false; setShowSkuList(sl); },150)}
+                          onKeyDown={e=>{
+                            if (e.key==="Tab" && showSkuList[i] && filtProd.length>0) {
+                              const exact = filtProd.find(p=>p.sku?.toLowerCase()===sq.toLowerCase());
+                              selectProduct(i, exact||filtProd[0]);
+                            }
+                          }}
                           placeholder="SKU"/>
                         {showSkuList[i] && filtProd.length>0 && sq && (
                           <div className="absolute z-50 left-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 w-64 max-h-48 overflow-y-auto">
