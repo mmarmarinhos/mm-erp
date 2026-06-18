@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.14";
+const APP_VERSION = "3.3.15";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8135,11 +8135,6 @@ const UsersModule = ({ currentUser }) => {
                       {!u.active && <span className="text-[10px] bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full">Inativo</span>}
                       {u.username===currentUser.username && <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full">Você</span>}
                       {u.customModules && <span className="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">Permissões personalizadas</span>}
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      {mods.map(m=>(
-                        <span key={m} className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">{MOD_LABELS[m]||m}</span>
-                      ))}
                     </div>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
