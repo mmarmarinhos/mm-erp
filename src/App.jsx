@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.6";
+const APP_VERSION = "3.3.7";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -3989,7 +3989,7 @@ const SupplierDetailPanel = ({ supplier, finance, purchases, onUpdatePurchase, o
   const ss = SUP_STATUS_STYLES[supplier.status] || SUP_STATUS_STYLES["Ativo"];
   const catColor = SUP_CAT_COLORS[supplier.category] || "#94a3b8";
   const supPurchases = (purchases||[])
-    .filter(p => p.supplierId===supplier.id)
+    .filter(p => String(p.supplierId)===String(supplier.id))
     .sort((a,b) => b.date.localeCompare(a.date));
 
   // Financial helpers
@@ -4396,7 +4396,7 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
           {filtered.map((s, idx) => {
             const ss       = SUP_STATUS_STYLES[s.status] || SUP_STATUS_STYLES["Ativo"];
             const catColor = SUP_CAT_COLORS[s.category] || "#94a3b8";
-            const supPurchases = purchases.filter(p => p.supplierId === s.id || p.supplier === s.name);
+            const supPurchases = purchases.filter(p => String(p.supplierId) === String(s.id) || p.supplier === s.name);
             const lastDate = supPurchases.length > 0
               ? supPurchases.map(p=>p.date).sort().reverse()[0]
               : null;
@@ -5341,7 +5341,7 @@ const ProductDetailPanel = ({ product, movements, onClose, onEdit, onDelete, onM
   const cc  = avatarColor(product.name);
   const catColor = INV_CAT_COLORS[product.category]||"#94a3b8";
   const margin = product.price&&product.cost ? ((product.price-product.cost)/product.price*100).toFixed(1) : null;
-  const prdMoves = movements.filter(m=>m.productId===product.id).sort((a,b)=> parseInt(b.id.replace(/\D/g,"")) - parseInt(a.id.replace(/\D/g,"")));
+  const prdMoves = movements.filter(m=>String(m.productId)===String(product.id)).sort((a,b)=> parseInt(b.id.replace(/\D/g,"")) - parseInt(a.id.replace(/\D/g,"")));
   const totalIn  = prdMoves.filter(m=>m.type==="entrada").reduce((s,m)=>s+m.qty,0);
   const totalOut = prdMoves.filter(m=>m.type==="saida").reduce((s,m)=>s+m.qty,0);
 
