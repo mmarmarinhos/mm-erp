@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.8";
+const APP_VERSION = "3.3.9";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -10724,6 +10724,27 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
 
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null), 2500); };
   const setE = (k,v) => setEmpresa(f=>({...f,[k]:v}));
+  const [cepLoadingEmp, setCepLoadingEmp] = useState(false);
+  const [cepErrorEmp,   setCepErrorEmp]   = useState("");
+  const handleCepChangeEmp = (e) => {
+    const raw = e.target.value.replace(/\D/g,"").slice(0,8);
+    setE("cep", fmtCepGlobal(raw));
+    if (raw.length === 8) buscarCepEmpresa(raw);
+  };
+  const buscarCepEmpresa = async (cep) => {
+    setCepLoadingEmp(true); setCepErrorEmp("");
+    try {
+      const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const d = await r.json();
+      if (d.erro) { setCepErrorEmp("CEP não encontrado"); setCepLoadingEmp(false); return; }
+      setE("rua",    d.logradouro||"");
+      setE("bairro", d.bairro||"");
+      setE("cidade", d.localidade||"");
+      setE("estado", d.uf||"");
+      setCepErrorEmp("");
+    } catch { setCepErrorEmp("Erro ao buscar CEP"); }
+    setCepLoadingEmp(false);
+  };
   const setC = (ch,k,v) => setCanais(prev=>({...prev,[ch]:{...prev[ch],[k]:v}}));
   const setA = (k,v) => setAlertas(prev=>({...prev,[k]:v}));
   const setS = (plat,k,v) => setSync(prev =>
@@ -10798,7 +10819,11 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">📍 Endereço</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">CEP</label>
-                    <input className={`${inp} font-mono`} value={empresa.cep||""} onChange={e=>setE("cep",fmtCepGlobal(e.target.value))} placeholder="00000-000" maxLength={9}/></div>
+                    <div className="flex gap-2">
+                      <input className={`${inp} font-mono flex-1`} value={empresa.cep||""} onChange={handleCepChangeEmp} placeholder="00000-000" maxLength={9}/>
+                      {cepLoadingEmp && <div className="w-9 h-9 flex items-center justify-center shrink-0"><div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"/></div>}
+                    </div>
+                    {cepErrorEmp && <p className="text-[10px] text-red-500 mt-1">⚠️ {cepErrorEmp}</p>}</div>
                   <div className="col-span-2"><label className="text-xs font-medium text-gray-600 block mb-1">Logradouro</label>
                     <input className={inp} value={empresa.rua||""} onChange={e=>setE("rua",e.target.value)} placeholder="Rua, Av, etc."/></div>
                   <div><label className="text-xs font-medium text-gray-600 block mb-1">Número</label>
