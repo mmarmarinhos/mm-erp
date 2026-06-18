@@ -1,7 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import {
-  dbCountUsers, dbFindUser, dbListUsers,
-  dbCreateUser, dbUpdateUserPassword,
+  dbCountUsers, dbVerifyLogin, dbListUsers,
+  dbCreateUser, dbResetPasswordWithRecovery,
   dbToggleUserActive, dbUpdateRole,
   dbLogAccess, dbTouchLastLogin,
   sha256,
@@ -119,12 +119,11 @@ function LoginScreen({ onDone }) {
     if (!username.trim() || !pwd) return
     setL(true); setErr('')
     try {
-      const user = await dbFindUser(username.trim())
-      if (!user) { setErr('Usuário não encontrado ou inativo'); setL(false); return }
       const hash = await sha256(pwd)
-      if (hash !== user.password_hash) {
+      const user = await dbVerifyLogin(username.trim(), hash)
+      if (!user) {
         await dbLogAccess(username.toLowerCase(), 'failed_login')
-        setErr('Senha incorreta'); setPwd(''); setL(false); return
+        setErr('Usuário ou senha incorretos'); setPwd(''); setL(false); return
       }
       await dbTouchLastLogin(user.username)
       await dbLogAccess(user.username, 'login')
@@ -150,12 +149,9 @@ function LoginScreen({ onDone }) {
     if (rf.pwd !== rf.pwd2){ setErr('Senhas não coincidem'); return }
     setL(true)
     try {
-      const user = await dbFindUser(username.trim())
-      if (!user) { setErr('Usuário não encontrado'); setL(false); return }
-      if (user.recovery_key !== rf.rkey.toUpperCase().replace(/\s/g,'')) {
-        setErr('Chave incorreta'); setL(false); return
-      }
-      await dbUpdateUserPassword(user.username, rf.pwd)
+      const newHash = await sha256(rf.pwd)
+      const ok = await dbResetPasswordWithRecovery(username.trim(), rf.rkey, newHash)
+      if (!ok) { setErr('Usuário ou chave de recuperação incorretos'); setL(false); return }
       setSuc('✅ Senha redefinida! Dados intactos.')
       setTimeout(() => { setMode('login'); setSuc(''); setPwd(''); setRf({rkey:'',pwd:'',pwd2:''}) }, 2500)
     } catch(e) { setErr('Erro: ' + e.message) }

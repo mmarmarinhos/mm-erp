@@ -48,6 +48,18 @@ export async function dbDelete(table, filter) {
   return true
 }
 
+// Chama uma function (RPC) do Postgres — usado para tudo que toca em
+// senha/usuário, pra essa lógica rodar dentro do banco e não no navegador.
+export async function dbRpc(fn, args = {}) {
+  const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
+    method:  'POST',
+    headers: sbHeaders(),
+    body:    JSON.stringify(args),
+  })
+  if (!r.ok) throw new Error(`[RPC ${fn}] ${r.status}: ${await r.text()}`)
+  return r.json()
+}
+
 // SHA-256 (mesmo salt do AuthWrapper legado para compatibilidade)
 export async function sha256(text) {
   const buf = await crypto.subtle.digest('SHA-256',
@@ -65,49 +77,49 @@ export function genRecoveryKey() {
 }
 
 // ─── User helpers ─────────────────────────────────────────────────────────
+// A partir daqui, nada disso lê ou escreve a tabela erp_users diretamente:
+// tudo passa por funções do Postgres (RPC) que nunca devolvem password_hash
+// nem recovery_key para o navegador.
+
 export async function dbCountUsers() {
-  const d = await dbGet('erp_users', '?select=id')
-  return d.length
+  return dbRpc('count_erp_users')
 }
 
-export async function dbFindUser(username) {
-  const d = await dbGet('erp_users',
-    `?username=eq.${encodeURIComponent(username.toLowerCase())}&active=eq.true&limit=1`)
+// Verifica usuário+senha dentro do banco. Devolve só dados seguros
+// (id, username, display_name, role) ou null se não bater.
+export async function dbVerifyLogin(username, passwordHash) {
+  const d = await dbRpc('verify_login', { p_username: username, p_password_hash: passwordHash })
   return d[0] || null
 }
 
+// Verifica a chave de recuperação e já troca a senha, tudo dentro do banco.
+// Devolve true/false — nunca expõe a recovery_key armazenada.
+export async function dbResetPasswordWithRecovery(username, recoveryKey, newPasswordHash) {
+  return dbRpc('reset_password_with_recovery', {
+    p_username: username, p_recovery_key: recoveryKey, p_new_hash: newPasswordHash,
+  })
+}
+
 export async function dbListUsers() {
-  return dbGet('erp_users',
-    '?select=id,username,display_name,role,active,last_login,created_at&order=created_at')
+  return dbRpc('list_users_safe')
 }
 
 export async function dbCreateUser(username, displayName, password, role = 'user') {
   const rkey = genRecoveryKey()
   const hash = await sha256(password)
-  await dbUpsert('erp_users', {
-    username:      username.toLowerCase().trim(),
-    display_name:  displayName.trim() || username.trim(),
-    password_hash: hash,
-    recovery_key:  rkey,
-    role,
-    active:        true,
+  await dbRpc('create_erp_user', {
+    p_username: username, p_display_name: displayName || username,
+    p_password_hash: hash, p_recovery_key: rkey, p_role: role,
   })
   return rkey
 }
 
-export async function dbUpdateUserPassword(username, newPassword) {
-  const hash = await sha256(newPassword)
-  return dbPatch('erp_users',
-    `?username=eq.${encodeURIComponent(username.toLowerCase())}`,
-    { password_hash: hash })
-}
-
 export async function dbToggleUserActive(id, active) {
-  return dbPatch('erp_users', `?id=eq.${id}`, { active })
+  return dbRpc('set_user_active', { p_id: String(id), p_active: active })
 }
 
 export async function dbUpdateRole(id, role) {
-  return dbPatch('erp_users', `?id=eq.${id}`, { role })
+  return dbRpc('set_user_role', { p_id: String(id), p_role: role })
 }
 
 export async function dbLogAccess(username, action) {
@@ -116,7 +128,5 @@ export async function dbLogAccess(username, action) {
 }
 
 export async function dbTouchLastLogin(username) {
-  return dbPatch('erp_users',
-    `?username=eq.${encodeURIComponent(username)}`,
-    { last_login: new Date().toISOString() }).catch(() => {})
+  return dbRpc('touch_last_login', { p_username: username }).catch(() => {})
 }
