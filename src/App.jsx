@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.15";
+const APP_VERSION = "3.3.16";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8123,18 +8123,20 @@ const UsersModule = ({ currentUser }) => {
             const mods = u.customModules || ROLES_DEF[u.role]?.modules || [];
             return (
               <div key={u.id} className={`bg-white border rounded-2xl p-4 transition-all ${u.active?"border-gray-100":"border-dashed border-gray-200 opacity-60"}`}>
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm shrink-0">
-                    {(u.displayName||u.username)[0].toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-900">{u.displayName||u.username}</span>
-                      <span className="text-xs text-gray-400 font-mono">@{u.username}</span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${rs.bg} ${rs.text}`}>{rs.label}</span>
-                      {!u.active && <span className="text-[10px] bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full">Inativo</span>}
-                      {u.username===currentUser.username && <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full">Você</span>}
-                      {u.customModules && <span className="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">Permissões personalizadas</span>}
+                <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm shrink-0">
+                      {(u.displayName||u.username)[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-gray-900">{u.displayName||u.username}</span>
+                        <span className="text-xs text-gray-400 font-mono">@{u.username}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${rs.bg} ${rs.text}`}>{rs.label}</span>
+                        {!u.active && <span className="text-[10px] bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full">Inativo</span>}
+                        {u.username===currentUser.username && <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full">Você</span>}
+                        {u.customModules && <span className="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">Permissões personalizadas</span>}
+                      </div>
                     </div>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
