@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.17";
+const APP_VERSION = "3.3.18";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -6139,10 +6139,10 @@ const FiscalModule = ({ nfes, setNfes }) => {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit overflow-x-auto">
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
         {[["nfes","📄 NF-es"],["calculadora","🧮 Calculadora DAS"],["agenda","📅 Agenda Fiscal"],["codigos","📚 CFOP / NCM"]].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${tab===id?"bg-white text-gray-900 shadow-sm":"text-gray-500 hover:text-gray-700"}`}>
+            className={`shrink-0 px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${tab===id?"bg-white text-gray-900 shadow-sm":"text-gray-500 hover:text-gray-700"}`}>
             {label}
             {id==="nfes"&&rascunhos>0&&<span className="ml-1.5 px-1.5 py-0.5 bg-amber-500 text-white text-[10px] rounded-full">{rascunhos}</span>}
           </button>
