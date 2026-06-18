@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from "recharts";
 
 // ─── Icons (inline SVGs) ───────────────────────────────────────────────────
@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.12";
+const APP_VERSION = "3.3.13";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -10535,7 +10535,7 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="grid grid-cols-12 gap-3 px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+            <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-2.5 border-b border-gray-100 bg-gray-50">
               <span className="col-span-4 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nome</span>
               <span className="col-span-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Contato</span>
               <span className="col-span-3 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Comissão</span>
@@ -10543,28 +10543,50 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
               <span className="col-span-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Ações</span>
             </div>
             {filteredReps.map(r=>(
-              <div key={r.id} className="grid grid-cols-12 gap-3 px-4 py-3 border-b border-gray-50 last:border-0 items-center hover:bg-gray-50/50">
-                <div className="col-span-4">
-                  <p className="text-sm font-medium text-gray-800">{r.nome}</p>
-                  <p className="text-[11px] text-gray-400">{r.cpfCnpj || "—"}</p>
+              <Fragment key={r.id}>
+                {/* Linha em tabela — telas md+ */}
+                <div className="hidden md:grid grid-cols-12 gap-3 px-4 py-3 border-b border-gray-50 last:border-0 items-center hover:bg-gray-50/50">
+                  <div className="col-span-4">
+                    <p className="text-sm font-medium text-gray-800">{r.nome}</p>
+                    <p className="text-[11px] text-gray-400">{r.cpfCnpj || "—"}</p>
+                  </div>
+                  <div className="col-span-3 text-xs text-gray-500">
+                    <p>{r.telefone || "—"}</p>
+                    <p className="truncate">{r.email || "—"}</p>
+                  </div>
+                  <div className="col-span-3 text-xs text-gray-600">
+                    {r.tipoComissao==="fixa"
+                      ? <span className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">{r.comissaoFixa}% fixa</span>
+                      : <span className="bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-medium">{(r.faixas||[]).length} faixa(s)</span>}
+                  </div>
+                  <div className="col-span-1">
+                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${r.status==="Ativo"?"bg-green-50 text-green-600":"bg-gray-100 text-gray-400"}`}>{r.status}</span>
+                  </div>
+                  <div className="col-span-1 flex justify-end gap-2">
+                    <button onClick={()=>setModal(r)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>
+                    <button onClick={()=>setConfirmDelete({type:"rep",item:r})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>
+                  </div>
                 </div>
-                <div className="col-span-3 text-xs text-gray-500">
-                  <p>{r.telefone || "—"}</p>
-                  <p className="truncate">{r.email || "—"}</p>
+                {/* Card — mobile */}
+                <div className="md:hidden flex items-start justify-between gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800">{r.nome}</p>
+                    <p className="text-[11px] text-gray-400">{r.cpfCnpj || "—"}</p>
+                    <p className="text-xs text-gray-500 mt-1.5">{r.telefone || "—"}</p>
+                    <p className="text-xs text-gray-500 truncate">{r.email || "—"}</p>
+                    <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                      {r.tipoComissao==="fixa"
+                        ? <span className="text-[11px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">{r.comissaoFixa}% fixa</span>
+                        : <span className="text-[11px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-medium">{(r.faixas||[]).length} faixa(s)</span>}
+                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${r.status==="Ativo"?"bg-green-50 text-green-600":"bg-gray-100 text-gray-400"}`}>{r.status}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center gap-2.5 shrink-0 pt-0.5">
+                    <button onClick={()=>setModal(r)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={16}/></button>
+                    <button onClick={()=>setConfirmDelete({type:"rep",item:r})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={16}/></button>
+                  </div>
                 </div>
-                <div className="col-span-3 text-xs text-gray-600">
-                  {r.tipoComissao==="fixa"
-                    ? <span className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">{r.comissaoFixa}% fixa</span>
-                    : <span className="bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-medium">{(r.faixas||[]).length} faixa(s)</span>}
-                </div>
-                <div className="col-span-1">
-                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${r.status==="Ativo"?"bg-green-50 text-green-600":"bg-gray-100 text-gray-400"}`}>{r.status}</span>
-                </div>
-                <div className="col-span-1 flex justify-end gap-2">
-                  <button onClick={()=>setModal(r)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>
-                  <button onClick={()=>setConfirmDelete({type:"rep",item:r})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>
-                </div>
-              </div>
+              </Fragment>
             ))}
           </div>
         )
