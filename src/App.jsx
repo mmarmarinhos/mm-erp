@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.21";
+const APP_VERSION = "3.4.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -5484,7 +5484,90 @@ const ProductDetailPanel = ({ product, movements, onClose, onEdit, onDelete, onM
 };
 
 // ─── Inventory Module ─────────────────────────────────────────────────────
-const InventoryModule = ({ products, setProducts, movements, setMovements, suppliers, onPriceHunt }) => {
+const ApplyCatalogModal = ({ product, catalogs, onClose, onConfirm }) => {
+  const [catalogId, setCatalogId] = useState(catalogs.length===1 ? catalogs[0].id : "");
+  const catalog = catalogs.find(c=>c.id===catalogId);
+  const [selected, setSelected] = useState(new Set(catalogs.length===1 ? catalogs[0].codigos : []));
+
+  useEffect(() => { if (catalog) setSelected(new Set(catalog.codigos)); }, [catalogId]);
+
+  const toggle = (code) => setSelected(prev => {
+    const next = new Set(prev);
+    next.has(code) ? next.delete(code) : next.add(code);
+    return next;
+  });
+
+  const noSku = !product.sku || !product.sku.trim();
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+          <div>
+            <h2 className="font-bold text-gray-900">🎨 Aplicar Catálogo de Variante</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{product.name}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon name="x" size={18}/></button>
+        </div>
+
+        {noSku ? (
+          <div className="p-6 text-center">
+            <p className="text-3xl mb-2">⚠️</p>
+            <p className="text-sm text-gray-600 font-medium">Esse produto não tem SKU preenchido</p>
+            <p className="text-xs text-gray-400 mt-1">O SKU de cada variante é gerado a partir do SKU do produto pai + o código (ex: SKU pai "001" + código "000" = "001000"). Edite o produto e preencha o SKU antes de aplicar um catálogo.</p>
+            <button onClick={onClose} className="mt-4 px-4 py-2 rounded-lg bg-gray-100 text-sm text-gray-600 hover:bg-gray-200">Entendi</button>
+          </div>
+        ) : (
+          <>
+            <div className="p-5 space-y-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Catálogo</label>
+                <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  value={catalogId} onChange={e=>setCatalogId(e.target.value)}>
+                  <option value="">Selecione um catálogo...</option>
+                  {catalogs.map(c=><option key={c.id} value={c.id}>{c.nome} ({(c.codigos||[]).length})</option>)}
+                </select>
+              </div>
+
+              {catalog && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-medium text-gray-600">Códigos a gerar ({selected.size}/{catalog.codigos.length})</label>
+                    <div className="flex gap-2">
+                      <button onClick={()=>setSelected(new Set(catalog.codigos))} className="text-xs text-indigo-600 hover:underline">Todos</button>
+                      <button onClick={()=>setSelected(new Set())} className="text-xs text-gray-400 hover:underline">Nenhum</button>
+                    </div>
+                  </div>
+                  <div className="border border-gray-200 rounded-lg p-2 max-h-56 overflow-y-auto grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                    {catalog.codigos.map(code=>(
+                      <label key={code} className={`flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-lg cursor-pointer ${selected.has(code)?"bg-indigo-50 text-indigo-700":"text-gray-500 hover:bg-gray-50"}`}>
+                        <input type="checkbox" className="accent-indigo-600" checked={selected.has(code)} onChange={()=>toggle(code)}/>
+                        <span className="font-mono">{code}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    Prévia do SKU: <span className="font-mono">{product.sku}{catalog.codigos[0]||"___"}</span>
+                    {catalog.codigos[1] && <>, <span className="font-mono">{product.sku}{catalog.codigos[1]}</span>...</>}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 p-5 border-t border-gray-100 sticky bottom-0 bg-white">
+              <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+              <button disabled={!catalog || selected.size===0} onClick={()=>onConfirm([...selected])}
+                className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                Gerar {selected.size>0?selected.size:""} Variante{selected.size!==1?"s":""}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const InventoryModule = ({ products, setProducts, movements, setMovements, suppliers, variantCatalogs=[], onPriceHunt }) => {
   const [search, setSearch]           = useState("");
   const [filterCat,    setFilterCat]    = useState("Todas");
   const [filterStock,  setFilterStock]  = useState("Todos");
@@ -5492,6 +5575,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
   const [selected, setSelected]       = useState(null);
   const [modal, setModal]             = useState(null);
   const [moveModal, setMoveModal]     = useState(null);
+  const [applyCatalogProduct, setApplyCatalogProduct] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [toast, setToast]             = useState(null);
   const [dismissAlerts, setDismissAlerts] = useState(false);
@@ -5576,6 +5660,47 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
     }
     setModal(null);
     showToast(data.id?"✅ Produto atualizado!":"✅ Produto criado!");
+  };
+
+  const handleApplyCatalog = (parent, selectedCodes) => {
+    if (!parent.sku || !parent.sku.trim()) {
+      showToast("⚠️ Preencha o SKU do produto antes de aplicar um catálogo");
+      return;
+    }
+    const existingSkus = new Set(products.map(p=>p.sku));
+    let nextNum = Math.max(0, ...products.map(p=>parseInt(p.id.replace("PRD-",""))||0));
+    const novos = [];
+    let pulados = 0;
+    selectedCodes.forEach(code => {
+      const sku = `${parent.sku}${code}`;
+      if (existingSkus.has(sku)) { pulados += 1; return; }
+      nextNum += 1;
+      novos.push({
+        id: `PRD-${String(nextNum).padStart(3,"0")}`,
+        name: `${parent.name} - ${code}`,
+        sku,
+        category: parent.category,
+        supplierId: parent.supplierId,
+        supplierName: parent.supplierName,
+        channels: [...(parent.channels||[])],
+        price: 0,
+        cost: parent.cost || 0,
+        stock: 0,
+        minStock: parent.minStock || 0,
+        unit: parent.unit || "un",
+        status: "Ativo",
+        description: "",
+        tags: [...(parent.tags||[])],
+        parentId: parent.id,
+        variantLabel: code,
+        createdAt: today(),
+        lastMovement: "",
+      });
+      existingSkus.add(sku);
+    });
+    if (novos.length>0) setProducts(prev=>[...prev, ...novos]);
+    setApplyCatalogProduct(null);
+    showToast(`✅ ${novos.length} variante(s) gerada(s)${pulados?` · ${pulados} pulada(s) por SKU já existir`:""}`);
   };
 
   const handleDelete = (prd) => {
@@ -5810,6 +5935,12 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
                               +V
                             </button>
                           )}
+                          {!p.parentId && variantCatalogs.length>0 && (
+                            <button onClick={()=>setApplyCatalogProduct(p)}
+                              className="p-1.5 rounded-lg text-violet-400 hover:text-violet-600 hover:bg-violet-50 transition-colors" title="Aplicar catálogo de variante (gerar várias de uma vez)">
+                              🎨
+                            </button>
+                          )}
                           <button onClick={()=>setConfirmDelete(p)} className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors">
                             <Icon name="trash" size={13}/>
                           </button>
@@ -5849,6 +5980,11 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
         </div>
       )}
       {modal && <ProductModal product={modal==="new"?null:modal} suppliers={suppliers} products={products} onClose={()=>setModal(null)} onSave={handleSaveProd}/>}
+      {applyCatalogProduct && (
+        <ApplyCatalogModal product={applyCatalogProduct} catalogs={variantCatalogs}
+          onClose={()=>setApplyCatalogProduct(null)}
+          onConfirm={(codes)=>handleApplyCatalog(applyCatalogProduct, codes)}/>
+      )}
     </div>
   );
 };
@@ -9118,6 +9254,16 @@ function comissaoAplicavel(rep, descontoPercent) {
 }
 
 const CONTA_KEY = "erp-mmarmarinhos-contas";
+
+// ─── Catálogo de Variantes (molde reutilizável de códigos pra gerar variantes em massa) ──
+const VARCAT_KEY = "erp-mmarmarinhos-catalogos-variante";
+async function loadVariantCatalogs() {
+  try { const r = await window.storage.get(VARCAT_KEY); if (r?.value) return JSON.parse(r.value); } catch(_) {}
+  return [];
+}
+async function saveVariantCatalogs(list) {
+  try { await window.storage.set(VARCAT_KEY, JSON.stringify(list)); } catch(_) {}
+}
 const CONTA_TIPOS = ["Corrente","Poupança"];
 const BANCOS_BR = [
   "Banco do Brasil","Itaú","Bradesco","Caixa Econômica Federal","Santander","Nubank",
@@ -10444,7 +10590,62 @@ const FormaPagamentoModal = ({ fp, onClose, onSave, contas=[] }) => {
   );
 };
 
-const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setContas, formasPagamento=[], setFormasPagamento }) => {
+// Parser de códigos: aceita separados por vírgula, espaço ou linha; remove vazios e duplicados
+function parseVariantCodes(text) {
+  const codes = (text||"").split(/[\n,]+/).map(c=>c.trim()).filter(Boolean);
+  return [...new Set(codes)];
+}
+
+const VariantCatalogModal = ({ catalog, onClose, onSave }) => {
+  const [nome, setNome] = useState(catalog?.nome || "");
+  const [codigosText, setCodigosText] = useState((catalog?.codigos||[]).join("\n"));
+  const [err, setErr] = useState("");
+  const codigos = useMemo(() => parseVariantCodes(codigosText), [codigosText]);
+
+  const handleSave = () => {
+    if (!nome.trim()) { setErr("Dê um nome pro catálogo (ex: Cores Linha 120)"); return; }
+    if (codigos.length === 0) { setErr("Cole pelo menos um código"); return; }
+    onSave({ ...(catalog||{}), nome: nome.trim(), codigos });
+  };
+
+  const inp = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300";
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+          <h2 className="font-bold text-gray-900">{catalog ? "Editar Catálogo de Variante" : "Novo Catálogo de Variante"}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon name="x" size={18}/></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Nome do catálogo *</label>
+            <input className={inp} value={nome} onChange={e=>{setNome(e.target.value); setErr("");}} placeholder="Ex: Cores Linha 120, Tamanhos Padrão..."/>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Códigos das variações *</label>
+            <textarea rows={6} className={`${inp} font-mono resize-none`} value={codigosText}
+              onChange={e=>{setCodigosText(e.target.value); setErr("");}}
+              placeholder={"Cole um código por linha (ou separados por vírgula):\n000\n001\n002\n..."}/>
+            <p className="text-[11px] text-gray-400 mt-1">{codigos.length} código(s) identificado(s){codigos.length>0 && ` — ex: ${codigos.slice(0,4).join(", ")}${codigos.length>4?"...":""}`}</p>
+          </div>
+          {err && <p className="text-xs text-red-500">⚠️ {err}</p>}
+          <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-2.5">
+            💡 Esse catálogo é só um molde: ao aplicá-lo num produto (na tela de Estoque), você escolhe quais códigos usar e o sistema gera uma variante pra cada um. Alterar o catálogo depois não afeta variantes já criadas.
+          </p>
+        </div>
+        <div className="flex gap-2 p-5 border-t border-gray-100 sticky bottom-0 bg-white">
+          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button onClick={handleSave} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+            {catalog ? "Salvar Alterações" : "Criar Catálogo"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setContas, formasPagamento=[], setFormasPagamento, variantCatalogs=[], setVariantCatalogs }) => {
   const [tab, setTab]         = useState("representantes");
   const [search, setSearch]   = useState("");
   const [modal, setModal]     = useState(null);
@@ -10492,7 +10693,20 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
   };
   const deleteFP = (f) => { setFormasPagamento(prev=>prev.filter(x=>x.id!==f.id)); setConfirmDelete(null); showToast("🗑️ Forma de pagamento removida"); };
 
-  const newLabel = { representantes:"Representante", contas:"Conta", formaspagamento:"Forma de Pagamento" }[tab];
+  // ── Catálogo de Variante ──
+  const filteredCatalogos = useMemo(() => variantCatalogs.filter(c =>
+    !search || c.nome?.toLowerCase().includes(search.toLowerCase())
+  ), [variantCatalogs, search]);
+
+  const saveCatalogo = (data) => {
+    if (data.id) setVariantCatalogs(prev=>prev.map(c=>c.id===data.id?data:c));
+    else setVariantCatalogs(prev=>[...prev, {...data, id:nextCadId(prev,"VCT")}]);
+    setModal(null);
+    showToast(data.id ? "✅ Catálogo atualizado!" : "✅ Catálogo cadastrado!");
+  };
+  const deleteCatalogo = (c) => { setVariantCatalogs(prev=>prev.filter(x=>x.id!==c.id)); setConfirmDelete(null); showToast("🗑️ Catálogo removido"); };
+
+  const newLabel = { representantes:"Representante", contas:"Conta", formaspagamento:"Forma de Pagamento", catalogovariante:"Catálogo" }[tab];
 
   return (
     <div className="space-y-4">
@@ -10510,7 +10724,7 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-2xl p-1.5 overflow-x-auto">
-        {[["representantes","🧑‍💼 Representantes"],["contas","🏦 Bancos e Contas"],["formaspagamento","💳 Forma de Pagamento"]].map(([id,label])=>(
+        {[["representantes","🧑‍💼 Representantes"],["contas","🏦 Bancos e Contas"],["formaspagamento","💳 Forma de Pagamento"],["catalogovariante","🎨 Catálogo de Variante"]].map(([id,label])=>(
           <button key={id} onClick={()=>{setTab(id);setSearch("");}}
             className={`shrink-0 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${tab===id?"bg-white text-gray-900 shadow-sm":"text-gray-500 hover:text-gray-700"}`}>
             {label}
@@ -10693,6 +10907,37 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
         )
       )}
 
+      {tab==="catalogovariante" && (
+        filteredCatalogos.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
+            <p className="text-3xl mb-2">🎨</p>
+            <p className="text-sm text-gray-400">Nenhum catálogo de variante cadastrado</p>
+            <p className="text-xs text-gray-300 mt-1">Cadastre uma lista de códigos (ex: cores) pra reaproveitar em vários produtos</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {filteredCatalogos.map(c=>(
+              <div key={c.id} className="flex items-start justify-between gap-3 px-4 py-3 border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800">{c.nome}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{(c.codigos||[]).length} código(s)</p>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {(c.codigos||[]).slice(0,12).map(cod=>(
+                      <span key={cod} className="text-[10px] font-mono bg-violet-50 text-violet-600 px-1.5 py-0.5 rounded">{cod}</span>
+                    ))}
+                    {(c.codigos||[]).length>12 && <span className="text-[10px] text-gray-400">+{c.codigos.length-12}</span>}
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0 pt-0.5">
+                  <button onClick={()=>setModal(c)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>
+                  <button onClick={()=>setConfirmDelete({type:"catalogo",item:c})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
       {/* Modais */}
       {modal && tab==="representantes" && (
         <RepresentanteModal rep={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={saveRep}/>
@@ -10702,6 +10947,9 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
       )}
       {modal && tab==="formaspagamento" && (
         <FormaPagamentoModal fp={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={saveFP} contas={contas}/>
+      )}
+      {modal && tab==="catalogovariante" && (
+        <VariantCatalogModal catalog={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={saveCatalogo}/>
       )}
 
       {/* Confirmação de exclusão */}
@@ -10713,12 +10961,14 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
               {confirmDelete.type==="rep" && `Remover o representante "${confirmDelete.item.nome}"?`}
               {confirmDelete.type==="conta" && `Remover a conta "${confirmDelete.item.banco} - ${confirmDelete.item.titular}"?`}
               {confirmDelete.type==="fp" && `Remover a forma de pagamento "${confirmDelete.item.nome}"?`}
+              {confirmDelete.type==="catalogo" && `Remover o catálogo "${confirmDelete.item.nome}"? Produtos já gerados a partir dele não são afetados.`}
             </p>
             <div className="flex gap-2">
               <button onClick={()=>setConfirmDelete(null)} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
               <button onClick={()=>{
                 if (confirmDelete.type==="rep") deleteRep(confirmDelete.item);
                 else if (confirmDelete.type==="conta") deleteConta(confirmDelete.item);
+                else if (confirmDelete.type==="catalogo") deleteCatalogo(confirmDelete.item);
                 else deleteFP(confirmDelete.item);
               }} className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700">Excluir</button>
             </div>
@@ -11252,6 +11502,7 @@ function ERPApp({ currentUser, onLogout }) {
   const [representantes, setRepresentantes_] = useState([]);
   const [contas,    setContas_]     = useState([]);
   const [formasPagamento, setFormasPagamento_] = useState([]);
+  const [variantCatalogs, setVariantCatalogs_] = useState([]);
   const [params,    setParamsState] = useState(PARAMS_DEFAULT);
   const [loading, setLoading]       = useState(true);
   const [active, setActive]         = useState("dashboard");
@@ -11269,12 +11520,12 @@ function ERPApp({ currentUser, onLogout }) {
 
   useEffect(() => {
     Promise.all([loadOrders(),loadFinance(),loadCustomers(),loadSuppliers(),loadProducts(),loadMovements(),loadNfes(),loadPurchases(),loadCotacoes(),loadParams(),
-      loadRepresentantes(),loadContas(),loadFormasPagamento(),
+      loadRepresentantes(),loadContas(),loadFormasPagamento(),loadVariantCatalogs(),
       window.storage.get(EMPRESA_KEY).catch(()=>null)])
-      .then(([o,f,c,s,p,m,n,pc,cot,prm,reps,ctas,fps,emp]) => {
+      .then(([o,f,c,s,p,m,n,pc,cot,prm,reps,ctas,fps,vcats,emp]) => {
         setOrders(o);setFinance(f);setSuppliers(s);setProducts(p);setMovements(m);setNfes(n);setPurchases(pc);setCotacoes(cot);
         if (prm) setParamsState(prm);
-        setRepresentantes_(reps); setContas_(ctas); setFormasPagamento_(fps);
+        setRepresentantes_(reps); setContas_(ctas); setFormasPagamento_(fps); setVariantCatalogs_(vcats);
         if (emp?.value) setEmpresaForm(JSON.parse(emp.value));
 
         // ── Automação: inativar clientes sem compras há 30+ dias ──
@@ -11447,6 +11698,14 @@ function ERPApp({ currentUser, onLogout }) {
     });
   }, []);
 
+  const updateVariantCatalogs = useCallback((updater) => {
+    setVariantCatalogs_(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      saveVariantCatalogs(next);
+      return next;
+    });
+  }, []);
+
   const updateCotacoes = useCallback((updater) => {
     setCotacoes(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
@@ -11471,7 +11730,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "dashboard": return <DashboardModule orders={orders} />;
       case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento}/>;
-      case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
+      case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases}/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
@@ -11479,7 +11738,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
       case "empresa":   return <EmpresaModule onSave={(data) => setEmpresaForm(data)}/>;
-      case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento}/>;
+      case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento} variantCatalogs={variantCatalogs} setVariantCatalogs={updateVariantCatalogs}/>;
       case "parametros": return <ParamsModule params={params} setParams={updateParams} onSaveEmpresa={(data)=>setEmpresaForm(data)} orders={orders} setOrders={updateOrders}/>;
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
