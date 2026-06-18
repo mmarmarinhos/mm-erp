@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.2";
+const APP_VERSION = "3.3.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -926,7 +926,88 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
     setModal(null);
   };
 
+  const ACTIVE_ORDER_STATUSES = ["Novo", "Em Separação", "Enviado", "Entregue"];
+
+  // Helpers de estoque reaproveitados pelo cancelamento e pela reativação de pedidos
+  const restoreStockForOrder = (order, reason) => {
+    const items = order.itemsList || [];
+    if (!items.length || !setProducts) return;
+    setProducts(prev => prev.map(prod => {
+      const it = items.find(i => String(i._prodId) === String(prod.id));
+      if (!it || (it.qty||0) <= 0) return prod;
+      return { ...prod, stock: (prod.stock || 0) + (it.qty || 0) };
+    }));
+    if (setMovements) {
+      setMovements(prev => {
+        const nums = prev.map(m => parseInt(m.id.replace("MOV-",""))||0);
+        const base = Math.max(0, ...nums, 0);
+        const novasMovs = items.filter(i => i._prodId && (i.qty||0) > 0).map((i, idx) => ({
+          id: `MOV-${String(base+idx+1).padStart(3,"0")}`,
+          productId: i._prodId,
+          type: "entrada",
+          qty: i.qty || 0,
+          date: today(),
+          reason,
+          notes: `${reason} — Pedido ${order.id} · ${order.customer||""}`.trim(),
+        }));
+        return [...prev, ...novasMovs];
+      });
+    }
+  };
+
+  const deductStockForOrder = (order, reason) => {
+    const items = order.itemsList || [];
+    if (!items.length || !setProducts) return;
+    setProducts(prev => prev.map(prod => {
+      const it = items.find(i => String(i._prodId) === String(prod.id));
+      if (!it) return prod;
+      return { ...prod, stock: Math.max(0, (prod.stock||0) - (it.qty||0)) };
+    }));
+    if (setMovements) {
+      setMovements(prev => {
+        const nums = prev.map(m => parseInt(m.id.replace("MOV-",""))||0);
+        const base = Math.max(0, ...nums, 0);
+        const novasMovs = items.filter(i => i._prodId && (i.qty||0) > 0).map((i, idx) => ({
+          id: `MOV-${String(base+idx+1).padStart(3,"0")}`,
+          productId: i._prodId,
+          type: "saida",
+          qty: i.qty || 0,
+          date: today(),
+          reason,
+          notes: `${reason} — Pedido ${order.id} · ${order.customer||""}`.trim(),
+        }));
+        return [...prev, ...novasMovs];
+      });
+    }
+  };
+
   const handleStatusChange = (id, newStatus) => {
+    const order = orders.find(o => o.id === id);
+    if (!order || order.status === newStatus) return;
+
+    const wasActive    = ACTIVE_ORDER_STATUSES.includes(order.status);
+    const willBeActive = ACTIVE_ORDER_STATUSES.includes(newStatus);
+
+    // Selecionar "Devolvido" direto no menu de status passa a usar o MESMO
+    // fluxo do botão "↩ Devolver" (restaura estoque + cria lançamento
+    // financeiro), em vez de só trocar o texto do status sem efeito nenhum.
+    if (newStatus === "Devolvido") {
+      if (wasActive) { setDevolucaoModal(order); return; }
+      // Já não estava ativo (ex: já era Cancelado) — não tem estoque pra
+      // restaurar de novo, só atualiza o status.
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+      return;
+    }
+
+    // Cancelar um pedido que já tinha baixado estoque -> devolve as unidades.
+    if (wasActive && newStatus === "Cancelado") {
+      restoreStockForOrder(order, "Cancelamento de pedido");
+    }
+    // Reativar um pedido que estava Cancelado/Devolvido -> baixa o estoque de novo.
+    else if (!wasActive && willBeActive) {
+      deductStockForOrder(order, "Reativação de pedido");
+    }
+
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
   };
 
