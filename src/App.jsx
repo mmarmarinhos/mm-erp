@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.18";
+const APP_VERSION = "3.3.19";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -10507,10 +10507,10 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-2xl p-1.5 flex-wrap">
+      <div className="flex gap-1 bg-gray-100 rounded-2xl p-1.5 overflow-x-auto">
         {[["representantes","🧑‍💼 Representantes"],["contas","🏦 Bancos e Contas"],["formaspagamento","💳 Forma de Pagamento"]].map(([id,label])=>(
           <button key={id} onClick={()=>{setTab(id);setSearch("");}}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${tab===id?"bg-white text-gray-900 shadow-sm":"text-gray-500 hover:text-gray-700"}`}>
+            className={`shrink-0 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${tab===id?"bg-white text-gray-900 shadow-sm":"text-gray-500 hover:text-gray-700"}`}>
             {label}
           </button>
         ))}
