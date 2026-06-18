@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.4.4";
+const APP_VERSION = "3.4.5";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -536,7 +536,9 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
                       <div className="col-span-2">
                         <p className="text-[10px] text-gray-400 mb-0.5">Qtd</p>
                         <input type="number" min="1" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                          value={it.qty} onChange={e=>setItem(i,"qty",parseFloat(e.target.value)||0)}/>
+                          value={it.qty===0?"":it.qty}
+                          onChange={e=>setItem(i,"qty", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                          onBlur={e=>{ if (e.target.value==="") setItem(i,"qty",0); }}/>
                       </div>
                       <div className="col-span-2">
                         <p className="text-[10px] text-gray-400 mb-0.5">Un</p>
@@ -548,7 +550,9 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
                       <div className="col-span-3">
                         <p className="text-[10px] text-gray-400 mb-0.5">Preço Unit.</p>
                         <input type="number" min="0" step="0.01" className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                          value={it.unitPrice} onChange={e=>setItem(i,"unitPrice",parseFloat(e.target.value)||0)}/>
+                          value={it.unitPrice===0?"":it.unitPrice}
+                          onChange={e=>setItem(i,"unitPrice", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                          onBlur={e=>{ if (e.target.value==="") setItem(i,"unitPrice",0); }}/>
                       </div>
                       <div className="col-span-3">
                         <p className="text-[10px] text-gray-400 mb-0.5">Desconto</p>
@@ -558,7 +562,9 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
                             {it.discountType||"%"}
                           </button>
                           <input type="number" min="0" step="0.01" className="w-full border border-gray-200 rounded-r-lg px-1 py-1.5 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                            value={it.discount||0} onChange={e=>setItem(i,"discount",parseFloat(e.target.value)||0)}/>
+                            value={it.discount===0?"":it.discount}
+                            onChange={e=>setItem(i,"discount", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                            onBlur={e=>{ if (e.target.value==="") setItem(i,"discount",0); }}/>
                         </div>
                       </div>
                       <div className="col-span-2 text-right">
@@ -7083,7 +7089,9 @@ const CanaisVendaTab = () => {
                 <div className="flex items-center gap-1">
                   <input type="number" min="0" max="100" step="0.01"
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                    value={c.taxaPerc} onChange={e=>setCanal(i,"taxaPerc",parseFloat(e.target.value)||0)}/>
+                    value={c.taxaPerc===0?"":c.taxaPerc}
+                    onChange={e=>setCanal(i,"taxaPerc", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                    onBlur={e=>{ if (e.target.value==="") setCanal(i,"taxaPerc",0); }}/>
                   <span className="text-gray-400 font-medium text-sm">%</span>
                 </div>
               </div>
@@ -7093,14 +7101,18 @@ const CanaisVendaTab = () => {
                   <span className="text-gray-400 text-sm">R$</span>
                   <input type="number" min="0" step="0.01"
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                    value={c.taxaFixa} onChange={e=>setCanal(i,"taxaFixa",parseFloat(e.target.value)||0)}/>
+                    value={c.taxaFixa===0?"":c.taxaFixa}
+                    onChange={e=>setCanal(i,"taxaFixa", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                    onBlur={e=>{ if (e.target.value==="") setCanal(i,"taxaFixa",0); }}/>
                 </div>
               </div>
               <div>
                 <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-1">Prazo Repasse (dias)</label>
                 <input type="number" min="0"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                  value={c.prazoRepasse} onChange={e=>setCanal(i,"prazoRepasse",parseInt(e.target.value)||0)}/>
+                  value={c.prazoRepasse===0?"":c.prazoRepasse}
+                  onChange={e=>setCanal(i,"prazoRepasse", e.target.value===""?"":(parseInt(e.target.value)||0))}
+                  onBlur={e=>{ if (e.target.value==="") setCanal(i,"prazoRepasse",0); }}/>
               </div>
             </div>
             {(c.taxaPerc>0 || c.taxaFixa>0) && (
@@ -8608,7 +8620,9 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
                       <div>
                         <p className="text-[10px] text-gray-400 mb-0.5">Qtd</p>
                         <input type="number" min="0" className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs text-center bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                          value={it.qty} onChange={e=>setItem(i,"qty",parseFloat(e.target.value)||0)}/>
+                          value={it.qty===0?"":it.qty}
+                          onChange={e=>setItem(i,"qty", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                          onBlur={e=>{ if (e.target.value==="") setItem(i,"qty",0); }}/>
                       </div>
                       <div>
                         <p className="text-[10px] text-gray-400 mb-0.5">Un</p>
@@ -8620,13 +8634,17 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
                       <div>
                         <p className="text-[10px] text-gray-400 mb-0.5">Preço Unit.</p>
                         <input type="number" min="0" step="0.01" className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                          value={it.unitPrice} onChange={e=>setItem(i,"unitPrice",parseFloat(e.target.value)||0)}/>
+                          value={it.unitPrice===0?"":it.unitPrice}
+                          onChange={e=>setItem(i,"unitPrice", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                          onBlur={e=>{ if (e.target.value==="") setItem(i,"unitPrice",0); }}/>
                       </div>
                       <div>
                         <p className="text-[10px] text-gray-400 mb-0.5">Desconto</p>
                         <div className="flex gap-0.5">
                           <input type="number" min="0" className="w-full border border-gray-200 rounded-lg px-1 py-1 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                            value={it.discount||0} onChange={e=>setItem(i,"discount",parseFloat(e.target.value)||0)}/>
+                            value={it.discount===0?"":it.discount}
+                            onChange={e=>setItem(i,"discount", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                            onBlur={e=>{ if (e.target.value==="") setItem(i,"discount",0); }}/>
                           <select className="border border-gray-200 rounded-lg text-xs bg-white focus:outline-none w-10"
                             value={it.discountType||"%"} onChange={e=>setItem(i,"discountType",e.target.value)}>
                             <option>%</option><option>R$</option>
@@ -8649,12 +8667,16 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">🚛 Frete (R$)</label>
               <input type="number" min="0" step="0.01" className={inp}
-                value={form.freight} onChange={e=>setForm(f=>{const u={...f,freight:parseFloat(e.target.value)||0};u.total=calcTotal(u);return u;})}/>
+                value={form.freight===0?"":form.freight}
+                onChange={e=>setForm(f=>{const v=e.target.value===""?"":(parseFloat(e.target.value)||0);const u={...f,freight:v};u.total=calcTotal(u);return u;})}
+                onBlur={e=>{ if (e.target.value==="") setForm(f=>{const u={...f,freight:0};u.total=calcTotal(u);return u;}); }}/>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">💰 Desconto (R$)</label>
               <input type="number" min="0" step="0.01" className={inp}
-                value={form.discount} onChange={e=>setForm(f=>{const u={...f,discount:parseFloat(e.target.value)||0};u.total=calcTotal(u);return u;})}/>
+                value={form.discount===0?"":form.discount}
+                onChange={e=>setForm(f=>{const v=e.target.value===""?"":(parseFloat(e.target.value)||0);const u={...f,discount:v};u.total=calcTotal(u);return u;})}
+                onBlur={e=>{ if (e.target.value==="") setForm(f=>{const u={...f,discount:0};u.total=calcTotal(u);return u;}); }}/>
             </div>
             <div className="flex flex-col justify-end text-right">
               <p className="text-xs text-gray-400">Subtotal: {fmt(subtotal)}</p>
@@ -9829,7 +9851,9 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                         <p className="text-[10px] text-gray-400 mb-0.5">Qtd</p>
                         <input type="number" min="1"
                           className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                          value={it.qty} onChange={e=>setItem(i,"qty",parseFloat(e.target.value)||0)}/>
+                          value={it.qty===0?"":it.qty}
+                          onChange={e=>setItem(i,"qty", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                          onBlur={e=>{ if (e.target.value==="") setItem(i,"qty",0); }}/>
                       </div>
                       <div className="col-span-2">
                         <p className="text-[10px] text-gray-400 mb-0.5">Un</p>
@@ -9842,7 +9866,9 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                         <p className="text-[10px] text-gray-400 mb-0.5">Preço Unit.</p>
                         <input type="number" min="0" step="0.01"
                           className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                          value={it.unitPrice} onChange={e=>setItem(i,"unitPrice",parseFloat(e.target.value)||0)}/>
+                          value={it.unitPrice===0?"":it.unitPrice}
+                          onChange={e=>setItem(i,"unitPrice", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                          onBlur={e=>{ if (e.target.value==="") setItem(i,"unitPrice",0); }}/>
                       </div>
                       <div className="col-span-3">
                         <p className="text-[10px] text-gray-400 mb-0.5">Desconto</p>
@@ -9853,7 +9879,9 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                           </button>
                           <input type="number" min="0" step="0.01"
                             className="w-full border border-gray-200 rounded-r-lg px-1 py-1.5 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                            value={it.discount||0} onChange={e=>setItem(i,"discount",parseFloat(e.target.value)||0)}/>
+                            value={it.discount===0?"":it.discount}
+                            onChange={e=>setItem(i,"discount", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                            onBlur={e=>{ if (e.target.value==="") setItem(i,"discount",0); }}/>
                         </div>
                       </div>
                       <div className="col-span-2 text-right">
@@ -9873,12 +9901,16 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
             <div>
               <label className="text-xs font-medium text-gray-600 block mb-1">Frete (R$)</label>
               <input type="number" min="0" step="0.01" className={inp}
-                value={form.freight} onChange={e=>set("freight",parseFloat(e.target.value)||0)}/>
+                value={form.freight===0?"":form.freight}
+                onChange={e=>set("freight", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                onBlur={e=>{ if (e.target.value==="") set("freight",0); }}/>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 block mb-1">Desconto (R$)</label>
               <input type="number" min="0" step="0.01" className={inp}
-                value={form.discount} onChange={e=>set("discount",parseFloat(e.target.value)||0)}/>
+                value={form.discount===0?"":form.discount}
+                onChange={e=>set("discount", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                onBlur={e=>{ if (e.target.value==="") set("discount",0); }}/>
             </div>
             <div className="flex flex-col justify-end">
               <p className="text-xs text-gray-500">Subtotal: {fmt(subtotal)}</p>
@@ -10378,7 +10410,7 @@ const RepresentanteModal = ({ rep, onClose, onSave }) => {
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
 
   const setFaixa = (i,k,v) => setForm(f=>{
-    const faixas = f.faixas.map((fx,idx)=> idx===i ? {...fx,[k]:parseFloat(v)||0} : fx);
+    const faixas = f.faixas.map((fx,idx)=> idx===i ? {...fx,[k]: v===""?"":(parseFloat(v)||0)} : fx);
     return {...f, faixas};
   });
   const addFaixa = () => setForm(f=>({...f, faixas:[...f.faixas, { ate:0, comissao:0 }]}));
@@ -10442,7 +10474,9 @@ const RepresentanteModal = ({ rep, onClose, onSave }) => {
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Comissão (%)</label>
                 <input type="number" min="0" max="100" step="0.1" className={`${inp} bg-white`}
-                  value={form.comissaoFixa} onChange={e=>set("comissaoFixa",parseFloat(e.target.value)||0)}/>
+                  value={form.comissaoFixa===0?"":form.comissaoFixa}
+                  onChange={e=>set("comissaoFixa", e.target.value==="" ? "" : parseFloat(e.target.value))}
+                  onBlur={e=>{ if (e.target.value==="") set("comissaoFixa",0); }}/>
               </div>
             ) : (
               <div className="space-y-2">
@@ -10452,11 +10486,13 @@ const RepresentanteModal = ({ rep, onClose, onSave }) => {
                     <span className="text-xs text-gray-500 shrink-0">Até</span>
                     <input type="number" min="0" max="100" step="0.1"
                       className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                      value={fx.ate} onChange={e=>setFaixa(i,"ate",e.target.value)}/>
+                      value={fx.ate===0?"":fx.ate} onChange={e=>setFaixa(i,"ate",e.target.value)}
+                      onBlur={e=>{ if (e.target.value==="") setFaixa(i,"ate",0); }}/>
                     <span className="text-xs text-gray-500 shrink-0">% desconto →</span>
                     <input type="number" min="0" max="100" step="0.1"
                       className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                      value={fx.comissao} onChange={e=>setFaixa(i,"comissao",e.target.value)}/>
+                      value={fx.comissao===0?"":fx.comissao} onChange={e=>setFaixa(i,"comissao",e.target.value)}
+                      onBlur={e=>{ if (e.target.value==="") setFaixa(i,"comissao",0); }}/>
                     <span className="text-xs text-gray-500 shrink-0">% comissão</span>
                     <button onClick={()=>removeFaixa(i)} className="ml-auto text-red-400 hover:text-red-600">
                       <Icon name="trash" size={14}/>
@@ -10588,11 +10624,15 @@ const FormaPagamentoModal = ({ fp, onClose, onSave, contas=[] }) => {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Taxa (%)</label>
-              <input type="number" min="0" max="100" step="0.01" className={inp} value={form.taxa} onChange={e=>set("taxa",parseFloat(e.target.value)||0)} placeholder="0,00"/>
+              <input type="number" min="0" max="100" step="0.01" className={inp} value={form.taxa===0?"":form.taxa}
+                onChange={e=>set("taxa", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                onBlur={e=>{ if (e.target.value==="") set("taxa",0); }} placeholder="0,00"/>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Prazo Recebimento (dias)</label>
-              <input type="number" min="0" className={inp} value={form.prazoRecebimento} onChange={e=>set("prazoRecebimento",parseInt(e.target.value)||0)} placeholder="0"/>
+              <input type="number" min="0" className={inp} value={form.prazoRecebimento===0?"":form.prazoRecebimento}
+                onChange={e=>set("prazoRecebimento", e.target.value===""?"":(parseInt(e.target.value)||0))}
+                onBlur={e=>{ if (e.target.value==="") set("prazoRecebimento",0); }} placeholder="0"/>
             </div>
           </div>
           <div>
@@ -11294,7 +11334,9 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                     <div className="flex items-center gap-1.5">
                       <input type="number" min="1" max="10"
                         className="w-14 border border-gray-200 rounded-lg px-2 py-1.5 text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                        value={cfg.sla||2} onChange={e=>setC(ch,"sla",parseInt(e.target.value)||1)}/>
+                        value={cfg.sla===0?"":cfg.sla}
+                        onChange={e=>setC(ch,"sla", e.target.value==="" ? "" : parseInt(e.target.value))}
+                        onBlur={e=>{ if (e.target.value==="") setC(ch,"sla",2); }}/>
                       <span className="text-xs text-gray-400">dias</span>
                     </div>
                   </div>
