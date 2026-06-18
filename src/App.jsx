@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.4.0";
+const APP_VERSION = "3.4.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -5547,8 +5547,10 @@ const ApplyCatalogModal = ({ product, catalogs, onClose, onConfirm }) => {
                     ))}
                   </div>
                   <p className="text-[11px] text-gray-400 mt-1.5">
-                    Prévia do SKU: <span className="font-mono">{product.sku}{catalog.codigos[0]||"___"}</span>
-                    {catalog.codigos[1] && <>, <span className="font-mono">{product.sku}{catalog.codigos[1]}</span>...</>}
+                    {(() => { const sel=[...selected]; return (
+                      <>Prévia do SKU: <span className="font-mono">{product.sku}{sel[0]||"___"}</span>
+                      {sel[1] && <>, <span className="font-mono">{product.sku}{sel[1]}</span>...</>}</>
+                    ); })()}
                   </p>
                 </div>
               )}
