@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.3.7";
+const APP_VERSION = "3.3.8";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2780,6 +2780,15 @@ function fmtTelefone(value) {
   if (d.length <= 6) return `(${d.slice(0,2)}) ${d.slice(2)}`;
   if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
   return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+}
+
+// Inscrição Estadual no formato XXX.XXX.XXX.XXX (12 dígitos)
+function fmtIE(value) {
+  const d = value.replace(/\D/g, "").slice(0, 12);
+  return d
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,3})$/, "$1.$2");
 }
 
 function fmtCepGlobal(value) {
@@ -9311,7 +9320,7 @@ const EmpresaModule = ({ onSave }) => {
             <input className={`${inp} font-mono`} value={form.cnpj} onChange={e=>set("cnpj", fmtCpfCnpj(e.target.value))} placeholder="00.000.000/0001-00" maxLength={18}/>
           </EmpresaField>
           <EmpresaField label="Inscrição Estadual (IE)">
-            <input className={`${inp} font-mono`} value={form.ie} onChange={e=>set("ie",e.target.value)} placeholder="000.000.000.000"/>
+            <input className={`${inp} font-mono`} value={form.ie} onChange={e=>set("ie",fmtIE(e.target.value))} placeholder="000.000.000.000" maxLength={15}/>
           </EmpresaField>
           <EmpresaField label="Inscrição Municipal (IM)">
             <input className={`${inp} font-mono`} value={form.im} onChange={e=>set("im",e.target.value)} placeholder="000000-0"/>
