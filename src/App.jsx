@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.4.7";
+const APP_VERSION = "3.4.8";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -413,11 +413,6 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
   };
 
   const subtotal = form.itemsList?.reduce((s,it)=>s+(it.total||0),0)||0;
-  const grossSubtotal = form.itemsList?.reduce((s,it)=>s+((it.qty||0)*(it.unitPrice||0)),0)||0;
-  const discountPercent = grossSubtotal > 0 ? Math.max(0,(1 - subtotal/grossSubtotal)*100) : 0;
-  const selectedRep = representantes.find(r => r.id === form.representanteId);
-  const comissaoPercent = selectedRep ? comissaoAplicavel(selectedRep, discountPercent) : 0;
-  const comissaoValor = (parseFloat(form.total)||0) * (comissaoPercent/100);
   const formasAtivas = formasPagamento.filter(f => f.status==="Ativo");
   const paymentOptions = formasAtivas.length > 0 ? formasAtivas.map(f=>f.nome) : PAYMENT_METHODS;
 
@@ -626,12 +621,6 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
                 <option value="">— Nenhum —</option>
                 {representantes.filter(r=>r.status==="Ativo").map(r=><option key={r.id} value={r.id}>{r.nome}</option>)}
               </select>
-              {selectedRep && (
-                <p className="text-[11px] text-gray-400 mt-1">
-                  Comissão estimada: <strong className="text-indigo-600">{comissaoPercent.toFixed(1)}%</strong> = <strong className="text-indigo-600">{fmt(comissaoValor)}</strong>
-                  {discountPercent > 0 && ` (desconto: ${discountPercent.toFixed(1)}%)`}
-                </p>
-              )}
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Emitido em</label>
@@ -9691,12 +9680,6 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
 
   const subtotal = form.items.reduce((s,it)=>s+(it.total||0),0);
   const total    = Math.max(0, subtotal - (Number(form.discount)||0) + (Number(form.freight)||0));
-  const grossSubtotal = form.items.reduce((s,it)=>s+((it.qty||0)*(it.unitPrice||0)),0);
-  const totalDiscountValue = (grossSubtotal - subtotal) + (Number(form.discount)||0);
-  const discountPercent = grossSubtotal > 0 ? Math.max(0,(totalDiscountValue/grossSubtotal)*100) : 0;
-  const selectedRep = representantes.find(r => r.id === form.representanteId);
-  const comissaoPercent = selectedRep ? comissaoAplicavel(selectedRep, discountPercent) : 0;
-  const comissaoValor = total * (comissaoPercent/100);
   const formasAtivas = formasPagamento.filter(f => f.status==="Ativo");
   const paymentOptions = formasAtivas.length > 0 ? formasAtivas.map(f=>f.nome) : PAYMENT_METHODS;
 
@@ -9794,12 +9777,6 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                 <option value="">— Nenhum —</option>
                 {representantes.filter(r=>r.status==="Ativo").map(r=><option key={r.id} value={r.id}>{r.nome}</option>)}
               </select>
-              {selectedRep && (
-                <p className="text-[11px] text-gray-400 mt-1">
-                  Comissão estimada: <strong className="text-indigo-600">{comissaoPercent.toFixed(1)}%</strong> = <strong className="text-indigo-600">{fmt(comissaoValor)}</strong>
-                  {discountPercent > 0 && ` (desconto: ${discountPercent.toFixed(1)}%)`}
-                </p>
-              )}
             </div>
           </div>
 
