@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.4.8";
+const APP_VERSION = "3.4.9";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -7195,6 +7195,27 @@ const TabelaPrecos = ({ products, setProducts }) => {
     }));
   };
 
+  const handlePropagateToVariants = (parentId) => {
+    const parent = products.find(x=>x.id===parentId);
+    if (!parent) return;
+    const variantIds = products.filter(x=>x.parentId===parentId).map(x=>x.id);
+    if (variantIds.length===0) return;
+    setProducts(prev => prev.map(x => {
+      if (!variantIds.includes(x.id)) return x;
+      const variantCost = Number(x.cost)||0;
+      const newChannelPrices = { ...(x.channelPrices||{}) };
+      CHANNELS.forEach(ch => {
+        if (!parent.channelPrices?.[ch]) return; // canal sem configuração no pai, não propaga
+        const pd  = getData(parent, ch);
+        const cur = getData(x, ch);
+        const custoBase = variantCost * (cur.qtd||1);
+        const price = pd.margin>0 ? calcPrice(custoBase, pd.margin, pd.freight, pd.taxaPerc, pd.otherCosts) : cur.price;
+        newChannelPrices[ch] = { ...cur, margin:pd.margin, freight:pd.freight, taxaPerc:pd.taxaPerc, otherCosts:pd.otherCosts, price };
+      });
+      return { ...x, channelPrices: newChannelPrices };
+    }));
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -7232,8 +7253,10 @@ const TabelaPrecos = ({ products, setProducts }) => {
         <div className="space-y-1">
           {filtered.map(p => {
             const cost = Number(p.cost)||0;
+            const hasVariants = !p.parentId && products.some(x=>x.parentId===p.id);
             return (
-              <PriceTableRow key={p.id} p={p} cost={cost} getData={getData} setField={setField} CHANNELS={CHANNELS} CHANNEL_STYLES={CHANNEL_STYLES} fmt={fmt}/>
+              <PriceTableRow key={p.id} p={p} cost={cost} getData={getData} setField={setField} CHANNELS={CHANNELS} CHANNEL_STYLES={CHANNEL_STYLES} fmt={fmt}
+                hasVariants={hasVariants} onPropagate={()=>handlePropagateToVariants(p.id)}/>
             );
           })}
         </div>
@@ -7243,8 +7266,15 @@ const TabelaPrecos = ({ products, setProducts }) => {
 };
 
 // ─── PriceTableRow — linha colapsável da tabela de preços ────────────────────
-const PriceTableRow = ({ p, cost, getData, setField, CHANNELS, CHANNEL_STYLES, fmt }) => {
+const PriceTableRow = ({ p, cost, getData, setField, CHANNELS, CHANNEL_STYLES, fmt, hasVariants, onPropagate }) => {
   const [open, setOpen] = useState(false);
+  const [propagated, setPropagated] = useState(false);
+  const handlePropagateClick = (e) => {
+    e.stopPropagation();
+    onPropagate();
+    setPropagated(true);
+    setTimeout(()=>setPropagated(false), 2500);
+  };
   return (
     <div className={`bg-white border rounded-xl shadow-sm overflow-hidden transition-all ${open?"border-indigo-200":"border-gray-100"}`}>
       {/* Linha compacta clicável */}
@@ -7282,6 +7312,12 @@ const PriceTableRow = ({ p, cost, getData, setField, CHANNELS, CHANNEL_STYLES, f
       {/* Detalhe expansível */}
       {open && (
         <div className="border-t border-gray-100 p-3 bg-gray-50/50">
+          {hasVariants && (
+            <button onClick={handlePropagateClick}
+              className={`w-full mb-3 text-xs font-medium rounded-lg py-2 transition-colors ${propagated?"bg-green-50 text-green-600":"bg-violet-50 text-violet-600 hover:bg-violet-100"}`}>
+              {propagated ? "✓ Repassado pras variantes!" : "📤 Repassar Margem/Frete/Taxa/Outros pras variantes"}
+            </button>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {CHANNELS.map(ch => {
               const d = getData(p, ch);
