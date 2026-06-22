@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.4.9";
+const APP_VERSION = "3.5.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -7923,14 +7923,14 @@ const SyncOperationsPanel = ({ orders, setOrders, backendUrl }) => {
 
 // ─── Roles & Permissions ─────────────────────────────────────────────────
 const ALL_MODULES = ["dashboard","orders","cotacao","inventory","pricing","pricehunt",
-                     "finance","fiscal","crm","suppliers","purchases","reports","cadastros","parametros"];
+                     "finance","fiscal","crm","suppliers","purchases","reports","movimentos","cadastros","parametros"];
 
 const ROLES_DEF = {
   admin:      { label:"Administrador", color:"text-purple-700", bg:"bg-purple-100",  modules:[...ALL_MODULES,"usuarios"] },
   gerente:    { label:"Gerente",       color:"text-blue-700",   bg:"bg-blue-100",    modules:ALL_MODULES },
   vendedor:   { label:"Vendedor",      color:"text-green-700",  bg:"bg-green-100",   modules:["dashboard","orders","pricing","pricehunt","crm"] },
   estoque:    { label:"Estoque",       color:"text-amber-700",  bg:"bg-amber-100",   modules:["dashboard","inventory","purchases","suppliers"] },
-  financeiro: { label:"Financeiro",    color:"text-indigo-700", bg:"bg-indigo-100",  modules:["dashboard","finance","fiscal","reports"] },
+  financeiro: { label:"Financeiro",    color:"text-indigo-700", bg:"bg-indigo-100",  modules:["dashboard","finance","fiscal","reports","movimentos"] },
   viewer:     { label:"Visualizador",  color:"text-gray-600",   bg:"bg-gray-100",    modules:["dashboard","reports"] },
 };
 
@@ -7938,7 +7938,7 @@ const MOD_LABELS = {
   dashboard:"Dashboard", orders:"Pedidos",
   inventory:"Estoque", pricing:"Tabela de Preços", pricehunt:"PriceHunt",
   finance:"Financeiro", fiscal:"Fiscal", crm:"Clientes",
-  suppliers:"Fornecedores", purchases:"Compras", reports:"Relatórios", usuarios:"Usuários", cadastros:"Cadastros", parametros:"Parâmetros",
+  suppliers:"Fornecedores", purchases:"Compras", reports:"Relatórios", movimentos:"Movimentos", usuarios:"Usuários", cadastros:"Cadastros", parametros:"Parâmetros",
 };
 
 // ─── Authentication ───────────────────────────────────────────────────────
@@ -9339,6 +9339,16 @@ async function saveVariantCatalogs(list) {
   try { await window.storage.set(VARCAT_KEY, JSON.stringify(list)); } catch(_) {}
 }
 const CONTA_TIPOS = ["Corrente","Poupança"];
+
+// ─── Fechamentos de Comissão de Representantes (módulo Movimentos) ───────────
+const FECHAMENTO_KEY = "erp-mmarmarinhos-fechamentos-comissao";
+async function loadFechamentos() {
+  try { const r = await window.storage.get(FECHAMENTO_KEY); if (r?.value) return JSON.parse(r.value); } catch(_) {}
+  return [];
+}
+async function saveFechamentos(list) {
+  try { await window.storage.set(FECHAMENTO_KEY, JSON.stringify(list)); } catch(_) {}
+}
 const BANCOS_BR = [
   "Banco do Brasil","Itaú","Bradesco","Caixa Econômica Federal","Santander","Nubank",
   "Inter","Sicoob","Sicredi","BTG Pactual","C6 Bank","PagBank","Mercado Pago",
@@ -10737,6 +10747,184 @@ const VariantCatalogModal = ({ catalog, onClose, onSave }) => {
   );
 };
 
+// ─── MovimentosModule — Fechamento/Faturamento de Comissão dos Representantes ──
+const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFechamentos }) => {
+  const [period, setPeriod] = useState(() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;
+  });
+  const [showHistorico, setShowHistorico] = useState(false);
+  const [collapsed, setCollapsed] = useState({});
+
+  const isEligible = (o) => o.status === "Entregue" || !!o.paidDate;
+
+  const periodLabel = (() => {
+    const [y,m] = period.split("-");
+    return new Date(Number(y), Number(m)-1, 1).toLocaleDateString("pt-BR", { month:"long", year:"numeric" });
+  })();
+
+  const repBlocks = useMemo(() => {
+    const byRep = {};
+    orders.forEach(o => {
+      if (!o.representanteId || !o.date || !o.date.startsWith(period) || !isEligible(o)) return;
+      (byRep[o.representanteId] = byRep[o.representanteId]||[]).push(o);
+    });
+    return Object.entries(byRep).map(([repId, ords]) => {
+      const rep = representantes.find(r=>r.id===repId);
+      if (!rep) return null;
+      const items = ords.map(o => {
+        const gross = (o.itemsList||[]).reduce((s,it)=>s+((it.qty||0)*(it.unitPrice||0)),0);
+        const net   = (o.itemsList||[]).reduce((s,it)=>s+(it.total||0),0);
+        const discPercent = gross>0 ? Math.max(0,(1-net/gross)*100) : 0;
+        const comissaoPercent = comissaoAplicavel(rep, discPercent);
+        const comissaoValor = (Number(o.total)||0) * (comissaoPercent/100);
+        return { order:o, discPercent, comissaoPercent, comissaoValor };
+      }).sort((a,b)=>(a.order.date||"").localeCompare(b.order.date||""));
+      const totalComissao = items.reduce((s,it)=>s+it.comissaoValor,0);
+      const fech = fechamentos.find(f=>f.representanteId===repId && f.periodo===period);
+      return { rep, items, totalComissao, fech };
+    }).filter(Boolean).sort((a,b)=>a.rep.nome.localeCompare(b.rep.nome));
+  }, [orders, representantes, fechamentos, period]);
+
+  const handleFechar = (block) => {
+    const novo = {
+      id: `FCH-${Date.now()}`,
+      representanteId: block.rep.id,
+      representanteNome: block.rep.nome,
+      periodo: period,
+      valorTotal: block.totalComissao,
+      qtdPedidos: block.items.length,
+      pedidosIds: block.items.map(it=>it.order.id),
+      dataFechamento: today(),
+    };
+    setFechamentos(prev => [...prev.filter(f=>!(f.representanteId===block.rep.id && f.periodo===period)), novo]);
+  };
+
+  const handleReabrir = (block) => {
+    setFechamentos(prev => prev.filter(f=>!(f.representanteId===block.rep.id && f.periodo===period)));
+  };
+
+  const historico = useMemo(() =>
+    fechamentos.slice().sort((a,b)=>(b.periodo+b.dataFechamento).localeCompare(a.periodo+a.dataFechamento))
+  , [fechamentos]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Movimentos</h1>
+          <p className="text-sm text-gray-500">Fechamento de comissão dos representantes · {periodLabel}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <input type="month" value={period} onChange={e=>setPeriod(e.target.value)}
+            className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
+          <button onClick={()=>setShowHistorico(v=>!v)}
+            className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${showHistorico?"bg-indigo-600 text-white":"bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+            📜 Histórico
+          </button>
+        </div>
+      </div>
+
+      {showHistorico && (
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+          {historico.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">Nenhum fechamento registrado ainda</p>
+          ) : historico.map(f => {
+            const [y,m] = f.periodo.split("-");
+            const lbl = new Date(Number(y),Number(m)-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"});
+            return (
+              <div key={f.id} className="flex items-center justify-between px-4 py-3 border-b border-gray-50 last:border-0">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{f.representanteNome}</p>
+                  <p className="text-xs text-gray-400">{lbl} · {f.qtdPedidos||f.pedidosIds?.length||0} pedido(s) · fechado em {new Date(f.dataFechamento+"T00:00:00").toLocaleDateString("pt-BR")}</p>
+                </div>
+                <p className="text-sm font-bold text-indigo-600">{fmt(f.valorTotal)}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {repBlocks.length === 0 ? (
+        <div className="bg-white border border-gray-100 rounded-2xl p-12 text-center shadow-sm">
+          <p className="text-3xl mb-2">🧾</p>
+          <p className="text-sm text-gray-500">Nenhum pedido elegível (Entregue/Pago) com representante nesse período</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {repBlocks.map(block => {
+            const isOpen = !collapsed[block.rep.id];
+            const fechado = !!block.fech;
+            return (
+              <div key={block.rep.id} className={`bg-white border rounded-2xl shadow-sm overflow-hidden ${fechado?"border-green-200":"border-gray-100"}`}>
+                <button onClick={()=>setCollapsed(c=>({...c,[block.rep.id]:isOpen}))}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-xs shrink-0 transition-transform ${isOpen?"rotate-90":"rotate-0"}`}>▶</span>
+                    <span className="font-semibold text-sm text-gray-800 truncate">{block.rep.nome}</span>
+                    {fechado && <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full font-medium shrink-0">🔒 Fechado</span>}
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-xs text-gray-400">{block.items.length} pedido(s)</span>
+                    <span className="font-bold text-indigo-600">{fmt(block.totalComissao)}</span>
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div className="border-t border-gray-100">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-[11px] text-gray-400 uppercase border-b border-gray-50">
+                            <th className="text-left px-4 py-2 font-medium">Pedido</th>
+                            <th className="text-left px-4 py-2 font-medium">Data</th>
+                            <th className="text-left px-4 py-2 font-medium">Cliente</th>
+                            <th className="text-right px-4 py-2 font-medium">Total</th>
+                            <th className="text-right px-4 py-2 font-medium">Desconto</th>
+                            <th className="text-right px-4 py-2 font-medium">Comissão %</th>
+                            <th className="text-right px-4 py-2 font-medium">Comissão R$</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {block.items.map(it => (
+                            <tr key={it.order.id} className="border-b border-gray-50 last:border-0">
+                              <td className="px-4 py-2 font-mono text-xs text-gray-500">{it.order.id}</td>
+                              <td className="px-4 py-2 text-xs text-gray-500">{new Date(it.order.date+"T00:00:00").toLocaleDateString("pt-BR")}</td>
+                              <td className="px-4 py-2 text-gray-700 truncate max-w-[180px]">{it.order.customer}</td>
+                              <td className="px-4 py-2 text-right text-gray-700">{fmt(it.order.total)}</td>
+                              <td className="px-4 py-2 text-right text-gray-400">{it.discPercent.toFixed(1)}%</td>
+                              <td className="px-4 py-2 text-right text-gray-500">{it.comissaoPercent.toFixed(1)}%</td>
+                              <td className="px-4 py-2 text-right font-semibold text-indigo-600">{fmt(it.comissaoValor)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="flex items-center justify-between px-4 py-3 bg-gray-50/50">
+                      <p className="text-sm text-gray-500">Total do período: <span className="font-bold text-gray-800">{fmt(block.totalComissao)}</span></p>
+                      {fechado ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400">Fechado em {new Date(block.fech.dataFechamento+"T00:00:00").toLocaleDateString("pt-BR")}</span>
+                          <button onClick={()=>handleReabrir(block)} className="text-xs text-amber-600 hover:underline font-medium">Reabrir</button>
+                        </div>
+                      ) : (
+                        <button onClick={()=>handleFechar(block)}
+                          className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+                          ✅ Marcar como fechado/pago
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setContas, formasPagamento=[], setFormasPagamento, variantCatalogs=[], setVariantCatalogs }) => {
   const [tab, setTab]         = useState("representantes");
   const [search, setSearch]   = useState("");
@@ -11568,6 +11756,7 @@ const NAV = [
   { id: "pricing",    label: "Tabela de Preços",  icon: "tag"        },
   { id: "pricehunt",  label: "PriceHunt",        icon: "search"     },
   { id: "reports",    label: "Relatórios",       icon: "reports"    },
+  { id: "movimentos", label: "Movimentos",       icon: "finance"    },
   { id: "usuarios",   label: "Usuários",         icon: "crm"        },
   { id: "cadastros",  label: "Cadastros",        icon: "tag"        },
   { id: "parametros", label: "Parâmetros",       icon: "settings"   },
@@ -11597,6 +11786,7 @@ function ERPApp({ currentUser, onLogout }) {
   const [contas,    setContas_]     = useState([]);
   const [formasPagamento, setFormasPagamento_] = useState([]);
   const [variantCatalogs, setVariantCatalogs_] = useState([]);
+  const [fechamentos, setFechamentos_] = useState([]);
   const [params,    setParamsState] = useState(PARAMS_DEFAULT);
   const [loading, setLoading]       = useState(true);
   const [active, setActive]         = useState("dashboard");
@@ -11614,12 +11804,12 @@ function ERPApp({ currentUser, onLogout }) {
 
   useEffect(() => {
     Promise.all([loadOrders(),loadFinance(),loadCustomers(),loadSuppliers(),loadProducts(),loadMovements(),loadNfes(),loadPurchases(),loadCotacoes(),loadParams(),
-      loadRepresentantes(),loadContas(),loadFormasPagamento(),loadVariantCatalogs(),
+      loadRepresentantes(),loadContas(),loadFormasPagamento(),loadVariantCatalogs(),loadFechamentos(),
       window.storage.get(EMPRESA_KEY).catch(()=>null)])
-      .then(([o,f,c,s,p,m,n,pc,cot,prm,reps,ctas,fps,vcats,emp]) => {
+      .then(([o,f,c,s,p,m,n,pc,cot,prm,reps,ctas,fps,vcats,fechs,emp]) => {
         setOrders(o);setFinance(f);setSuppliers(s);setProducts(p);setMovements(m);setNfes(n);setPurchases(pc);setCotacoes(cot);
         if (prm) setParamsState(prm);
-        setRepresentantes_(reps); setContas_(ctas); setFormasPagamento_(fps); setVariantCatalogs_(vcats);
+        setRepresentantes_(reps); setContas_(ctas); setFormasPagamento_(fps); setVariantCatalogs_(vcats); setFechamentos_(fechs);
         if (emp?.value) setEmpresaForm(JSON.parse(emp.value));
 
         // ── Automação: inativar clientes sem compras há 30+ dias ──
@@ -11800,6 +11990,14 @@ function ERPApp({ currentUser, onLogout }) {
     });
   }, []);
 
+  const updateFechamentos = useCallback((updater) => {
+    setFechamentos_(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      saveFechamentos(next);
+      return next;
+    });
+  }, []);
+
   const updateCotacoes = useCallback((updater) => {
     setCotacoes(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
@@ -11837,6 +12035,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
       case "reports":   return <ReportsModule orders={orders} finance={finance} customers={customers} suppliers={suppliers} purchases={purchases} products={products}/>;
+      case "movimentos": return <MovimentosModule orders={orders} representantes={representantes} fechamentos={fechamentos} setFechamentos={updateFechamentos}/>;
       default: return null;
     }
   };
