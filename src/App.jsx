@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.5.4";
+const APP_VERSION = "3.5.5";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1119,14 +1119,14 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
       </div>
 
       {/* Status pills */}
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         {ORDER_STATUSES.map(s => {
           const st = STATUS_STYLES[s];
           return (
             <button key={s} onClick={() => setFilterStatus(filterStatus === s ? "Todos" : s)}
-              className={`rounded-xl p-3 text-center border transition-all ${filterStatus === s ? `${st.bg} border-transparent` : "bg-white border-gray-100 hover:border-gray-200"}`}>
+              className={`rounded-xl p-2.5 text-center border transition-all ${filterStatus === s ? `${st.bg} border-transparent` : "bg-white border-gray-100 hover:border-gray-200"}`}>
               <p className={`text-lg font-bold ${filterStatus === s ? st.text : "text-gray-800"}`}>{stats[s]}</p>
-              <p className={`text-xs mt-0.5 ${filterStatus === s ? st.text : "text-gray-500"}`}>{s}</p>
+              <p className={`text-[11px] mt-0.5 ${filterStatus === s ? st.text : "text-gray-500"}`}>{s}</p>
             </button>
           );
         })}
