@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.5.3";
+const APP_VERSION = "3.5.4";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2280,7 +2280,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
                         {fmt(t.amount)}
                       </span>
                       <button
-                        onClick={() => setFinance(prev => prev.map(x => x.id===t.id ? {...x, status:"pago"} : x))}
+                        onClick={() => setFinance(prev => prev.map(x => x.id===t.id ? {...x, status:"pago", paidDate: x.paidDate||today()} : x))}
                         className="px-3 py-1 text-xs font-medium bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
                         Pagar
                       </button>
@@ -10757,6 +10757,7 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
   });
   const [showHistorico, setShowHistorico] = useState(false);
   const [collapsed, setCollapsed] = useState({});
+  const [faturando, setFaturando] = useState({});
 
   const isEligible = (o) => o.status === "Entregue" || !!o.paidDate;
 
@@ -10789,6 +10790,8 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
   }, [orders, representantes, fechamentos, period]);
 
   const handleFaturar = (block) => {
+    if (faturando[block.rep.id] || block.fech) return;
+    setFaturando(f=>({...f,[block.rep.id]:true}));
     const finNums = finance.map(f=>parseInt((f.id||"").replace("FIN-",""))||0);
     const newFinId = `FIN-${String(Math.max(0,...finNums,0)+1).padStart(3,"0")}`;
 
@@ -10827,6 +10830,7 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
       setFinance(prev => prev.filter(f=>f.id!==fin.id));
     }
     setFechamentos(prev => prev.filter(f=>!(f.representanteId===block.rep.id && f.periodo===period)));
+    setFaturando(f=>{ const n={...f}; delete n[block.rep.id]; return n; });
   };
 
   const historico = useMemo(() =>
@@ -10933,9 +10937,9 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
                           <button onClick={()=>handleReabrir(block)} className="text-xs text-amber-600 hover:underline font-medium">Reabrir</button>
                         </div>
                       ) : (
-                        <button onClick={()=>handleFaturar(block)}
-                          className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
-                          🧾 Faturar
+                        <button onClick={()=>handleFaturar(block)} disabled={!!faturando[block.rep.id]}
+                          className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                          {faturando[block.rep.id] ? "Faturando..." : "🧾 Faturar"}
                         </button>
                       )}
                     </div>
