@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.5.1";
+const APP_VERSION = "3.5.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1853,7 +1853,7 @@ const FinPagModal = ({ item, onClose, onSave }) => {
   );
 };
 
-const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) => {
+const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setPurchases }) => {
   const [tab, setTab]         = useState("overview");
   const [filterMode, setFilterMode] = useState("mes");  // mes | trimestre | ano | personalizado | todos
   const [period, setPeriod]   = useState(() => {
@@ -2502,6 +2502,8 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases }) =>
                 onSave={(updated)=>{
                   if (updated._type === "lancamento") {
                     setFinance(prev => prev.map(t => t.id === updated.id ? {...t, status:"pago", paidDate:updated.paidDate, payment:updated.payment} : t));
+                  } else if (updated._type === "compra") {
+                    setPurchases(prev => prev.map(p => p.id === updated.id ? {...p, paidDate:updated.paidDate, payment:updated.payment} : p));
                   }
                   setPayPag(null);
                 }}/>
@@ -12047,7 +12049,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
-      case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases}/>;
+      case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases}/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases}/>;
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements}/>;
