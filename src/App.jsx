@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.5.0";
+const APP_VERSION = "3.5.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -10748,7 +10748,7 @@ const VariantCatalogModal = ({ catalog, onClose, onSave }) => {
 };
 
 // ─── MovimentosModule — Fechamento/Faturamento de Comissão dos Representantes ──
-const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFechamentos }) => {
+const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFechamentos, finance=[], setFinance }) => {
   const [period, setPeriod] = useState(() => {
     const n = new Date();
     return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;
@@ -10786,7 +10786,23 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
     }).filter(Boolean).sort((a,b)=>a.rep.nome.localeCompare(b.rep.nome));
   }, [orders, representantes, fechamentos, period]);
 
-  const handleFechar = (block) => {
+  const handleFaturar = (block) => {
+    const finNums = finance.map(f=>parseInt((f.id||"").replace("FIN-",""))||0);
+    const newFinId = `FIN-${String(Math.max(0,...finNums,0)+1).padStart(3,"0")}`;
+
+    setFinance(prev => [{
+      id: newFinId,
+      type: "despesa",
+      category: "Comissão de Representantes",
+      description: `Comissão - ${block.rep.nome} (${periodLabel})`,
+      amount: block.totalComissao,
+      date: today(),
+      dueDate: addDaysISO(today(), 5),
+      status: "pendente",
+      notes: `Fechamento de comissão referente a ${block.items.length} pedido(s) do período ${period}.`,
+      representanteId: block.rep.id,
+    }, ...prev]);
+
     const novo = {
       id: `FCH-${Date.now()}`,
       representanteId: block.rep.id,
@@ -10796,11 +10812,18 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
       qtdPedidos: block.items.length,
       pedidosIds: block.items.map(it=>it.order.id),
       dataFechamento: today(),
+      finLancamentoId: newFinId,
     };
     setFechamentos(prev => [...prev.filter(f=>!(f.representanteId===block.rep.id && f.periodo===period)), novo]);
   };
 
   const handleReabrir = (block) => {
+    const fin = finance.find(f=>f.id===block.fech.finLancamentoId);
+    if (fin && fin.status === "pago") {
+      alert("O lançamento financeiro dessa comissão já foi marcado como pago no Financeiro. Reabrindo o fechamento aqui, mas o lançamento não será removido — ajuste manualmente se necessário.");
+    } else if (fin) {
+      setFinance(prev => prev.filter(f=>f.id!==fin.id));
+    }
     setFechamentos(prev => prev.filter(f=>!(f.representanteId===block.rep.id && f.periodo===period)));
   };
 
@@ -10836,7 +10859,7 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
               <div key={f.id} className="flex items-center justify-between px-4 py-3 border-b border-gray-50 last:border-0">
                 <div>
                   <p className="text-sm font-medium text-gray-800">{f.representanteNome}</p>
-                  <p className="text-xs text-gray-400">{lbl} · {f.qtdPedidos||f.pedidosIds?.length||0} pedido(s) · fechado em {new Date(f.dataFechamento+"T00:00:00").toLocaleDateString("pt-BR")}</p>
+                  <p className="text-xs text-gray-400">{lbl} · {f.qtdPedidos||f.pedidosIds?.length||0} pedido(s) · faturado em {new Date(f.dataFechamento+"T00:00:00").toLocaleDateString("pt-BR")}{f.finLancamentoId?` · lançamento ${f.finLancamentoId}`:""}</p>
                 </div>
                 <p className="text-sm font-bold text-indigo-600">{fmt(f.valorTotal)}</p>
               </div>
@@ -10862,7 +10885,7 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
                   <div className="flex items-center gap-2 min-w-0">
                     <span className={`text-xs shrink-0 transition-transform ${isOpen?"rotate-90":"rotate-0"}`}>▶</span>
                     <span className="font-semibold text-sm text-gray-800 truncate">{block.rep.nome}</span>
-                    {fechado && <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full font-medium shrink-0">🔒 Fechado</span>}
+                    {fechado && <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full font-medium shrink-0">🧾 Faturado</span>}
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="text-xs text-gray-400">{block.items.length} pedido(s)</span>
@@ -10904,13 +10927,13 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
                       <p className="text-sm text-gray-500">Total do período: <span className="font-bold text-gray-800">{fmt(block.totalComissao)}</span></p>
                       {fechado ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-400">Fechado em {new Date(block.fech.dataFechamento+"T00:00:00").toLocaleDateString("pt-BR")}</span>
+                          <span className="text-xs text-gray-400">Faturado em {new Date(block.fech.dataFechamento+"T00:00:00").toLocaleDateString("pt-BR")} · lançamento {block.fech.finLancamentoId} em Contas a Pagar</span>
                           <button onClick={()=>handleReabrir(block)} className="text-xs text-amber-600 hover:underline font-medium">Reabrir</button>
                         </div>
                       ) : (
-                        <button onClick={()=>handleFechar(block)}
+                        <button onClick={()=>handleFaturar(block)}
                           className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
-                          ✅ Marcar como fechado/pago
+                          🧾 Faturar
                         </button>
                       )}
                     </div>
@@ -12035,7 +12058,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
       case "reports":   return <ReportsModule orders={orders} finance={finance} customers={customers} suppliers={suppliers} purchases={purchases} products={products}/>;
-      case "movimentos": return <MovimentosModule orders={orders} representantes={representantes} fechamentos={fechamentos} setFechamentos={updateFechamentos}/>;
+      case "movimentos": return <MovimentosModule orders={orders} representantes={representantes} fechamentos={fechamentos} setFechamentos={updateFechamentos} finance={finance} setFinance={updateFinance}/>;
       default: return null;
     }
   };
