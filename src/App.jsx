@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.5.2";
+const APP_VERSION = "3.5.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2501,7 +2501,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
               <FinPagModal item={payPag} onClose={()=>setPayPag(null)}
                 onSave={(updated)=>{
                   if (updated._type === "lancamento") {
-                    setFinance(prev => prev.map(t => t.id === updated.id ? {...t, status:"pago", paidDate:updated.paidDate, payment:updated.payment} : t));
+                    setFinance(prev => prev.map(t => t.id === updated.id ? {...t, status:updated.status, paidDate:updated.paidDate, payment:updated.payment} : t));
                   } else if (updated._type === "compra") {
                     setPurchases(prev => prev.map(p => p.id === updated.id ? {...p, paidDate:updated.paidDate, payment:updated.payment} : p));
                   }
