@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.7.2";
+const APP_VERSION = "3.7.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9835,8 +9835,11 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
       <div ref={modalRef} onKeyDown={e=>trapTabFocus(e, modalRef)} className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
           <h2 className="font-bold text-gray-900">{isNew?"Nova Cotação":`Editar ${cotacao.id}`}</h2>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400">📅 {form.date ? new Date(form.date+"T00:00:00").toLocaleDateString("pt-BR") : "—"}</span>
+          <div className="flex items-start gap-3">
+            <div className="text-right text-xs text-gray-400 leading-relaxed">
+              <p>📅 {form.date ? new Date(form.date+"T00:00:00").toLocaleDateString("pt-BR") : "—"}</p>
+              <p>⏳ Válida até {form.validUntil ? new Date(form.validUntil+"T00:00:00").toLocaleDateString("pt-BR") : "—"}</p>
+            </div>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
           </div>
         </div>
@@ -9895,12 +9898,6 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
               <select className={inp} value={form.status} onChange={e=>set("status",e.target.value)}>
                 {COT_STATUS.map(s=><option key={s}>{s}</option>)}
               </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 block mb-1">⏳ Válida até</label>
-              <div className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500">
-                {form.validUntil ? new Date(form.validUntil+"T00:00:00").toLocaleDateString("pt-BR") : "—"}
-              </div>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 block mb-1">Forma de Pagamento</label>
