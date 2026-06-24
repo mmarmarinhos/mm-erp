@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.6.3";
+const APP_VERSION = "3.6.4";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -331,6 +331,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
   const [showSkuList, setShowSkuList] = useState([]);
   const [askAddItem, setAskAddItem] = useState(false);
   const naoItemRef = useRef(null);
+  const skuInputRefs = useRef([]);
   const simItemRef = useRef(null);
 
   const set = (k, v) => setForm(f => {
@@ -517,6 +518,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
                               selectProduct(i, exact||filtProd[0]);
                             }
                           }}
+                          ref={el=>skuInputRefs.current[i]=el}
                           placeholder="SKU"/>
                         {showSkuList[i] && filtProd.length>0 && sq && (
                           <div className="absolute z-50 left-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 w-64 max-h-48 overflow-y-auto">
@@ -665,7 +667,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
             <p className="text-sm text-gray-500 mb-4">Você pode continuar incluindo produtos neste pedido.</p>
             <div className="flex gap-2">
               <button ref={naoItemRef} onClick={()=>setAskAddItem(false)} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Não</button>
-              <button ref={simItemRef} autoFocus onClick={()=>{addItem(); setAskAddItem(false);}} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Sim, adicionar</button>
+              <button ref={simItemRef} autoFocus onClick={()=>{const newIdx=form.itemsList.length; addItem(); setAskAddItem(false); setTimeout(()=>skuInputRefs.current[newIdx]?.focus(),50);}} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Sim, adicionar</button>
             </div>
           </div>
         </div>
@@ -8503,6 +8505,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
   const [showSkuList, setShowSkuList] = useState((purchase?.items||[emptyItem()]).map(()=>false));
   const [askAddItem, setAskAddItem] = useState(false);
   const naoItemRef = useRef(null);
+  const skuInputRefs = useRef([]);
   const simItemRef = useRef(null);
 
   const setItem = (i, k, v) => setForm(f => {
@@ -8662,6 +8665,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
                               selectProduct(i, exact||filtProd[0]);
                             }
                           }}
+                          ref={el=>skuInputRefs.current[i]=el}
                           placeholder="SKU"/>
                         {showSkuList[i] && sq.length>0 && filtProd.length>0 && (
                           <div className="absolute z-50 top-full left-0 w-64 bg-white border border-gray-200 rounded-lg shadow-lg mt-0.5 max-h-40 overflow-y-auto">
@@ -8786,7 +8790,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
             <p className="text-sm text-gray-500 mb-4">Você pode continuar incluindo produtos neste pedido de compra.</p>
             <div className="flex gap-2">
               <button ref={naoItemRef} onClick={()=>setAskAddItem(false)} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Não</button>
-              <button ref={simItemRef} autoFocus onClick={()=>{addItem(); setAskAddItem(false);}} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Sim, adicionar</button>
+              <button ref={simItemRef} autoFocus onClick={()=>{const newIdx=form.items.length; addItem(); setAskAddItem(false); setTimeout(()=>skuInputRefs.current[newIdx]?.focus(),50);}} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Sim, adicionar</button>
             </div>
           </div>
         </div>
@@ -9725,6 +9729,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
   const [showSkuList, setShowSkuList] = useState([]);
   const [askAddItem, setAskAddItem] = useState(false);
   const naoItemRef = useRef(null);
+  const skuInputRefs = useRef([]);
   const simItemRef = useRef(null);
 
   const calcItemTotal = (it) => {
@@ -9911,6 +9916,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                               selectProduct(i, exact||filtProd[0]);
                             }
                           }}
+                          ref={el=>skuInputRefs.current[i]=el}
                           placeholder="SKU"/>
                         {showSkuList[i] && filtProd.length>0 && sq && (
                           <div className="absolute z-50 left-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 w-64 max-h-48 overflow-y-auto">
@@ -10032,7 +10038,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
             <p className="text-sm text-gray-500 mb-4">Você pode continuar incluindo produtos nesta cotação.</p>
             <div className="flex gap-2">
               <button ref={naoItemRef} onClick={()=>setAskAddItem(false)} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Não</button>
-              <button ref={simItemRef} autoFocus onClick={()=>{addItem(); setAskAddItem(false);}} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Sim, adicionar</button>
+              <button ref={simItemRef} autoFocus onClick={()=>{const newIdx=form.items.length; addItem(); setAskAddItem(false); setTimeout(()=>skuInputRefs.current[newIdx]?.focus(),50);}} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Sim, adicionar</button>
             </div>
           </div>
         </div>
