@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.6.2";
+const APP_VERSION = "3.6.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -330,6 +330,8 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
   const [skuSearch, setSkuSearch]   = useState([]);
   const [showSkuList, setShowSkuList] = useState([]);
   const [askAddItem, setAskAddItem] = useState(false);
+  const naoItemRef = useRef(null);
+  const simItemRef = useRef(null);
 
   const set = (k, v) => setForm(f => {
     const updated = { ...f, [k]: v };
@@ -656,14 +658,14 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
       </div>
 
       {askAddItem && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onKeyDown={e=>{ if (e.key==="Escape") setAskAddItem(false); }}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onKeyDown={e=>{ if (e.key==="Escape") { setAskAddItem(false); return; } if (e.key==="Tab") { e.preventDefault(); (document.activeElement===simItemRef.current ? naoItemRef : simItemRef).current?.focus(); } }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 text-center">
             <p className="text-3xl mb-2">➕</p>
             <p className="font-semibold text-gray-900 mb-1">Adicionar outro item?</p>
             <p className="text-sm text-gray-500 mb-4">Você pode continuar incluindo produtos neste pedido.</p>
             <div className="flex gap-2">
-              <button onClick={()=>setAskAddItem(false)} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Não</button>
-              <button autoFocus onClick={()=>{addItem(); setAskAddItem(false);}} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Sim, adicionar</button>
+              <button ref={naoItemRef} onClick={()=>setAskAddItem(false)} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Não</button>
+              <button ref={simItemRef} autoFocus onClick={()=>{addItem(); setAskAddItem(false);}} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Sim, adicionar</button>
             </div>
           </div>
         </div>
@@ -8500,6 +8502,8 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
   const [skuSearch, setSkuSearch] = useState((purchase?.items||[emptyItem()]).map(it=>it.sku||""));
   const [showSkuList, setShowSkuList] = useState((purchase?.items||[emptyItem()]).map(()=>false));
   const [askAddItem, setAskAddItem] = useState(false);
+  const naoItemRef = useRef(null);
+  const simItemRef = useRef(null);
 
   const setItem = (i, k, v) => setForm(f => {
     const items = f.items.map((it,idx) => {
@@ -8775,14 +8779,14 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
       </div>
 
       {askAddItem && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onKeyDown={e=>{ if (e.key==="Escape") setAskAddItem(false); }}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onKeyDown={e=>{ if (e.key==="Escape") { setAskAddItem(false); return; } if (e.key==="Tab") { e.preventDefault(); (document.activeElement===simItemRef.current ? naoItemRef : simItemRef).current?.focus(); } }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 text-center">
             <p className="text-3xl mb-2">➕</p>
             <p className="font-semibold text-gray-900 mb-1">Adicionar outro item?</p>
             <p className="text-sm text-gray-500 mb-4">Você pode continuar incluindo produtos neste pedido de compra.</p>
             <div className="flex gap-2">
-              <button onClick={()=>setAskAddItem(false)} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Não</button>
-              <button autoFocus onClick={()=>{addItem(); setAskAddItem(false);}} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Sim, adicionar</button>
+              <button ref={naoItemRef} onClick={()=>setAskAddItem(false)} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Não</button>
+              <button ref={simItemRef} autoFocus onClick={()=>{addItem(); setAskAddItem(false);}} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Sim, adicionar</button>
             </div>
           </div>
         </div>
@@ -9720,6 +9724,8 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
   const [skuSearch, setSkuSearch]   = useState([]);
   const [showSkuList, setShowSkuList] = useState([]);
   const [askAddItem, setAskAddItem] = useState(false);
+  const naoItemRef = useRef(null);
+  const simItemRef = useRef(null);
 
   const calcItemTotal = (it) => {
     const gross = (it.qty||0) * (it.unitPrice||0);
@@ -10019,14 +10025,14 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
       </div>
 
       {askAddItem && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onKeyDown={e=>{ if (e.key==="Escape") setAskAddItem(false); }}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onKeyDown={e=>{ if (e.key==="Escape") { setAskAddItem(false); return; } if (e.key==="Tab") { e.preventDefault(); (document.activeElement===simItemRef.current ? naoItemRef : simItemRef).current?.focus(); } }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 text-center">
             <p className="text-3xl mb-2">➕</p>
             <p className="font-semibold text-gray-900 mb-1">Adicionar outro item?</p>
             <p className="text-sm text-gray-500 mb-4">Você pode continuar incluindo produtos nesta cotação.</p>
             <div className="flex gap-2">
-              <button onClick={()=>setAskAddItem(false)} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Não</button>
-              <button autoFocus onClick={()=>{addItem(); setAskAddItem(false);}} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Sim, adicionar</button>
+              <button ref={naoItemRef} onClick={()=>setAskAddItem(false)} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Não</button>
+              <button ref={simItemRef} autoFocus onClick={()=>{addItem(); setAskAddItem(false);}} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Sim, adicionar</button>
             </div>
           </div>
         </div>
