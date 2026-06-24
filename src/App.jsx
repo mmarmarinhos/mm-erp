@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.7.7";
+const APP_VERSION = "3.7.8";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9487,7 +9487,7 @@ const PARAMS_DEFAULT = {
     shopee: { partnerId: "",  partnerKey: "", shopId: "",     autoImport: false },
     backendUrl: "",
   },
-  vendas: { validadeCotacaoDias: 10 },
+  vendas: { validadeCotacaoDias: 10, multaAtrasoPercent: 2, jurosAtrasoPercentMes: 1 },
   compras: {},
 };
 async function loadParams() {
@@ -11671,6 +11671,29 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                 Toda cotação nova nasce com "Válida até" igual à data de emissão + esse número de dias. Cotações já criadas não são alteradas.
               </p>
             </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">⚠️ Cobrança por Atraso (Contas a Receber)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Multa por atraso (%)</label>
+                <input type="number" min="0" max="100" step="0.1" className={inp}
+                  value={vendas.multaAtrasoPercent===0?"":vendas.multaAtrasoPercent}
+                  onChange={e=>setV("multaAtrasoPercent", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                  onBlur={e=>{ if (e.target.value==="") setV("multaAtrasoPercent",0); }}/>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Juros por atraso (% ao mês)</label>
+                <input type="number" min="0" max="100" step="0.1" className={inp}
+                  value={vendas.jurosAtrasoPercentMes===0?"":vendas.jurosAtrasoPercentMes}
+                  onChange={e=>setV("jurosAtrasoPercentMes", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                  onBlur={e=>{ if (e.target.value==="") setV("jurosAtrasoPercentMes",0); }}/>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 bg-gray-50 rounded-xl px-3 py-2">
+              Multa: cobrada uma única vez sobre o valor em atraso (o limite legal pra consumidor no Brasil é 2%). Juros: cobrados proporcionalmente aos dias de atraso, com base no percentual mensal informado.
+            </p>
           </div>
 
           <button onClick={()=>mergeAndSave({vendas}).then(()=>showToast("✅ Configurações de Vendas salvas!"))}
