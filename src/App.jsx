@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.5.7";
+const APP_VERSION = "3.5.8";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1062,7 +1062,8 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
             description: `Devolução pedido ${order.id} — ${order.customer}`,
             amount: order.total,
             date: today(),
-            status: "pago",
+            dueDate: today(),
+            status: "pendente",
             notes: `Estorno do pedido ${order.id} (${order.channel})`,
           }, ...prev];
         });
@@ -1345,7 +1346,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
               {(devolucaoModal.itemsList||[]).filter(i=>i._prodId&&i.qty>0).length > 0 && (
                 <p>✅ Estoque será <b>restaurado</b> ({(devolucaoModal.itemsList||[]).filter(i=>i._prodId&&i.qty>0).length} item(s))</p>
               )}
-              <p>✅ Lançamento de <b>Devolução / Reembolso</b> criado no financeiro</p>
+              <p>✅ Lançamento de <b>Devolução / Reembolso</b> criado em Contas a Pagar</p>
             </div>
             <div className="flex gap-2">
               <button onClick={() => setDevolucaoModal(null)}
