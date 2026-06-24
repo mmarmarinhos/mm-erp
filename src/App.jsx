@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.7.8";
+const APP_VERSION = "3.7.9";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1826,7 +1826,15 @@ const FinPayModal = ({ order, onClose, onSave }) => {
         <div className="bg-gray-50 rounded-xl p-3 text-sm">
           <p className="font-mono font-bold text-indigo-600 text-xs">{order.id}</p>
           <p className="text-gray-600 text-xs mt-0.5 truncate">{order.customer}</p>
-          <p className="font-bold text-gray-900 text-lg mt-1">{fmt(order.total)}</p>
+          {order.urgency==="overdue" ? (
+            <>
+              <p className="text-xs text-gray-400 line-through mt-1">{fmt(order.total)}</p>
+              <p className="font-bold text-red-600 text-lg">{fmt(order.totalComEncargos)}</p>
+              <p className="text-[10px] text-red-400">+{fmt(order.multa)} multa +{fmt(order.juros)} juros ({order.diasAtraso} dia{order.diasAtraso!==1?"s":""} de atraso)</p>
+            </>
+          ) : (
+            <p className="font-bold text-gray-900 text-lg mt-1">{fmt(order.total)}</p>
+          )}
         </div>
         <div className="flex items-center justify-between p-3 bg-green-50 border border-green-100 rounded-xl">
           <div>
@@ -1914,7 +1922,7 @@ const FinPagModal = ({ item, onClose, onSave }) => {
   );
 };
 
-const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setPurchases }) => {
+const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setPurchases, params }) => {
   const [tab, setTab]         = useState("overview");
   const [filterMode, setFilterMode] = useState("mes");  // mes | trimestre | ano | personalizado | todos
   const [period, setPeriod]   = useState(() => {
@@ -2358,6 +2366,8 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
       {tab === "receber" && (() => {
         const today0 = new Date(); today0.setHours(0,0,0,0);
         const diffDays = (a,b) => Math.round((a-b)/86400000);
+        const multaPct = params?.vendas?.multaAtrasoPercent ?? 2;
+        const jurosPctMes = params?.vendas?.jurosAtrasoPercentMes ?? 1;
         const recItems = (orders||[])
           .filter(o => o.status !== "Cancelado" && (showPaidRec ? true : !o.paidDate))
           .map(o => {
@@ -2365,12 +2375,16 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
             if (due) due.setHours(0,0,0,0);
             const diff = due ? diffDays(due, today0) : null;
             const urgency = o.paidDate ? "open" : (diff===null?"open":diff<0?"overdue":diff===0?"today":diff<=3?"soon":"open");
-            return { ...o, due, diff, urgency };
+            const diasAtraso = (!o.paidDate && urgency==="overdue") ? Math.abs(diff) : 0;
+            const multa = diasAtraso>0 ? o.total * (multaPct/100) : 0;
+            const juros = diasAtraso>0 ? o.total * (jurosPctMes/100) * (diasAtraso/30) : 0;
+            const totalComEncargos = o.total + multa + juros;
+            return { ...o, due, diff, urgency, diasAtraso, multa, juros, totalComEncargos };
           })
           .sort((a,b) => ({overdue:0,today:1,soon:2,open:3}[a.urgency]??3)-({overdue:0,today:1,soon:2,open:3}[b.urgency]??3));
 
         const totalRec     = recItems.reduce((s,o)=>s+o.total,0);
-        const totalOverdue = recItems.filter(o=>o.urgency==="overdue").reduce((s,o)=>s+o.total,0);
+        const totalOverdue = recItems.filter(o=>o.urgency==="overdue").reduce((s,o)=>s+o.totalComEncargos,0);
         const overdueCount = recItems.filter(o=>o.urgency==="overdue").length;
         const urg = { overdue:{bg:"bg-red-100",text:"text-red-700",icon:"🔴"},
                       today:  {bg:"bg-amber-100",text:"text-amber-700",icon:"🟡"},
@@ -2385,7 +2399,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
                 <p className="text-xs text-green-500">{recItems.length} pedido{recItems.length!==1?"s":""}</p>
               </div>
               <div className={`border rounded-xl p-3 text-center ${totalOverdue>0?"bg-red-50 border-red-100":"bg-gray-50 border-gray-100"}`}>
-                <p className="text-xs text-gray-500 font-medium">Vencidos</p>
+                <p className="text-xs text-gray-500 font-medium">Vencidos (+ multa/juros)</p>
                 <p className={`text-lg font-bold mt-0.5 ${totalOverdue>0?"text-red-600":"text-gray-400"}`}>{fmt(totalOverdue)}</p>
                 <p className={`text-xs ${totalOverdue>0?"text-red-400":"text-gray-400"}`}>{overdueCount} pedido{overdueCount!==1?"s":""}</p>
               </div>
@@ -2428,7 +2442,15 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
                           </div>
                         </div>
                         <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
-                          <p className="font-bold text-green-700 text-base">{fmt(o.total)}</p>
+                          {o.urgency==="overdue" ? (
+                            <div className="text-right">
+                              <p className="text-xs text-gray-400 line-through">{fmt(o.total)}</p>
+                              <p className="font-bold text-red-600 text-base">{fmt(o.totalComEncargos)}</p>
+                              <p className="text-[10px] text-red-400">+{fmt(o.multa)} multa +{fmt(o.juros)} juros</p>
+                            </div>
+                          ) : (
+                            <p className="font-bold text-green-700 text-base">{fmt(o.total)}</p>
+                          )}
                           <Badge label={o.status} style={STATUS_STYLES[o.status]}/>
                           {o.paidDate && (
                             <div className="flex flex-col items-end gap-1">
@@ -12228,7 +12250,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
-      case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases}/>;
+      case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params}/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases}/>;
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements}/>;
