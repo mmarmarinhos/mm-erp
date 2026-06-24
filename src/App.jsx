@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.8.0";
+const APP_VERSION = "3.8.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2018,7 +2018,9 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
     }
     return true;
   });
-  const ordersReceitas = paidOrdersInPeriod.reduce((s,o) => s+(o.total||0), 0);
+  const valorRecebidoOrder = (o) => o.pagoComAtraso ? (o.valorRecebido ?? o.total ?? 0) : (o.total||0);
+  const ordersReceitas = paidOrdersInPeriod.reduce((s,o) => s+valorRecebidoOrder(o), 0);
+  const multaJurosRecebidosPeriodo = paidOrdersInPeriod.reduce((s,o) => s+(o.pagoComAtraso ? (o.valorMulta||0)+(o.valorJuros||0) : 0), 0);
 
   const periodReceitasManual = periodActive.filter(t => t.type === "receita").reduce((s,t) => s+t.amount, 0);
   const periodReceitas = periodReceitasManual + ordersReceitas;
@@ -2052,7 +2054,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
       return {
         label,
         receitas: txs.filter(t => t.type==="receita").reduce((s,t) => s+t.amount, 0)
-                + ordersRec.reduce((s,o) => s+(o.total||0), 0),
+                + ordersRec.reduce((s,o) => s+valorRecebidoOrder(o), 0),
         despesas: txs.filter(t => t.type==="despesa").reduce((s,t) => s+t.amount, 0),
       };
     });
@@ -2068,7 +2070,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
     paidOrdersInPeriod.forEach(o => {
       const cat = o.channel || "Vendas";
       if (!cats[cat]) cats[cat] = { cat, type:"receita", total:0 };
-      cats[cat].total += (o.total||0);
+      cats[cat].total += valorRecebidoOrder(o);
     });
     return Object.values(cats).sort((a,b) => b.total-a.total);
   }, [periodActive, paidOrdersInPeriod]);
@@ -2176,6 +2178,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
           <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Receitas</p>
           <p className="text-2xl font-bold text-green-600 mt-1">{fmt(periodReceitas)}</p>
           <p className="text-xs text-gray-400 mt-0.5">{periodActive.filter(t=>t.type==="receita").length + paidOrdersInPeriod.length} lançamentos</p>
+          {multaJurosRecebidosPeriodo>0 && <p className="text-[10px] text-red-400 mt-0.5">inclui {fmt(multaJurosRecebidosPeriodo)} de multa/juros</p>}
         </div>
         <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
           <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Despesas</p>
