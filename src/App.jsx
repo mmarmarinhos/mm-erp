@@ -8744,10 +8744,10 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
                       <div className="w-28 shrink-0">
                         <p className="text-[10px] text-gray-400 mb-0.5">Desconto</p>
                         <div className="flex gap-0.5">
-                          <select className="border border-gray-200 rounded-l-lg text-xs bg-white focus:outline-none w-10 shrink-0"
-                            value={it.discountType||"%"} onChange={e=>setItem(i,"discountType",e.target.value)}>
-                            <option>%</option><option>R$</option>
-                          </select>
+                          <button onClick={()=>setItem(i,"discountType",it.discountType==="%"?"R$":"%")}
+                            className="border border-gray-200 rounded-l-lg px-2 py-1.5 text-[10px] font-bold bg-white hover:bg-indigo-50 hover:text-indigo-700 transition-colors shrink-0 text-gray-600">
+                            {it.discountType||"%"}
+                          </button>
                           <input type="number" min="0" className="w-full border border-gray-200 rounded-r-lg px-1 py-1.5 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
                             value={it.discount===0?"":it.discount}
                             onChange={e=>{setItem(i,"discount", e.target.value===""?"":(parseFloat(e.target.value)||0)); suppressNextAsk.current=false;}}
