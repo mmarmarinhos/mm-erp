@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.6.4";
+const APP_VERSION = "3.6.5";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -360,10 +360,12 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
     c.name.toLowerCase().includes(custSearch.toLowerCase())
   ).slice(0, 8);
 
+  const custInputRef = useRef(null);
   const selectCustomer = (c) => {
     setCustSearch(c.name);
     setForm(f => ({ ...f, customer:c.name, channel:c.channel||f.channel }));
     setShowCustList(false);
+    setTimeout(()=>custInputRef.current?.focus(), 0);
   };
 
   const setItem = (i, k, v) => setForm(f => {
@@ -441,7 +443,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 relative">
               <label className="text-xs font-medium text-gray-600 mb-1 block">Cliente *</label>
-              <input className={inp}
+              <input className={inp} ref={custInputRef}
                 value={custSearch}
                 onChange={e=>{ setCustSearch(e.target.value); setForm(f=>({...f,customer:e.target.value})); setShowCustList(true); }}
                 onFocus={()=>setShowCustList(true)}
@@ -8494,10 +8496,12 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
     .filter(s=>s.status==="Ativo"||s.status==="Desenvolvimento")
     .filter(s=>s.name?.toLowerCase().includes(supSearch.toLowerCase()))
     .slice(0,8);
+  const supInputRef = useRef(null);
   const selectSupplier = (s) => {
     setSupSearch(s.name);
     setForm(f=>({...f, supplierId:s.id, supplierName:s.name, paymentTerms:s.paymentTerms?String(s.paymentTerms)+"":f.paymentTerms}));
     setShowSupList(false);
+    setTimeout(()=>supInputRef.current?.focus(), 0);
   };
 
   // SKU/Product autocomplete per item
@@ -8589,7 +8593,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 relative">
               <label className="text-xs font-medium text-gray-600 mb-1 block">Fornecedor *</label>
-              <input className={inp}
+              <input className={inp} ref={supInputRef}
                 value={supSearch}
                 onChange={e=>{ setSupSearch(e.target.value); setForm(f=>({...f,supplierName:e.target.value})); setShowSupList(true); }}
                 onFocus={()=>setShowSupList(true)}
@@ -9718,10 +9722,12 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
     .filter(c => c.name.toLowerCase().includes(custSearch.toLowerCase()))
     .slice(0, 8);
 
+  const custInputRef = useRef(null);
   const selectCustomer = (c) => {
     setCustSearch(c.name);
     setForm(f => ({ ...f, customer:c.name, channel:c.channel||f.channel }));
     setShowCustList(false);
+    setTimeout(()=>custInputRef.current?.focus(), 0);
   };
 
   // SKU autocomplete state per item
@@ -9806,7 +9812,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 relative">
               <label className="text-xs font-medium text-gray-600 block mb-1">Cliente *</label>
-              <input className={inp}
+              <input className={inp} ref={custInputRef}
                 value={custSearch}
                 onChange={e=>{ setCustSearch(e.target.value); set("customer",e.target.value); setShowCustList(true); }}
                 onFocus={()=>setShowCustList(true)}
