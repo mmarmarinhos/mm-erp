@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.7.3";
+const APP_VERSION = "3.7.4";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9832,7 +9832,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div ref={modalRef} onKeyDown={e=>trapTabFocus(e, modalRef)} className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+      <div ref={modalRef} onKeyDown={e=>trapTabFocus(e, modalRef)} className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
           <h2 className="font-bold text-gray-900">{isNew?"Nova Cotação":`Editar ${cotacao.id}`}</h2>
           <div className="flex items-start gap-3">
@@ -9920,8 +9920,9 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
               <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Itens</label>
               <button onClick={addItem} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Adicionar item</button>
             </div>
-            <div className="space-y-2">
-              {form.items.map((it,i)=>{
+            <div className="overflow-x-auto">
+              <div className="space-y-2 min-w-[700px]">
+                {form.items.map((it,i)=>{
                 const sq = skuSearch[i]||it.sku||"";
                 const filtProd = products.filter(p =>
                   p.sku?.toLowerCase().includes(sq.toLowerCase()) ||
@@ -9932,10 +9933,10 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                   ? gross*((it.discount||0)/100)
                   : (it.discount||0);
                 return (
-                  <div key={i} className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
-                    {/* Row 1: SKU + Description */}
-                    <div className="flex gap-2">
-                      <div className="relative w-24 shrink-0">
+                  <div key={i} className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                    <div className="flex gap-2 items-start">
+                      <div className="relative w-28 shrink-0">
+                        <p className="text-[10px] text-gray-400 mb-0.5">SKU</p>
                         <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 font-mono"
                           value={sq}
                           onChange={e=>{ const ss=[...skuSearch]; ss[i]=e.target.value; setSkuSearch(ss); setItem(i,"sku",e.target.value); const sl=[...showSkuList]; sl[i]=true; setShowSkuList(sl); }}
@@ -9962,13 +9963,12 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                           </div>
                         )}
                       </div>
-                      <input className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                        value={it.description} onChange={e=>setItem(i,"description",e.target.value)} placeholder="Produto / serviço"/>
-                      {form.items.length>1 && <button onClick={()=>removeItem(i)} className="text-red-400 hover:text-red-600 text-sm shrink-0">✕</button>}
-                    </div>
-                    {/* Row 2: Qty, Un, Preço, Desconto, Total */}
-                    <div className="grid grid-cols-12 gap-1 items-center">
-                      <div className="col-span-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] text-gray-400 mb-0.5">Produto / Serviço</p>
+                        <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                          value={it.description} onChange={e=>setItem(i,"description",e.target.value)} placeholder="Produto / serviço"/>
+                      </div>
+                      <div className="w-16 shrink-0">
                         <p className="text-[10px] text-gray-400 mb-0.5">Qtd</p>
                         <input type="number" min="1"
                           className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
@@ -9976,14 +9976,14 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                           onChange={e=>setItem(i,"qty", e.target.value===""?"":(parseFloat(e.target.value)||0))}
                           onBlur={e=>{ if (e.target.value==="") setItem(i,"qty",0); }}/>
                       </div>
-                      <div className="col-span-2">
+                      <div className="w-20 shrink-0">
                         <p className="text-[10px] text-gray-400 mb-0.5">Un</p>
                         <select className="w-full border border-gray-200 rounded-lg px-1 py-1.5 text-xs bg-white focus:outline-none"
                           value={it.unit} onChange={e=>setItem(i,"unit",e.target.value)}>
                           {INV_UNITS.map(u=><option key={u}>{u}</option>)}
                         </select>
                       </div>
-                      <div className="col-span-3">
+                      <div className="w-24 shrink-0">
                         <p className="text-[10px] text-gray-400 mb-0.5">Preço Unit.</p>
                         <input type="number" min="0" step="0.01"
                           className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
@@ -9991,7 +9991,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                           onChange={e=>setItem(i,"unitPrice", e.target.value===""?"":(parseFloat(e.target.value)||0))}
                           onBlur={e=>{ if (e.target.value==="") setItem(i,"unitPrice",0); }}/>
                       </div>
-                      <div className="col-span-3">
+                      <div className="w-28 shrink-0">
                         <p className="text-[10px] text-gray-400 mb-0.5">Desconto</p>
                         <div className="flex gap-0.5">
                           <button onClick={()=>setItem(i,"discountType",it.discountType==="%"?"R$":"%")}
@@ -10005,15 +10005,19 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                             onBlur={e=>{ if (e.target.value==="") setItem(i,"discount",0); if (suppressNextAsk.current) { suppressNextAsk.current=false; return; } lastFocusedRef.current=e.target; setAskAddItem(true); }}/>
                         </div>
                       </div>
-                      <div className="col-span-2 text-right">
+                      <div className="w-24 shrink-0 text-right">
                         <p className="text-[10px] text-gray-400 mb-0.5">Total</p>
-                        <p className="text-sm font-bold text-gray-900">{fmt(it.total)}</p>
+                        <p className="text-sm font-bold text-gray-900 pt-1">{fmt(it.total)}</p>
                         {discAmt>0 && <p className="text-[10px] text-green-600">-{fmt(discAmt)}</p>}
                       </div>
+                      {form.items.length>1 && (
+                        <button onClick={()=>removeItem(i)} className="text-red-400 hover:text-red-600 text-sm shrink-0 mt-5">✕</button>
+                      )}
                     </div>
                   </div>
                 );
               })}
+              </div>
             </div>
           </div>
 
