@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.6.8";
+const APP_VERSION = "3.7.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9475,6 +9475,8 @@ const PARAMS_DEFAULT = {
     shopee: { partnerId: "",  partnerKey: "", shopId: "",     autoImport: false },
     backendUrl: "",
   },
+  vendas: { validadeCotacaoDias: 10 },
+  compras: {},
 };
 async function loadParams() {
   try {
@@ -9487,6 +9489,8 @@ async function loadParams() {
         canais: { ...PARAMS_DEFAULT.canais, ...(saved.canais||{}) },
         alertas: { ...PARAMS_DEFAULT.alertas, ...(saved.alertas||{}) },
         sincronizacao: { ...PARAMS_DEFAULT.sincronizacao, ...(saved.sincronizacao||{}) },
+        vendas: { ...PARAMS_DEFAULT.vendas, ...(saved.vendas||{}) },
+        compras: { ...PARAMS_DEFAULT.compras, ...(saved.compras||{}) },
       };
     }
   } catch(_) {}
@@ -9728,11 +9732,11 @@ async function saveCotacoes(c) {
   try { await window.storage.set(COT_KEY, JSON.stringify(c)); } catch(_){} }
 
 // ─── Cotação Modal ────────────────────────────────────────────────────────
-const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [], representantes = [], formasPagamento = [] }) => {
+const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [], representantes = [], formasPagamento = [], params }) => {
   const isNew = !cotacao;
   const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, discount:0, discountType:"%", total:0 });
   const [form, setForm] = useState(cotacao ? { ...cotacao } : {
-    customer:"", channel:"WhatsApp", date:today(), validUntil:addDaysISO(today(),10),
+    customer:"", channel:"WhatsApp", date:today(), validUntil:addDaysISO(today(), params?.vendas?.validadeCotacaoDias || 10),
     status:"Rascunho", payment:"Pix", freight:0, discount:0,
     items:[emptyItem()], notes:"", orderId:null, representanteId:"",
   });
@@ -10183,7 +10187,7 @@ const gerarCotacaoPDF = (cotacao, empresaRaw) => {
   if (w) { w.document.write(html); w.document.close(); }
 };
 
-const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [], products = [], setProducts, movements = [], setMovements, empresa = {}, representantes = [], formasPagamento = [] }) => {
+const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [], products = [], setProducts, movements = [], setMovements, empresa = {}, representantes = [], formasPagamento = [], params }) => {
   const [modal,    setModal]    = useState(null);
   const [detail,   setDetail]   = useState(null);
   const [filter,   setFilter]   = useState("Todos");
@@ -10524,7 +10528,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
         })}
       </div>
 
-      {modal && <CotacaoModal cotacao={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={handleSave} customers={customers} products={products} representantes={representantes} formasPagamento={formasPagamento}/>}
+      {modal && <CotacaoModal cotacao={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={handleSave} customers={customers} products={products} representantes={representantes} formasPagamento={formasPagamento} params={params}/>}
     </div>
   );
 };
@@ -11407,12 +11411,16 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
   const [canais,  setCanais]  = useState(params?.canais        || PARAMS_DEFAULT.canais);
   const [alertas, setAlertas] = useState(params?.alertas       || PARAMS_DEFAULT.alertas);
   const [sync,    setSync]    = useState(params?.sincronizacao || PARAMS_DEFAULT.sincronizacao);
+  const [vendas,  setVendas]  = useState(params?.vendas        || PARAMS_DEFAULT.vendas);
+  const [compras, setCompras] = useState(params?.compras       || PARAMS_DEFAULT.compras);
 
   useEffect(() => {
     if (params) {
       setCanais(params.canais        || PARAMS_DEFAULT.canais);
       setAlertas(params.alertas      || PARAMS_DEFAULT.alertas);
       setSync(params.sincronizacao   || PARAMS_DEFAULT.sincronizacao);
+      setVendas(params.vendas        || PARAMS_DEFAULT.vendas);
+      setCompras(params.compras      || PARAMS_DEFAULT.compras);
     }
   }, [params]);
 
@@ -11448,6 +11456,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
   };
   const setC = (ch,k,v) => setCanais(prev=>({...prev,[ch]:{...prev[ch],[k]:v}}));
   const setA = (k,v) => setAlertas(prev=>({...prev,[k]:v}));
+  const setV = (k,v) => setVendas(prev=>({...prev,[k]:v}));
   const setS = (plat,k,v) => setSync(prev =>
     k==="backendUrl" ? {...prev,backendUrl:v} : {...prev,[plat]:{...prev[plat],[k]:v}}
   );
@@ -11483,7 +11492,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-2xl p-1.5 overflow-x-auto">
-        {[["empresa","🏢 Empresa"],["canais","💳 Canais"],["alertas","🔔 Alertas"],["sync","🔗 Sincronização"],["automacao","🤖 Automação"]].map(([id,label])=>(
+        {[["empresa","🏢 Empresa"],["canais","💳 Canais"],["vendas","🛒 Vendas"],["compras","📦 Compras"],["alertas","🔔 Alertas"],["sync","🔗 Sincronização"],["automacao","🤖 Automação"]].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)}
             className={`shrink-0 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${tab===id?"bg-white text-gray-900 shadow-sm":"text-gray-500 hover:text-gray-700"}`}>
             {label}
@@ -11637,6 +11646,36 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
       )}
 
       {/* ══ TAB: ALERTAS ════════════════════════════════════════════════ */}
+      {tab==="vendas" && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">📄 Cotações</p>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Validade da cotação (dias corridos)</label>
+              <input type="number" min="1" className={inp + " max-w-[160px]"}
+                value={vendas.validadeCotacaoDias===0?"":vendas.validadeCotacaoDias}
+                onChange={e=>setV("validadeCotacaoDias", e.target.value===""?"":(parseInt(e.target.value)||0))}
+                onBlur={e=>{ if (e.target.value==="") setV("validadeCotacaoDias",10); }}/>
+              <p className="mt-2 text-xs text-gray-400 bg-gray-50 rounded-xl px-3 py-2">
+                Toda cotação nova nasce com "Válida até" igual à data de emissão + esse número de dias. Cotações já criadas não são alteradas.
+              </p>
+            </div>
+          </div>
+
+          <button onClick={()=>mergeAndSave({vendas}).then(()=>showToast("✅ Configurações de Vendas salvas!"))}
+            className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+            💾 Salvar Vendas
+          </button>
+        </div>
+      )}
+
+      {tab==="compras" && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
+          <p className="text-3xl mb-2">📦</p>
+          <p className="text-sm text-gray-400">Nenhuma configuração de Compras ainda</p>
+        </div>
+      )}
+
       {tab==="alertas" && (
         <div className="space-y-4">
           {/* Inatividade de clientes */}
@@ -12152,7 +12191,7 @@ function ERPApp({ currentUser, onLogout }) {
     switch (active) {
       case "dashboard": return <DashboardModule orders={orders} />;
       case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento}/>;
-      case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento}/>;
+      case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases}/>;
