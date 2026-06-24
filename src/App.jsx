@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.7.6";
+const APP_VERSION = "3.7.7";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8744,14 +8744,14 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
                       <div className="w-28 shrink-0">
                         <p className="text-[10px] text-gray-400 mb-0.5">Desconto</p>
                         <div className="flex gap-0.5">
-                          <input type="number" min="0" className="w-full border border-gray-200 rounded-l-lg px-1 py-1.5 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                            value={it.discount===0?"":it.discount}
-                            onChange={e=>{setItem(i,"discount", e.target.value===""?"":(parseFloat(e.target.value)||0)); suppressNextAsk.current=false;}}
-                            onBlur={e=>{ if (e.target.value==="") setItem(i,"discount",0); if (suppressNextAsk.current) { suppressNextAsk.current=false; return; } lastFocusedRef.current=e.target; setAskAddItem(true); }}/>
-                          <select className="border border-gray-200 rounded-r-lg text-xs bg-white focus:outline-none w-10 shrink-0"
+                          <select className="border border-gray-200 rounded-l-lg text-xs bg-white focus:outline-none w-10 shrink-0"
                             value={it.discountType||"%"} onChange={e=>setItem(i,"discountType",e.target.value)}>
                             <option>%</option><option>R$</option>
                           </select>
+                          <input type="number" min="0" className="w-full border border-gray-200 rounded-r-lg px-1 py-1.5 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                            value={it.discount===0?"":it.discount}
+                            onChange={e=>{setItem(i,"discount", e.target.value===""?"":(parseFloat(e.target.value)||0)); suppressNextAsk.current=false;}}
+                            onBlur={e=>{ if (e.target.value==="") setItem(i,"discount",0); if (suppressNextAsk.current) { suppressNextAsk.current=false; return; } lastFocusedRef.current=e.target; setAskAddItem(true); }}/>
                         </div>
                       </div>
                       <div className="w-24 shrink-0 text-right">
