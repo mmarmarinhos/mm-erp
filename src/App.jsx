@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.6.0";
+const APP_VERSION = "3.6.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -394,7 +394,6 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
     });
     const ss=[...skuSearch]; ss[i]=prod.sku||prod.name; setSkuSearch(ss);
     const sl=[...showSkuList]; sl[i]=false; setShowSkuList(sl);
-    setAskAddItem(true);
   };
 
   const addItem = () => {
@@ -566,7 +565,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
                           <input type="number" min="0" step="0.01" className="w-full border border-gray-200 rounded-r-lg px-1 py-1.5 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
                             value={it.discount===0?"":it.discount}
                             onChange={e=>setItem(i,"discount", e.target.value===""?"":(parseFloat(e.target.value)||0))}
-                            onBlur={e=>{ if (e.target.value==="") setItem(i,"discount",0); }}/>
+                            onBlur={e=>{ if (e.target.value==="") setItem(i,"discount",0); setAskAddItem(true); }}/>
                         </div>
                       </div>
                       <div className="col-span-2 text-right">
@@ -8530,7 +8529,6 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
     });
     const ss=[...skuSearch]; ss[i]=prod.sku||prod.name||""; setSkuSearch(ss);
     const sl=[...showSkuList]; sl[i]=false; setShowSkuList(sl);
-    setAskAddItem(true);
   };
 
   const addItem = () => {
@@ -8707,7 +8705,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
                           <input type="number" min="0" className="w-full border border-gray-200 rounded-lg px-1 py-1 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
                             value={it.discount===0?"":it.discount}
                             onChange={e=>setItem(i,"discount", e.target.value===""?"":(parseFloat(e.target.value)||0))}
-                            onBlur={e=>{ if (e.target.value==="") setItem(i,"discount",0); }}/>
+                            onBlur={e=>{ if (e.target.value==="") setItem(i,"discount",0); setAskAddItem(true); }}/>
                           <select className="border border-gray-200 rounded-lg text-xs bg-white focus:outline-none w-10"
                             value={it.discountType||"%"} onChange={e=>setItem(i,"discountType",e.target.value)}>
                             <option>%</option><option>R$</option>
@@ -9759,7 +9757,6 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
     setSkuSearch(ss);
     const sl = [...showSkuList]; sl[i] = false;
     setShowSkuList(sl);
-    setAskAddItem(true);
   };
 
   const addItem = () => {
@@ -9962,7 +9959,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                             className="w-full border border-gray-200 rounded-r-lg px-1 py-1.5 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
                             value={it.discount===0?"":it.discount}
                             onChange={e=>setItem(i,"discount", e.target.value===""?"":(parseFloat(e.target.value)||0))}
-                            onBlur={e=>{ if (e.target.value==="") setItem(i,"discount",0); }}/>
+                            onBlur={e=>{ if (e.target.value==="") setItem(i,"discount",0); setAskAddItem(true); }}/>
                         </div>
                       </div>
                       <div className="col-span-2 text-right">
