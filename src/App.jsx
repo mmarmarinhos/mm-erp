@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.5.6";
+const APP_VERSION = "3.5.7";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1047,51 +1047,63 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
   };
 
   const handleDevolucao = (order) => {
-    // 1. Marcar pedido como Devolvido
-    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "Devolvido" } : o));
-
-    // 2. Restaurar estoque dos itens
-    const items = order.itemsList || [];
-    if (items.length > 0 && setProducts) {
-      setProducts(prev => prev.map(prod => {
-        const it = items.find(i => String(i._prodId) === String(prod.id));
-        if (!it || (it.qty||0) <= 0) return prod;
-        return { ...prod, stock: (prod.stock || 0) + (it.qty || 0) };
-      }));
-      if (setMovements) {
-        setMovements(prev => {
-          const nums = prev.map(m => parseInt(m.id.replace("MOV-",""))||0);
-          const base = Math.max(0, ...nums, 0);
-          const novasMovs = items.filter(i => i._prodId && (i.qty||0) > 0).map((i, idx) => ({
-            id: `MOV-${String(base+idx+1).padStart(3,"0")}`,
-            productId: i._prodId,
-            type: "entrada",
-            qty: i.qty || 0,
+    // 1. Criar lançamento financeiro de devolução — feito primeiro e isolado
+    //    em try/catch, pra garantir que ele seja criado mesmo se algo falhar
+    //    nas etapas de estoque mais abaixo.
+    if (setFinance) {
+      try {
+        setFinance(prev => {
+          const nums = prev.map(t => parseInt((t.id||"").replace("FIN-",""))||0);
+          const newId = `FIN-${String(Math.max(0,...nums,0)+1).padStart(3,"0")}`;
+          return [{
+            id: newId,
+            type: "despesa",
+            category: "Devoluções / Reembolsos",
+            description: `Devolução pedido ${order.id} — ${order.customer}`,
+            amount: order.total,
             date: today(),
-            reason: "Devolução de cliente",
-            notes: `Devolução do pedido ${order.id} — ${order.customer}`,
-          }));
-          return [...prev, ...novasMovs];
+            status: "pago",
+            notes: `Estorno do pedido ${order.id} (${order.channel})`,
+          }, ...prev];
         });
+      } catch (e) {
+        console.error("Erro ao criar lançamento financeiro da devolução:", e);
+        alert("Não foi possível criar o lançamento financeiro dessa devolução automaticamente. O pedido será marcado como Devolvido normalmente — registre o lançamento manualmente em Financeiro > Contas a Pagar.");
       }
     }
 
-    // 3. Criar lançamento financeiro de devolução
-    if (setFinance) {
-      setFinance(prev => {
-        const nums = prev.map(t => parseInt(t.id.replace("FIN-",""))||0);
-        const newId = `FIN-${String(Math.max(0,...nums,0)+1).padStart(3,"0")}`;
-        return [{
-          id: newId,
-          type: "despesa",
-          category: "Devoluções / Reembolsos",
-          description: `Devolução pedido ${order.id} — ${order.customer}`,
-          amount: order.total,
-          date: today(),
-          status: "pago",
-          notes: `Estorno do pedido ${order.id} (${order.channel})`,
-        }, ...prev];
-      });
+    // 2. Marcar pedido como Devolvido
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: "Devolvido" } : o));
+
+    // 3. Restaurar estoque dos itens
+    try {
+      const items = order.itemsList || [];
+      if (items.length > 0 && setProducts) {
+        setProducts(prev => prev.map(prod => {
+          const it = items.find(i => String(i._prodId) === String(prod.id));
+          if (!it || (it.qty||0) <= 0) return prod;
+          return { ...prod, stock: (prod.stock || 0) + (it.qty || 0) };
+        }));
+        if (setMovements) {
+          setMovements(prev => {
+            const nums = prev.map(m => parseInt((m.id||"").replace("MOV-",""))||0);
+            const base = Math.max(0, ...nums, 0);
+            const novasMovs = items.filter(i => i._prodId && (i.qty||0) > 0).map((i, idx) => ({
+              id: `MOV-${String(base+idx+1).padStart(3,"0")}`,
+              productId: i._prodId,
+              type: "entrada",
+              qty: i.qty || 0,
+              date: today(),
+              reason: "Devolução de cliente",
+              notes: `Devolução do pedido ${order.id} — ${order.customer}`,
+            }));
+            return [...prev, ...novasMovs];
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao restaurar estoque da devolução:", e);
+      alert("O pedido foi marcado como Devolvido e o lançamento financeiro foi criado, mas houve um problema ao restaurar o estoque. Confira manualmente em Estoque.");
     }
 
     setDevolucaoModal(null);
