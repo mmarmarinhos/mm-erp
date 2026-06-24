@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.6.5";
+const APP_VERSION = "3.6.6";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -280,6 +280,23 @@ const addDaysISO = (dateStr, days) => {
   d.setDate(d.getDate()+days);
   return d.toISOString().split("T")[0];
 };
+// Prende o TAB dentro de um modal (não deixa escapar pra tela de trás)
+const trapTabFocus = (e, containerRef) => {
+  if (e.key !== "Tab" || !containerRef.current) return;
+  const focusables = Array.from(
+    containerRef.current.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])')
+  ).filter(el => !el.disabled && el.offsetParent !== null);
+  if (focusables.length === 0) return;
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  } else if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  }
+};
 const nextId = (orders) => {
   const nums = orders.map(o => parseInt(o.id.replace("PED-", "")) || 0);
   return `PED-${String(Math.max(0, ...nums) + 1).padStart(3, "0")}`;
@@ -331,6 +348,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
   const [showSkuList, setShowSkuList] = useState([]);
   const [askAddItem, setAskAddItem] = useState(false);
   const naoItemRef = useRef(null);
+  const modalRef = useRef(null);
   const skuInputRefs = useRef([]);
   const simItemRef = useRef(null);
 
@@ -432,7 +450,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+      <div ref={modalRef} onKeyDown={e=>trapTabFocus(e, modalRef)} className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
           <h2 className="font-semibold text-gray-800">{isNew ? "Novo Pedido" : `Editar ${form.id}`}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon name="x"/></button>
@@ -8509,6 +8527,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
   const [showSkuList, setShowSkuList] = useState((purchase?.items||[emptyItem()]).map(()=>false));
   const [askAddItem, setAskAddItem] = useState(false);
   const naoItemRef = useRef(null);
+  const modalRef = useRef(null);
   const skuInputRefs = useRef([]);
   const simItemRef = useRef(null);
 
@@ -8582,7 +8601,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+      <div ref={modalRef} onKeyDown={e=>trapTabFocus(e, modalRef)} className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
           <h2 className="font-semibold text-gray-800">{isNew ? "📦 Novo Pedido de Compra" : `Editar ${purchase.id||""}`}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon name="x"/></button>
@@ -9735,6 +9754,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
   const [showSkuList, setShowSkuList] = useState([]);
   const [askAddItem, setAskAddItem] = useState(false);
   const naoItemRef = useRef(null);
+  const modalRef = useRef(null);
   const skuInputRefs = useRef([]);
   const simItemRef = useRef(null);
 
@@ -9801,7 +9821,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+      <div ref={modalRef} onKeyDown={e=>trapTabFocus(e, modalRef)} className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
           <h2 className="font-bold text-gray-900">{isNew?"Nova Cotação":`Editar ${cotacao.id}`}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
