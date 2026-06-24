@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.7.9";
+const APP_VERSION = "3.8.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1810,11 +1810,17 @@ const FinPayModal = ({ order, onClose, onSave }) => {
   const [paidDate, setPaidDate] = useState(todayStr);
   const [payment,  setPayment]  = useState(order.payment || "Pix");
   const [markPaid, setMarkPaid] = useState(true);
+  const [pagoComAtraso, setPagoComAtraso] = useState(order.urgency==="overdue");
+  const cobraEncargos = markPaid && order.urgency==="overdue" && pagoComAtraso;
   const handleSave = () => onSave({
     ...order,
     paidDate: markPaid ? paidDate : "",
     payment,
     status: markPaid ? "Entregue" : order.status,
+    pagoComAtraso: markPaid ? cobraEncargos : undefined,
+    valorMulta: cobraEncargos ? order.multa : undefined,
+    valorJuros: cobraEncargos ? order.juros : undefined,
+    valorRecebido: markPaid ? (cobraEncargos ? order.totalComEncargos : order.total) : undefined,
   });
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1828,8 +1834,8 @@ const FinPayModal = ({ order, onClose, onSave }) => {
           <p className="text-gray-600 text-xs mt-0.5 truncate">{order.customer}</p>
           {order.urgency==="overdue" ? (
             <>
-              <p className="text-xs text-gray-400 line-through mt-1">{fmt(order.total)}</p>
-              <p className="font-bold text-red-600 text-lg">{fmt(order.totalComEncargos)}</p>
+              <p className={`text-lg font-bold mt-1 ${cobraEncargos?"text-gray-400 line-through":"text-gray-900"}`}>{fmt(order.total)}</p>
+              {cobraEncargos && <p className="font-bold text-red-600 text-lg">{fmt(order.totalComEncargos)}</p>}
               <p className="text-[10px] text-red-400">+{fmt(order.multa)} multa +{fmt(order.juros)} juros ({order.diasAtraso} dia{order.diasAtraso!==1?"s":""} de atraso)</p>
             </>
           ) : (
@@ -1846,6 +1852,18 @@ const FinPayModal = ({ order, onClose, onSave }) => {
             <span className={"absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all " + (markPaid?"right-0.5":"left-0.5")}/>
           </button>
         </div>
+        {markPaid && order.urgency==="overdue" && (
+          <div className="flex items-center justify-between p-3 bg-red-50 border border-red-100 rounded-xl">
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Pago com atraso?</p>
+              <p className="text-xs text-gray-500 mt-0.5">{pagoComAtraso ? "Cobrando multa + juros" : "Sem cobrar multa/juros"}</p>
+            </div>
+            <button onClick={()=>setPagoComAtraso(v=>!v)}
+              className={"w-12 h-6 rounded-full transition-all relative " + (pagoComAtraso?"bg-red-500":"bg-gray-300")}>
+              <span className={"absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all " + (pagoComAtraso?"right-0.5":"left-0.5")}/>
+            </button>
+          </div>
+        )}
         {markPaid && (<>
           <div>
             <label className="text-xs font-medium text-gray-600 block mb-1">✅ Data de Pagamento</label>
@@ -1862,7 +1880,7 @@ const FinPayModal = ({ order, onClose, onSave }) => {
         </>)}
         <div className="flex gap-2 pt-1 flex-wrap">
           <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
-          {order.paidDate && <button onClick={()=>onSave({...order,paidDate:"",status:order.status==="Entregue"?"Novo":order.status})} className="px-4 py-2.5 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-sm font-semibold hover:bg-amber-100">↩ Voltar Aberto</button>}
+          {order.paidDate && <button onClick={()=>onSave({...order,paidDate:"",status:order.status==="Entregue"?"Novo":order.status,pagoComAtraso:undefined,valorMulta:undefined,valorJuros:undefined,valorRecebido:undefined})} className="px-4 py-2.5 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-sm font-semibold hover:bg-amber-100">↩ Voltar Aberto</button>}
           <button onClick={handleSave} className="flex-1 px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700">
             {markPaid ? "✅ Confirmar Pagamento" : "Salvar"}
           </button>
@@ -2449,11 +2467,12 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
                               <p className="text-[10px] text-red-400">+{fmt(o.multa)} multa +{fmt(o.juros)} juros</p>
                             </div>
                           ) : (
-                            <p className="font-bold text-green-700 text-base">{fmt(o.total)}</p>
+                            <p className="font-bold text-green-700 text-base">{fmt(o.paidDate && o.pagoComAtraso ? (o.valorRecebido??o.total) : o.total)}</p>
                           )}
                           <Badge label={o.status} style={STATUS_STYLES[o.status]}/>
                           {o.paidDate && (
                             <div className="flex flex-col items-end gap-1">
+                              {o.pagoComAtraso && <span className="text-[10px] text-red-500 font-semibold">⚠️ Pago com atraso (+multa/juros)</span>}
                               <span className="text-[10px] text-green-600 font-semibold">✅ Pago em {new Date(o.paidDate+"T12:00:00").toLocaleDateString("pt-BR")}</span>
                               <button onClick={()=>setPayRec(o)} className="text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100">↩ Editar pgto</button>
                             </div>
