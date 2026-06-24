@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.7.1";
+const APP_VERSION = "3.7.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -738,6 +738,7 @@ const gerarPedidoPDF = async (order) => {
   const eEmail = emp.email  || "";
   const eSite  = emp.site   || "";
   const hoje   = new Date().toLocaleDateString("pt-BR");
+  const fmtBR = (iso) => iso ? new Date(iso+"T00:00:00").toLocaleDateString("pt-BR") : "";
 
   // Itens
   const items = order.itemsList || (order.items && typeof order.items !== "string" ? order.items : null) || [];
@@ -820,7 +821,7 @@ const gerarPedidoPDF = async (order) => {
   var body = "<div class='hdr'>"
     + "<div><div class='enome'>" + eNome + "</div><div class='einfo'>" + infoEmp + "</div></div>"
     + "<div><div class='badge'>PEDIDO " + (order.id||"") + "</div>"
-    + "<div class='bsub'>Data: " + (order.date||"-") + "<br>Status: <b>" + (order.status||"-") + "</b></div></div>"
+    + "<div class='bsub'>Data: " + (fmtBR(order.date)||"-") + "<br>Status: <b>" + (order.status||"-") + "</b></div></div>"
     + "</div>"
     + "<div class='sec'><div class='stitle'>Cliente</div><div class='grid'>"
     + "<div class='ibox'><div class='ilabel'>Nome</div><div class='ival'>" + (order.customer||"-") + "</div></div>"
@@ -10093,6 +10094,7 @@ const gerarCotacaoPDF = (cotacao, empresaRaw) => {
   const subtotal = items.reduce(function(s,it){ return s + (it.total||0); }, 0);
   const total = parseFloat(cotacao.total) || subtotal;
   const hoje = new Date().toLocaleDateString("pt-BR");
+  const fmtBR = (iso) => iso ? new Date(iso+"T00:00:00").toLocaleDateString("pt-BR") : "";
 
   const infoEmp = (eCnpj  ? "CNPJ: "  + eCnpj  + "<br>" : "")
                 + (eTel   ? "Cel: "    + eTel   + "<br>" : "")
@@ -10123,7 +10125,7 @@ const gerarCotacaoPDF = (cotacao, empresaRaw) => {
     ? "<div style='background:#fafafa;border:1px solid #e2e8f0;border-radius:10px;padding:14px;font-size:12px;color:#64748b;line-height:1.6;margin-bottom:20px;'>" + cotacao.notes + "</div>"
     : "";
 
-  const validLine = cotacao.validUntil ? "<br>Valida ate: " + cotacao.validUntil : "";
+  const validLine = cotacao.validUntil ? "<br>Valida ate: " + fmtBR(cotacao.validUntil) : "";
 
   const css = "<style>"
     + "* {margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif;}"
@@ -10155,7 +10157,7 @@ const gerarCotacaoPDF = (cotacao, empresaRaw) => {
   const body = "<div class='hdr'>"
     + "<div><div class='enome'>" + eNome + "</div><div class='einfo'>" + infoEmp + "</div></div>"
     + "<div><div class='badge'>COTACAO " + (cotacao.id||"") + "</div>"
-    + "<div class='bsub'>Data: " + (cotacao.date||"-") + validLine + "</div></div>"
+    + "<div class='bsub'>Data: " + (fmtBR(cotacao.date)||"-") + validLine + "</div></div>"
     + "</div>"
     + "<div class='sec'><div class='stitle'>Cliente</div><div class='grid'>"
     + "<div class='ibox'><div class='ilabel'>Nome</div><div class='ival'>" + (cotacao.customer||"-") + "</div></div>"
