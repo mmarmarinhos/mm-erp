@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.5.8";
+const APP_VERSION = "3.5.9";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -522,7 +522,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
                                 className="w-full text-left px-3 py-2 hover:bg-indigo-50 border-b border-gray-50 last:border-0">
                                 <p className="text-xs font-mono font-bold text-indigo-600">{p.sku||"—"}</p>
                                 <p className="text-xs text-gray-700 truncate">{p.name}</p>
-                                <p className="text-[10px] text-gray-400">{fmt(p.price||0)} · {p.unit||"un"}</p>
+                                <p className={`text-[10px] ${(p.stock||0)<=0?"text-red-400":"text-gray-400"}`}>Estoque: {p.stock||0} {p.unit||"un"}</p>
                               </button>
                             ))}
                           </div>
@@ -9882,7 +9882,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                                 className="w-full text-left px-3 py-2 hover:bg-indigo-50 border-b border-gray-50 last:border-0">
                                 <p className="text-xs font-mono font-bold text-indigo-600">{p.sku||"—"}</p>
                                 <p className="text-xs text-gray-700 truncate">{p.name}</p>
-                                <p className="text-[10px] text-gray-400">{fmt(p.price||0)} · {p.unit||"un"}</p>
+                                <p className={`text-[10px] ${(p.stock||0)<=0?"text-red-400":"text-gray-400"}`}>Estoque: {p.stock||0} {p.unit||"un"}</p>
                               </button>
                             ))}
                           </div>
