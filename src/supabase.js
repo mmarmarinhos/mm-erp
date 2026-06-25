@@ -7,7 +7,6 @@ const SB_KEY = 'sb_publishable_OT57sICfkoFtEhyMfQ1XAA_qVF1Cczu'
 function sbHeaders(extra = {}) {
   return {
     'apikey':        SB_KEY,
-    'Authorization': `Bearer ${SB_KEY}`,
     'Content-Type':  'application/json',
     ...extra,
   }
