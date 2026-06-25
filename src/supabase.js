@@ -122,6 +122,16 @@ export async function dbUpdateRole(id, role) {
   return dbRpc('set_user_role', { p_id: String(id), p_role: role })
 }
 
+export async function dbSetUserPassword(id, newPasswordHash) {
+  return dbRpc('set_user_password', { p_id: String(id), p_new_hash: newPasswordHash })
+}
+
+export async function dbUpdateUserProfile(id, displayName, role, customModules) {
+  return dbRpc('update_user_profile', {
+    p_id: String(id), p_display_name: displayName, p_role: role, p_custom_modules: customModules,
+  })
+}
+
 export async function dbLogAccess(username, action) {
   return dbUpsert('access_log', { username, action })
     .catch(() => {}) // non-critical

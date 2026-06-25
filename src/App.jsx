@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from "recharts";
+import {
+  dbCountUsers, dbVerifyLogin, dbResetPasswordWithRecovery, dbListUsers,
+  dbCreateUser, dbToggleUserActive, dbSetUserPassword, dbUpdateUserProfile,
+} from "./supabase.js";
 
 // ─── Icons (inline SVGs) ───────────────────────────────────────────────────
 const Icon = ({ name, size = 18, className = "" }) => {
@@ -41,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.8.2";
+const APP_VERSION = "3.8.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8054,7 +8058,6 @@ const AUTH = {
   hash: "erp_auth_hash",
   rkey: "erp_auth_rkey",
   sess: "erp_session_v2",
-  sysUsers: "erp_sys_users",
 };
 
 async function sha256(text) {
@@ -8073,14 +8076,6 @@ const getSession  = () => { try { return JSON.parse(sessionStorage.getItem(AUTH.
 const setSession  = (u) => sessionStorage.setItem(AUTH.sess, JSON.stringify(u));
 const clearSession= () => sessionStorage.removeItem(AUTH.sess);
 
-// Sys users helpers (stored in window.storage so they persist across devices)
-async function loadSysUsers() {
-  try { const r = await window.storage.get(AUTH.sysUsers); if (r?.value) return JSON.parse(r.value); } catch(_){}
-  return [];
-}
-async function saveSysUsers(users) {
-  try { await window.storage.set(AUTH.sysUsers, JSON.stringify(users)); } catch(_){} }
-
 function buildUserSession(u) {
   const modules = u.customModules || ROLES_DEF[u.role]?.modules || ROLES_DEF.viewer.modules;
   return { id:u.id, username:u.username, displayName:u.displayName||u.username, role:u.role, modules };
@@ -8092,11 +8087,13 @@ const AuthSetup = ({ onDone }) => {
   const [name,  setName]  = useState("");
   const [pwd,   setPwd]   = useState("");
   const [pwd2,  setPwd2]  = useState("");
-  const [rkey]            = useState(genRecoveryKey);
+  const [rkey, setRkey]   = useState("");
   const [step,  setStep]  = useState(1);
   const [err,   setErr]   = useState("");
   const [copied,setCopied]= useState(false);
   const [loading,setL]    = useState(false);
+
+  const [createdUser, setCreatedUser] = useState(null);
 
   const handleCreate = async () => {
     if (!user.trim())     { setErr("Informe um nome de usuário"); return; }
@@ -8104,22 +8101,20 @@ const AuthSetup = ({ onDone }) => {
     if (pwd !== pwd2)     { setErr("Senhas não coincidem"); return; }
     setL(true); setErr("");
     try {
+      const generatedKey = await dbCreateUser(user.trim().toLowerCase(), name.trim()||user.trim(), pwd, "admin");
+      setRkey(generatedKey);
       const hash = await sha256(pwd);
-      const newUser = { id:"USR-001", username:user.trim().toLowerCase(), displayName:name.trim()||user.trim(),
-        passwordHash:hash, recoveryKey:rkey, role:"admin", customModules:null, active:true, createdAt:today() };
-      await saveSysUsers([newUser]);
-      // Also keep localStorage for backward compat
-      localStorage.setItem(AUTH.user, user.trim());
-      localStorage.setItem(AUTH.hash, hash);
-      localStorage.setItem(AUTH.rkey, rkey);
+      const safeUser = await dbVerifyLogin(user.trim().toLowerCase(), hash);
+      setCreatedUser(safeUser);
       setStep(2);
     } catch(e) { setErr("Erro ao criar: "+e.message); }
     setL(false);
   };
 
   const handleFinish = () => {
-    const u = { id:"USR-001", username:user.trim().toLowerCase(), displayName:name.trim()||user.trim(), role:"admin",
-      modules:[...ALL_MODULES,"usuarios"] };
+    const u = createdUser
+      ? { id:createdUser.id, username:createdUser.username, displayName:createdUser.display_name||createdUser.displayName||createdUser.username, role:createdUser.role, modules:[...ALL_MODULES,"usuarios"] }
+      : { id:"USR-001", username:user.trim().toLowerCase(), displayName:name.trim()||user.trim(), role:"admin", modules:[...ALL_MODULES,"usuarios"] };
     setSession(u); onDone(u);
   };
 
@@ -8201,11 +8196,14 @@ const AuthLogin = ({ onDone }) => {
     if (!username.trim()||!pwd) return;
     setLoading(true); setErr("");
     try {
-      const users = await loadSysUsers();
-      const u = users.find(u => u.username===username.trim().toLowerCase() && u.active);
-      if (!u) { setErr("Usuário não encontrado ou inativo"); setLoading(false); return; }
       const hash = await sha256(pwd);
-      if (hash !== u.passwordHash) { setErr("Senha incorreta"); setPwd(""); setLoading(false); return; }
+      const safeUser = await dbVerifyLogin(username.trim().toLowerCase(), hash);
+      if (!safeUser) { setErr("Usuário ou senha incorretos"); setPwd(""); setLoading(false); return; }
+      const u = {
+        id: safeUser.id, username: safeUser.username,
+        displayName: safeUser.display_name||safeUser.displayName||safeUser.username,
+        role: safeUser.role, customModules: safeUser.custom_modules||safeUser.customModules||null,
+      };
       const session = buildUserSession(u);
       setSession(session); onDone(session);
     } catch(e) { setErr("Erro: "+e.message); }
@@ -8220,14 +8218,11 @@ const AuthLogin = ({ onDone }) => {
     if (rf.pwd!==rf.pwd2) { setErr("Senhas não coincidem"); return; }
     setLoading(true);
     try {
-      const users = await loadSysUsers();
-      const idx = users.findIndex(u => u.username===username.trim().toLowerCase());
-      if (idx===-1) { setErr("Usuário não encontrado"); setLoading(false); return; }
-      if (users[idx].recoveryKey !== rf.rkey.toUpperCase().replace(/\s/g,"")) {
-        setErr("Chave de recuperação incorreta"); setLoading(false); return;
-      }
-      users[idx].passwordHash = await sha256(rf.pwd);
-      await saveSysUsers(users);
+      const newHash = await sha256(rf.pwd);
+      const okResult = await dbResetPasswordWithRecovery(
+        username.trim().toLowerCase(), rf.rkey.toUpperCase().replace(/\s/g,""), newHash
+      );
+      if (!okResult) { setErr("Usuário ou chave de recuperação incorretos"); setLoading(false); return; }
       setSuc("✅ Senha redefinida! Dados intactos.");
       setTimeout(()=>{ setMode("login"); setSuc(""); setPwd(""); setRf({rkey:"",pwd:"",pwd2:""}); }, 2500);
     } catch(e) { setErr("Erro: "+e.message); }
@@ -8289,8 +8284,9 @@ const AppAuth = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
-    loadSysUsers().then(users => {
-      if (users.length === 0) { setAuthState("setup"); return; }
+    dbCountUsers().then(raw => {
+      const count = typeof raw === "number" ? raw : (Array.isArray(raw) ? (raw[0]?.count ?? raw[0] ?? 0) : (raw?.count ?? 0));
+      if (!count) { setAuthState("setup"); return; }
       const session = getSession();
       if (session && session.id === "DEMO") {
         clearSession();
@@ -8327,7 +8323,17 @@ const UsersModule = ({ currentUser }) => {
   const [modal,   setModal]   = useState(null); // null | "new" | user
   const [saving,  setSaving]  = useState(false);
 
-  const load = async () => { setLoading(true); setUsers(await loadSysUsers()); setLoading(false); };
+  const normalizeUser = (u) => ({
+    id: u.id,
+    username: u.username,
+    displayName: u.display_name ?? u.displayName ?? u.username,
+    role: u.role,
+    customModules: u.custom_modules ?? u.customModules ?? null,
+    active: u.active !== undefined ? u.active : true,
+    createdAt: u.created_at ?? u.createdAt,
+  });
+
+  const load = async () => { setLoading(true); const raw = await dbListUsers(); setUsers((raw||[]).map(normalizeUser)); setLoading(false); };
   useEffect(() => { load(); }, []);
 
   // User form state
@@ -8359,29 +8365,24 @@ const UsersModule = ({ currentUser }) => {
     if (modal==="new" && form.pwd.length<6) { setErr("Senha mínimo 6 caracteres"); return; }
     setSaving(true);
     try {
-      const all = await loadSysUsers();
-      const nums = all.map(u=>parseInt(u.id.replace("USR-",""))||0);
-      const nextId = `USR-${String(Math.max(0,...nums)+1).padStart(3,"0")}`;
-
       if (modal==="new") {
-        if (all.find(u=>u.username===form.username.toLowerCase())) { setErr("Usuário já existe"); setSaving(false); return; }
-        const rkey = genRecoveryKey();
-        const hash = await sha256(form.pwd);
-        const newUser = { id:nextId, username:form.username.toLowerCase(), displayName:form.displayName||form.username,
-          passwordHash:hash, recoveryKey:rkey, role:form.role,
-          customModules:form.useCustom?form.customModules:null, active:true, createdAt:today() };
-        await saveSysUsers([...all, newUser]);
+        if (users.find(u=>u.username===form.username.toLowerCase())) { setErr("Usuário já existe"); setSaving(false); return; }
+        const rkey = await dbCreateUser(form.username.toLowerCase(), form.displayName||form.username, form.pwd, form.role);
+        // módulos customizados, se houver, num segundo passo (create_erp_user não recebe esse campo)
+        if (form.useCustom && form.customModules) {
+          const hash = await sha256(form.pwd);
+          const created = await dbVerifyLogin(form.username.toLowerCase(), hash);
+          if (created) await dbUpdateUserProfile(created.id, form.displayName||form.username, form.role, form.customModules);
+        }
         setOk(`✅ Usuário criado! Chave de recuperação: ${rkey}`);
         load();
         setForm(emptyForm);
       } else {
-        const newHash = form.pwd.length>=6 ? await sha256(form.pwd) : null;
-        const updated = all.map(u => u.id===modal.id ? {
-          ...u, displayName:form.displayName||u.displayName, role:form.role,
-          customModules:form.useCustom?form.customModules:null,
-          ...(newHash ? { passwordHash: newHash } : {})
-        } : u);
-        await saveSysUsers(updated);
+        await dbUpdateUserProfile(modal.id, form.displayName||modal.displayName, form.role, form.useCustom?form.customModules:null);
+        if (form.pwd.length>=6) {
+          const newHash = await sha256(form.pwd);
+          await dbSetUserPassword(modal.id, newHash);
+        }
         setOk("✅ Usuário atualizado!"); load();
       }
     } catch(e) { setErr("Erro: "+e.message); }
@@ -8389,8 +8390,7 @@ const UsersModule = ({ currentUser }) => {
   };
 
   const toggleActive = async (u) => {
-    const all = await loadSysUsers();
-    await saveSysUsers(all.map(x => x.id===u.id ? { ...x, active:!x.active } : x));
+    await dbToggleUserActive(u.id, !u.active);
     load();
   };
 
