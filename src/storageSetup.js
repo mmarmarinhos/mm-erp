@@ -3,7 +3,7 @@
 // Uses Supabase kv_store if env vars are set, otherwise falls back to localStorage
 
 const SB_URL = 'https://mfgaxixmuxmildztcmry.supabase.co'
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mZ2F4aXhtdXhtaWxkenRjbXJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMDk1OTUsImV4cCI6MjA5Njc4NTU5NX0.Ex7S2x-HDFih6quatKN6paoFUv88R8Sxeo6ErTWe8nY'
+const SB_KEY = 'sb_publishable_OT57sICfkoFtEhyMfQ1XAA_qVF1Cczu'
 
 const sbHeaders = () => ({
   'apikey': SB_KEY,
