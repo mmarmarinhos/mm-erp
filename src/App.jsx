@@ -41,7 +41,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.8.1";
+const APP_VERSION = "3.8.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8292,6 +8292,11 @@ const AppAuth = ({ children }) => {
     loadSysUsers().then(users => {
       if (users.length === 0) { setAuthState("setup"); return; }
       const session = getSession();
+      if (session && session.id === "DEMO") {
+        clearSession();
+        setAuthState("login");
+        return;
+      }
       if (session) {
         // Sempre atualiza módulos pelo role atual (captura novos módulos adicionados ao sistema)
         const freshModules = session.customModules || ROLES_DEF[session.role]?.modules || ROLES_DEF.viewer.modules;
@@ -8311,20 +8316,7 @@ const AppAuth = ({ children }) => {
     </div>
   );
   if (authState==="setup") return <AuthSetup onDone={u=>{ setCurrentUser(u); setAuthState("authed"); }}/>;
-  if (authState==="login") return (
-    <div>
-      <AuthLogin onDone={u=>{ setCurrentUser(u); setAuthState("authed"); }}/>
-      <div className="fixed bottom-4 right-4 z-50">
-        <button onClick={()=>{
-          const demo = { id:"DEMO", username:"demo", displayName:"Demo Admin", role:"admin",
-            modules:[...ALL_MODULES,"usuarios"] };
-          setSession(demo); setCurrentUser(demo); setAuthState("authed");
-        }} className="bg-gray-900 text-white text-xs px-4 py-2.5 rounded-xl shadow-xl hover:bg-gray-700 transition-colors flex items-center gap-2">
-          ⚡ Entrar como Demo
-        </button>
-      </div>
-    </div>
-  );
+  if (authState==="login") return <AuthLogin onDone={u=>{ setCurrentUser(u); setAuthState("authed"); }}/>;
   return children({ currentUser, onLogout:()=>{ clearSession(); setAuthState("login"); setCurrentUser(null); } });
 };
 
