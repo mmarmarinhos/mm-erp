@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.8.5";
+const APP_VERSION = "3.9.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8094,6 +8094,7 @@ const AuthSetup = ({ onDone }) => {
   const [loading,setL]    = useState(false);
 
   const [createdUser, setCreatedUser] = useState(null);
+  const [createdToken, setCreatedToken] = useState(null);
 
   const handleCreate = async () => {
     if (!user.trim())     { setErr("Informe um nome de usuário"); return; }
@@ -8104,8 +8105,13 @@ const AuthSetup = ({ onDone }) => {
       const generatedKey = await dbCreateUser(user.trim().toLowerCase(), name.trim()||user.trim(), pwd, "admin");
       setRkey(generatedKey);
       const hash = await sha256(pwd);
-      const safeUser = await dbVerifyLogin(user.trim().toLowerCase(), hash);
-      setCreatedUser(safeUser);
+      const r = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user.trim().toLowerCase(), passwordHash: hash }),
+      });
+      const data = await r.json().catch(()=>({}));
+      if (r.ok) { setCreatedUser(data.user); setCreatedToken(data.token); }
       setStep(2);
     } catch(e) { setErr("Erro ao criar: "+e.message); }
     setL(false);
@@ -8113,9 +8119,10 @@ const AuthSetup = ({ onDone }) => {
 
   const handleFinish = () => {
     const u = createdUser
-      ? { id:createdUser.id, username:createdUser.username, displayName:createdUser.display_name||createdUser.displayName||createdUser.username, role:createdUser.role, modules:[...ALL_MODULES,"usuarios"] }
+      ? { id:createdUser.id, username:createdUser.username, displayName:createdUser.displayName||createdUser.username, role:createdUser.role, modules:[...ALL_MODULES,"usuarios"] }
       : { id:"USR-001", username:user.trim().toLowerCase(), displayName:name.trim()||user.trim(), role:"admin", modules:[...ALL_MODULES,"usuarios"] };
-    setSession(u); onDone(u);
+    const session = { ...u, token: createdToken };
+    setSession(session); onDone(session);
   };
 
   return (
@@ -8197,14 +8204,19 @@ const AuthLogin = ({ onDone }) => {
     setLoading(true); setErr("");
     try {
       const hash = await sha256(pwd);
-      const safeUser = await dbVerifyLogin(username.trim().toLowerCase(), hash);
-      if (!safeUser) { setErr("Usuário ou senha incorretos"); setPwd(""); setLoading(false); return; }
+      const r = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim().toLowerCase(), passwordHash: hash }),
+      });
+      const data = await r.json().catch(()=>({}));
+      if (!r.ok) { setErr(data.error||"Usuário ou senha incorretos"); setPwd(""); setLoading(false); return; }
       const u = {
-        id: safeUser.id, username: safeUser.username,
-        displayName: safeUser.display_name||safeUser.displayName||safeUser.username,
-        role: safeUser.role, customModules: safeUser.custom_modules||safeUser.customModules||null,
+        id: data.user.id, username: data.user.username,
+        displayName: data.user.displayName||data.user.username,
+        role: data.user.role, customModules: null,
       };
-      const session = buildUserSession(u);
+      const session = { ...buildUserSession(u), token: data.token };
       setSession(session); onDone(session);
     } catch(e) { setErr("Erro: "+e.message); }
     setLoading(false);

@@ -1,75 +1,74 @@
 
 // ─── window.storage setup ──────────────────────────────────────────────────
-// Uses Supabase kv_store if env vars are set, otherwise falls back to localStorage
+// Em vez de falar direto com o Supabase (com uma chave pública, que dava
+// pra usar de fora pra ler/escrever todos os dados), o navegador agora só
+// fala com o nosso próprio servidor (/api/storage), que exige o tíquete de
+// acesso emitido no login antes de buscar qualquer coisa no banco.
 
-const SB_URL = 'https://mfgaxixmuxmildztcmry.supabase.co'
-const SB_KEY = 'sb_publishable_OT57sICfkoFtEhyMfQ1XAA_qVF1Cczu'
+const SESSION_KEY = 'erp_session_v2' // mesma chave que o app usa pra guardar a sessão
 
-const sbHeaders = () => ({
-  'apikey': SB_KEY,
-  'Content-Type': 'application/json',
-})
+function getToken() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY)
+    if (!raw) return null
+    const session = JSON.parse(raw)
+    return session?.token || null
+  } catch { return null }
+}
 
-const useSupabase = !!(SB_URL && SB_KEY)
+async function apiStorage(action, payload = {}) {
+  const token = getToken()
+  const res = await fetch('/api/storage', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ action, ...payload }),
+  })
+
+  if (res.status === 401) {
+    // Tíquete inválido/expirado — desloga e volta pro login
+    sessionStorage.removeItem(SESSION_KEY)
+    window.location.reload()
+    throw new Error('Sessão expirada')
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || `Erro ${res.status}`)
+  }
+
+  return res.json()
+}
 
 window.storage = {
   async get(key, shared = false) {
-    if (useSupabase) {
-      try {
-        const r = await fetch(
-          `${SB_URL}/rest/v1/kv_store?key=eq.${encodeURIComponent(key)}&limit=1`,
-          { headers: sbHeaders() }
-        )
-        const rows = await r.json()
-        if (rows?.[0]) return { key, value: rows[0].value, shared }
-        return null
-      } catch { return null }
-    } else {
-      const val = localStorage.getItem(key)
-      return val ? { key, value: val, shared } : null
-    }
+    try {
+      const data = await apiStorage('get', { key })
+      if (data?.value == null) return null
+      return { key, value: data.value, shared }
+    } catch { return null }
   },
 
   async set(key, value, shared = false) {
-    if (useSupabase) {
-      try {
-        await fetch(`${SB_URL}/rest/v1/kv_store`, {
-          method: 'POST',
-          headers: { ...sbHeaders(), 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-          body: JSON.stringify({ key, value, updated_at: new Date().toISOString() })
-        })
-        return { key, value, shared }
-      } catch { return null }
-    } else {
-      localStorage.setItem(key, value)
+    try {
+      await apiStorage('set', { key, value })
       return { key, value, shared }
-    }
+    } catch { return null }
   },
 
   async delete(key, shared = false) {
-    if (useSupabase) {
-      try {
-        await fetch(`${SB_URL}/rest/v1/kv_store?key=eq.${encodeURIComponent(key)}`,
-          { method: 'DELETE', headers: sbHeaders() })
-        return { key, deleted: true, shared }
-      } catch { return null }
-    } else {
-      localStorage.removeItem(key)
+    try {
+      await apiStorage('delete', { key })
       return { key, deleted: true, shared }
-    }
+    } catch { return null }
   },
 
   async list(prefix = '', shared = false) {
-    if (useSupabase) {
-      try {
-        const qs = prefix ? `?key=like.${encodeURIComponent(prefix + '%')}` : ''
-        const r  = await fetch(`${SB_URL}/rest/v1/kv_store${qs}`, { headers: sbHeaders() })
-        const rows = await r.json()
-        return { keys: (rows||[]).map(r => r.key), prefix, shared }
-      } catch { return { keys: [], prefix, shared } }
-    } else {
-      const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix))
-      return { keys, prefix, shared }
-    }
-  }
+    try {
+      const data = await apiStorage('list', { prefix })
+      return { keys: data.keys || [], prefix, shared }
+    } catch { return { keys: [], prefix, shared } }
+  },
 }
