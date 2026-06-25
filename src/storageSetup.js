@@ -28,9 +28,14 @@ async function apiStorage(action, payload = {}) {
   })
 
   if (res.status === 401) {
-    // Tíquete inválido/expirado — desloga e volta pro login
+    // Tíquete inválido/expirado — desloga e volta pro login, mas só recarrega
+    // uma vez (evita loop infinito caso algo chame isso repetidamente rápido)
+    const lastReload = Number(sessionStorage.getItem('erp_last_401_reload') || 0)
     sessionStorage.removeItem(SESSION_KEY)
-    window.location.reload()
+    if (Date.now() - lastReload > 3000) {
+      sessionStorage.setItem('erp_last_401_reload', String(Date.now()))
+      window.location.reload()
+    }
     throw new Error('Sessão expirada')
   }
 

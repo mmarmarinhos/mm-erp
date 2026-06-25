@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.9.0";
+const APP_VERSION = "3.9.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8301,6 +8301,12 @@ const AppAuth = ({ children }) => {
       if (!count) { setAuthState("setup"); return; }
       const session = getSession();
       if (session && session.id === "DEMO") {
+        clearSession();
+        setAuthState("login");
+        return;
+      }
+      if (session && !session.token) {
+        // Sessão de antes da troca pro servidor intermediário (sem tíquete) — inválida agora
         clearSession();
         setAuthState("login");
         return;
