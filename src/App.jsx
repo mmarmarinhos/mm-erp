@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.11.6";
+const APP_VERSION = "3.12.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9642,204 +9642,6 @@ const EMPRESA_EMPTY = {
 
 const REGIMES = ["Simples Nacional","Lucro Presumido","Lucro Real","MEI","Imune/Isento"];
 
-// ─── Empresa sub-components (defined outside to avoid focus loss on re-render)
-const EmpresaSection = ({title, children}) => (
-  <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-4">
-    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{title}</p>
-    {children}
-  </div>
-);
-const EmpresaField = ({label, children, span=false}) => (
-  <div className={span?"col-span-2":""}>
-    <label className="text-xs font-medium text-gray-600 block mb-1">{label}</label>
-    {children}
-  </div>
-);
-
-const EmpresaModule = ({ onSave }) => {
-  const [form,    setForm]   = useState(EMPRESA_EMPTY);
-  const [loading, setLoading]= useState(true);
-  const [saved,   setSaved]  = useState(false);
-  const [logo,    setLogo]   = useState(null);
-  const [logoSaved, setLogoSaved] = useState(false);
-  const fileRef = useRef(null);
-
-  useEffect(() => {
-    Promise.all([
-      window.storage.get(EMPRESA_KEY).catch(()=>null),
-      window.storage.get(LOGO_KEY).catch(()=>null),
-    ]).then(([d, l]) => {
-      if (d?.value) setForm({...EMPRESA_EMPTY,...JSON.parse(d.value)});
-      if (l?.value) setLogo(l.value);
-      setLoading(false);
-    });
-  }, []);
-
-  const set = useCallback((k,v) => setForm(f=>({...f,[k]:v})), []);
-
-  const handleSave = async () => {
-    await window.storage.set(EMPRESA_KEY, JSON.stringify(form)).catch(()=>{});
-    if (onSave) onSave(form);
-    setSaved(true);
-    setTimeout(()=>setSaved(false), 2500);
-  };
-
-  const handleLogoUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 500 * 1024) { alert("Imagem muito grande. Use uma imagem menor que 500KB."); return; }
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const base64 = ev.target.result;
-      setLogo(base64);
-      await window.storage.set(LOGO_KEY, base64).catch(()=>{});
-      setLogoSaved(true);
-      setTimeout(()=>setLogoSaved(false), 2500);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleLogoRemove = async () => {
-    setLogo(null);
-    await window.storage.delete(LOGO_KEY).catch(()=>{});
-  };
-
-  const inp = "w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white";
-  if (loading) return <div className="flex items-center justify-center py-24"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"/></div>;
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Minha Empresa</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Dados cadastrais do seu negócio</p>
-        </div>
-        <button onClick={handleSave}
-          className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${saved ? "bg-green-500 text-white" : "bg-indigo-600 text-white hover:bg-indigo-700"}`}>
-          {saved ? "✓ Salvo!" : "Salvar"}
-        </button>
-      </div>
-
-      {/* Logo */}
-      <EmpresaSection title="🖼️ Logo da Empresa">
-        <div className="flex items-center gap-5">
-          <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 shrink-0 overflow-hidden">
-            {logo
-              ? <img src={logo} alt="Logo" className="w-full h-full object-contain p-1"/>
-              : <div className="text-gray-300 text-center text-xs">Sem logo</div>
-            }
-          </div>
-          <div className="space-y-2 flex-1">
-            <p className="text-sm text-gray-600">
-              Substitui o ícone padrão em todo o sistema — barra lateral e telas de login.
-            </p>
-            <p className="text-xs text-gray-400">PNG ou JPG · máximo 500KB · recomendado 200×200px</p>
-            <div className="flex gap-2 flex-wrap">
-              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                className="hidden" onChange={handleLogoUpload}/>
-              <button onClick={()=>fileRef.current?.click()}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors">
-                {logo ? "Trocar Logo" : "Carregar Logo"}
-              </button>
-              {logo && (
-                <button onClick={handleLogoRemove}
-                  className="px-4 py-2 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors">
-                  Remover
-                </button>
-              )}
-              {logoSaved && <span className="text-green-600 text-sm font-medium self-center">✓ Logo salvo!</span>}
-            </div>
-          </div>
-        </div>
-      </EmpresaSection>
-
-      {/* Identificação */}
-      <EmpresaSection title="🏢 Identificação">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <EmpresaField label="Razão Social" span><input className={inp} value={form.razaoSocial} onChange={e=>set("razaoSocial",e.target.value)} placeholder="Nome jurídico da empresa"/></EmpresaField>
-          <EmpresaField label="Nome Fantasia">
-            <input className={inp} value={form.nomeFantasia} onChange={e=>set("nomeFantasia",e.target.value)} placeholder="Como é conhecido no mercado"/>
-          </EmpresaField>
-          <EmpresaField label="CNPJ">
-            <input className={`${inp} font-mono`} value={form.cnpj} onChange={e=>set("cnpj", fmtCpfCnpj(e.target.value))} placeholder="00.000.000/0001-00" maxLength={18}/>
-          </EmpresaField>
-          <EmpresaField label="Inscrição Estadual (IE)">
-            <input className={`${inp} font-mono`} value={form.ie} onChange={e=>set("ie",fmtIE(e.target.value))} placeholder="000.000.000.000" maxLength={15}/>
-          </EmpresaField>
-          <EmpresaField label="Inscrição Municipal (IM)">
-            <input className={`${inp} font-mono`} value={form.im} onChange={e=>set("im",e.target.value)} placeholder="000000-0"/>
-          </EmpresaField>
-          <EmpresaField label="Regime Tributário">
-            <select className={inp} value={form.regime} onChange={e=>set("regime",e.target.value)}>
-              {REGIMES.map(r=><option key={r}>{r}</option>)}
-            </select>
-          </EmpresaField>
-        </div>
-      </EmpresaSection>
-
-      {/* Endereço */}
-      <EmpresaSection title="📍 Endereço">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <EmpresaField label="CEP">
-            <input className={`${inp} font-mono`} value={form.cep} onChange={e=>set("cep",e.target.value)} placeholder="00000-000" maxLength={9}/>
-          </EmpresaField>
-          <EmpresaField label="Rua / Logradouro" span>
-            <input className={inp} value={form.rua} onChange={e=>set("rua",e.target.value)} placeholder="Rua, Av., Alameda..."/>
-          </EmpresaField>
-          <EmpresaField label="Número">
-            <input className={inp} value={form.numero} onChange={e=>set("numero",e.target.value)} placeholder="123"/>
-          </EmpresaField>
-          <EmpresaField label="Complemento">
-            <input className={inp} value={form.complemento} onChange={e=>set("complemento",e.target.value)} placeholder="Sala, Andar, Galpão..."/>
-          </EmpresaField>
-          <EmpresaField label="Bairro">
-            <input className={inp} value={form.bairro} onChange={e=>set("bairro",e.target.value)} placeholder="Bairro"/>
-          </EmpresaField>
-          <CidadeEstadoFields city={form.cidade} state={form.estado}
-            onCityChange={v=>set("cidade",v)} onStateChange={v=>set("estado",v)} inp={inp}/>
-        </div>
-      </EmpresaSection>
-
-      {/* Contato */}
-      <EmpresaSection title="📞 Contato">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <EmpresaField label="Telefone Fixo">
-            <input className={inp} value={form.telefone} onChange={e=>set("telefone",e.target.value)} placeholder="(11) 3000-0000"/>
-          </EmpresaField>
-          <EmpresaField label="Celular / WhatsApp">
-            <input className={inp} value={form.celular} onChange={e=>set("celular",e.target.value)} placeholder="(11) 99999-9999"/>
-          </EmpresaField>
-          <EmpresaField label="E-mail">
-            <input type="email" className={inp} value={form.email} onChange={e=>set("email",e.target.value)} placeholder="contato@empresa.com.br"/>
-          </EmpresaField>
-          <EmpresaField label="Site">
-            <input className={inp} value={form.site} onChange={e=>set("site",e.target.value)} placeholder="www.empresa.com.br"/>
-          </EmpresaField>
-        </div>
-      </EmpresaSection>
-
-      {/* Responsável */}
-      <EmpresaSection title="👤 Responsável">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <EmpresaField label="Nome do Responsável">
-            <input className={inp} value={form.responsavel} onChange={e=>set("responsavel",e.target.value)} placeholder="Nome completo"/>
-          </EmpresaField>
-          <EmpresaField label="Cargo / Função">
-            <input className={inp} value={form.cargo} onChange={e=>set("cargo",e.target.value)} placeholder="Proprietário, Sócio, Diretor..."/>
-          </EmpresaField>
-          <EmpresaField label="Observações" span>
-            <textarea rows={3} className={`${inp} resize-none`} value={form.obs} onChange={e=>set("obs",e.target.value)} placeholder="Informações adicionais sobre a empresa..."/>
-          </EmpresaField>
-        </div>
-      </EmpresaSection>
-
-      <button onClick={handleSave}
-        className={`w-full py-3 rounded-xl text-sm font-semibold transition-all ${saved ? "bg-green-500 text-white" : "bg-indigo-600 text-white hover:bg-indigo-700"}`}>
-        {saved ? "✓ Dados salvos com sucesso!" : "Salvar Dados da Empresa"}
-      </button>
-    </div>
-  );
-};
 
 // ─── Cotação Module ───────────────────────────────────────────────────────
 const COT_STATUS     = ["Rascunho","Enviada","Aprovada","Recusada","Expirada","Convertida"];
@@ -11536,6 +11338,9 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
   // Empresa tab — usa EMPRESA_KEY (mesma chave que EmpresaModule)
   const [empresa, setEmpresa]     = useState(EMPRESA_EMPTY);
   const [empLoading, setEmpLoading] = useState(true);
+  const [logo, setLogo] = useState(null);
+  const [logoSaved, setLogoSaved] = useState(false);
+  const fileRef = useRef(null);
 
   // Params locais editáveis
   const [canais,  setCanais]  = useState(params?.canais        || PARAMS_DEFAULT.canais);
@@ -11555,11 +11360,35 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
   }, [params]);
 
   useEffect(() => {
-    window.storage.get(EMPRESA_KEY).catch(()=>null).then(r => {
+    Promise.all([
+      window.storage.get(EMPRESA_KEY).catch(()=>null),
+      window.storage.get(LOGO_KEY).catch(()=>null),
+    ]).then(([r, l]) => {
       if (r?.value) setEmpresa(prev => ({...prev,...JSON.parse(r.value)}));
+      if (l?.value) setLogo(l.value);
       setEmpLoading(false);
     });
   }, []);
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) { alert("Imagem muito grande. Use uma imagem menor que 500KB."); return; }
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const base64 = ev.target.result;
+      setLogo(base64);
+      await window.storage.set(LOGO_KEY, base64).catch(()=>{});
+      setLogoSaved(true);
+      setTimeout(()=>setLogoSaved(false), 2500);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleLogoRemove = async () => {
+    setLogo(null);
+    await window.storage.delete(LOGO_KEY).catch(()=>{});
+  };
 
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null), 2500); };
   const setE = (k,v) => setEmpresa(f=>({...f,[k]:v}));
@@ -11635,6 +11464,39 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
         empLoading
           ? <div className="flex items-center justify-center py-16"><div className="w-7 h-7 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"/></div>
           : <div className="space-y-4">
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">🖼️ Logo da Empresa</p>
+                <div className="flex items-center gap-5">
+                  <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50 shrink-0 overflow-hidden">
+                    {logo
+                      ? <img src={logo} alt="Logo" className="w-full h-full object-contain p-1"/>
+                      : <div className="text-gray-300 text-center text-xs">Sem logo</div>
+                    }
+                  </div>
+                  <div className="space-y-2 flex-1">
+                    <p className="text-sm text-gray-600">
+                      Aparece na barra lateral do sistema e nos documentos gerados (pedidos, cotações). Não altera a tela de login.
+                    </p>
+                    <p className="text-xs text-gray-400">PNG ou JPG · máximo 500KB · recomendado 200×200px</p>
+                    <div className="flex gap-2 flex-wrap items-center">
+                      <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                        className="hidden" onChange={handleLogoUpload}/>
+                      <button onClick={()=>fileRef.current?.click()}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors">
+                        {logo ? "Trocar Logo" : "Carregar Logo"}
+                      </button>
+                      {logo && (
+                        <button onClick={handleLogoRemove}
+                          className="px-4 py-2 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors">
+                          Remover
+                        </button>
+                      )}
+                      {logoSaved && <span className="text-xs text-green-600 font-medium">✓ Salvo!</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">🏛 Identificação</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -12352,7 +12214,6 @@ function ERPApp({ currentUser, onLogout }) {
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases}/>;
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
-      case "empresa":   return <EmpresaModule onSave={(data) => setEmpresaForm(data)}/>;
       case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento} variantCatalogs={variantCatalogs} setVariantCatalogs={updateVariantCatalogs}/>;
       case "parametros": return <ParamsModule params={params} setParams={updateParams} onSaveEmpresa={(data)=>setEmpresaForm(data)} orders={orders} setOrders={updateOrders}/>;
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes}/>;
