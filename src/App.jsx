@@ -44,7 +44,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.10.4";
+const APP_VERSION = "3.11.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8437,6 +8437,13 @@ const UsersModule = ({ currentUser }) => {
     load();
   };
 
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const deleteUser = async (u) => {
+    try { await callUsersApi({ action:"delete", id:u.id }); load(); }
+    catch(e) { setErr("Erro ao excluir: "+e.message); }
+    setConfirmDelete(null);
+  };
+
   const roleStyle = (r) => ({ bg: ROLES_DEF[r]?.bg||"bg-gray-100", text: ROLES_DEF[r]?.color||"text-gray-600", label: ROLES_DEF[r]?.label||r });
 
   const allModsWithUsuarios = [...ALL_MODULES, "usuarios"];
@@ -8480,10 +8487,16 @@ const UsersModule = ({ currentUser }) => {
                   <div className="flex gap-1.5 shrink-0">
                     <button onClick={()=>openEdit(u)} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">Editar</button>
                     {u.username!==currentUser.username && (
-                      <button onClick={()=>toggleActive(u)}
-                        className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${u.active?"bg-red-50 text-red-600 hover:bg-red-100":"bg-green-50 text-green-600 hover:bg-green-100"}`}>
-                        {u.active?"Desativar":"Reativar"}
-                      </button>
+                      <>
+                        <button onClick={()=>toggleActive(u)}
+                          className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${u.active?"bg-red-50 text-red-600 hover:bg-red-100":"bg-green-50 text-green-600 hover:bg-green-100"}`}>
+                          {u.active?"Desativar":"Reativar"}
+                        </button>
+                        <button onClick={()=>setConfirmDelete(u)}
+                          className="px-3 py-1.5 text-xs bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors">
+                          Excluir
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -8565,6 +8578,21 @@ const UsersModule = ({ currentUser }) => {
                 className="flex-1 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50">
                 {saving?"Salvando...":(modal==="new"?"Criar Usuário":"Salvar")}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5">
+            <p className="font-bold text-gray-900 mb-1">Excluir usuário?</p>
+            <p className="text-sm text-gray-500 mb-4">
+              Tem certeza que quer excluir <b>{confirmDelete.displayName||confirmDelete.username}</b>? Essa ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={()=>setConfirmDelete(null)} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+              <button onClick={()=>deleteUser(confirmDelete)} className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700">Excluir</button>
             </div>
           </div>
         </div>

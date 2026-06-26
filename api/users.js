@@ -29,7 +29,7 @@ async function sbRpc(fn, args = {}) {
 async function validateAdminSession(token) {
   if (!token) return null;
   const r = await fetch(
-    `${SB_URL}/rest/v1/sessions?token=eq.${encodeURIComponent(token)}&select=username,role,expires_at&limit=1`,
+    `${SB_URL}/rest/v1/sessions?token=eq.${encodeURIComponent(token)}&select=user_id,username,role,expires_at&limit=1`,
     { headers: secretHeaders() }
   );
   if (!r.ok) return null;
@@ -95,6 +95,16 @@ export default async function handler(req, res) {
       const { id, passwordHash } = req.body;
       if (!id || !passwordHash) return res.status(400).json({ error: 'Informe o id e a nova senha' });
       await sbRpc('set_user_password', { p_id: String(id), p_new_hash: passwordHash });
+      return res.status(200).json({ ok: true });
+    }
+
+    if (action === 'delete') {
+      const { id } = req.body;
+      if (!id) return res.status(400).json({ error: 'Informe o id do usuário' });
+      if (String(id) === String(session.user_id)) {
+        return res.status(400).json({ error: 'Você não pode excluir a própria conta' });
+      }
+      await sbRpc('delete_erp_user', { p_id: String(id) });
       return res.status(200).json({ ok: true });
     }
 
