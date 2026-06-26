@@ -11956,7 +11956,75 @@ export default function App() {
   );
 }
 
+const ChangePasswordModal = ({ onClose }) => {
+  const [current, setCurrent] = useState("");
+  const [pwd, setPwd] = useState("");
+  const [pwd2, setPwd2] = useState("");
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setErr(""); setOk("");
+    if (!current) { setErr("Informe a senha atual"); return; }
+    if (pwd.length < 6) { setErr("Nova senha precisa ter no mínimo 6 caracteres"); return; }
+    if (pwd !== pwd2) { setErr("As senhas não coincidem"); return; }
+    setSaving(true);
+    try {
+      const token = getSession()?.token;
+      const currentPasswordHash = await sha256(current);
+      const newPasswordHash = await sha256(pwd);
+      const r = await fetch("/api/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token?{Authorization:`Bearer ${token}`}:{}) },
+        body: JSON.stringify({ currentPasswordHash, newPasswordHash }),
+      });
+      const data = await r.json().catch(()=>({}));
+      if (!r.ok) { setErr(data.error||"Erro ao trocar senha"); setSaving(false); return; }
+      setOk("✅ Senha alterada com sucesso!");
+      setCurrent(""); setPwd(""); setPwd2("");
+      setTimeout(onClose, 1800);
+    } catch(e) { setErr("Erro: "+e.message); }
+    setSaving(false);
+  };
+
+  const inp = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300";
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-gray-900">Trocar senha</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Senha atual</label>
+          <input type="password" className={inp} value={current} onChange={e=>setCurrent(e.target.value)}/>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Nova senha</label>
+          <input type="password" className={inp} value={pwd} onChange={e=>setPwd(e.target.value)} placeholder="Mínimo 6 caracteres"/>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 block mb-1">Confirmar nova senha</label>
+          <input type="password" className={inp} value={pwd2} onChange={e=>setPwd2(e.target.value)}/>
+        </div>
+        {err && <p className="text-red-500 text-sm">{err}</p>}
+        {ok && <p className="text-green-600 text-sm font-medium">{ok}</p>}
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50">
+            {saving?"Salvando...":"Salvar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function ERPApp({ currentUser, onLogout }) {
+  const [showChangePwd, setShowChangePwd] = useState(false);
   const [form, setEmpresaForm] = useState(EMPRESA_EMPTY); // empresa data for sidebar
   const [orders, setOrders]         = useState([]);
   const [finance, setFinance]       = useState([]);
@@ -12266,6 +12334,13 @@ function ERPApp({ currentUser, onLogout }) {
               </p>
             </div>
           </div>
+          <button onClick={()=>setShowChangePwd(true)}
+            className="w-full px-4 py-2 text-xs text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center gap-2">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L19 5m-7 7l3 3m1-4l2 2m-2.5-1.5l5 5"/>
+            </svg>
+            Trocar senha
+          </button>
           <button onClick={onLogout}
             className="w-full px-4 py-2 text-xs text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -12305,6 +12380,7 @@ function ERPApp({ currentUser, onLogout }) {
           {renderModule()}
         </main>
       </div>
+      {showChangePwd && <ChangePasswordModal onClose={()=>setShowChangePwd(false)}/>}
     </div>
   );
 }
