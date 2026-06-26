@@ -22,7 +22,8 @@ async function sbRpc(fn, args = {}) {
     body: JSON.stringify(args),
   });
   if (!r.ok) throw new Error(`[RPC ${fn}] ${r.status}: ${await r.text()}`);
-  return r.json();
+  const text = await r.text();
+  return text ? JSON.parse(text) : null;
 }
 
 async function validateAdminSession(token) {
@@ -100,6 +101,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Ação não reconhecida' });
   } catch (err) {
     console.error('Erro em /api/users:', err);
-    return res.status(500).json({ error: 'Erro interno: ' + err.message });
+    return res.status(500).json({ error: 'Erro interno' });
   }
 }

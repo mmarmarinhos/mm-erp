@@ -26,7 +26,8 @@ async function sbRpc(fn, args = {}) {
     body: JSON.stringify(args),
   });
   if (!r.ok) throw new Error(`[RPC ${fn}] ${r.status}: ${await r.text()}`);
-  return r.json();
+  const text = await r.text();
+  return text ? JSON.parse(text) : null;
 }
 
 async function sbInsert(table, data) {
