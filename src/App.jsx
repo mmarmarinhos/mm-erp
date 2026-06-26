@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.11.5";
+const APP_VERSION = "3.11.6";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8129,7 +8129,7 @@ const AuthSetup = ({ onDone }) => {
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
         <div className="text-center mb-3">
-          <img src={mmErpLogoUrl} alt="MM ERP" className="mx-auto mb-1" style={{width:320,height:320,objectFit:"contain"}}/>
+          <img src={mmErpLogoUrl} alt="MM ERP" className="mx-auto mb-2" style={{width:240,height:240,objectFit:"contain"}}/>
           <p className="text-gray-500 mt-1 text-sm">{step===1?"Configurar acesso inicial":"Guarde sua chave de recuperação"}</p>
         </div>
 
@@ -8246,7 +8246,7 @@ const AuthLogin = ({ onDone }) => {
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
         <div className="text-center mb-3">
-          <img src={mmErpLogoUrl} alt="MM ERP" className="mx-auto mb-1" style={{width:320,height:320,objectFit:"contain"}}/>
+          <img src={mmErpLogoUrl} alt="MM ERP" className="mx-auto mb-2" style={{width:240,height:240,objectFit:"contain"}}/>
           <p className="text-gray-500 mt-1 text-sm">{mode==="login"?"Acesso ao sistema":"Recuperar senha"}</p>
         </div>
         {mode==="login" ? (
