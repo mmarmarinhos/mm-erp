@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from "recharts";
 import {
-  dbCountUsers, dbVerifyLogin, dbResetPasswordWithRecovery, dbListUsers,
-  dbCreateUser, dbToggleUserActive, dbSetUserPassword, dbUpdateUserProfile,
+  dbCountUsers, dbResetPasswordWithRecovery,
 } from "./supabase.js";
 
 // ─── Icons (inline SVGs) ───────────────────────────────────────────────────
@@ -45,7 +44,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.9.4";
+const APP_VERSION = "3.10.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8101,16 +8100,17 @@ const AuthSetup = ({ onDone }) => {
     if (pwd !== pwd2)     { setErr("Senhas não coincidem"); return; }
     setL(true); setErr("");
     try {
-      const generatedKey = await dbCreateUser(user.trim().toLowerCase(), name.trim()||user.trim(), pwd, "admin");
-      setRkey(generatedKey);
       const hash = await sha256(pwd);
-      const r = await fetch("/api/login", {
+      const r = await fetch("/api/setup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: user.trim().toLowerCase(), passwordHash: hash }),
+        body: JSON.stringify({ username: user.trim().toLowerCase(), displayName: name.trim()||user.trim(), passwordHash: hash }),
       });
       const data = await r.json().catch(()=>({}));
-      if (r.ok) { setCreatedUser(data.user); setCreatedToken(data.token); }
+      if (!r.ok) { setErr(data.error||"Erro ao criar usuário"); setL(false); return; }
+      setRkey(data.recoveryKey);
+      setCreatedUser(data.user);
+      setCreatedToken(data.token);
       setStep(2);
     } catch(e) { setErr("Erro ao criar: "+e.message); }
     setL(false);
@@ -8350,7 +8350,26 @@ const UsersModule = ({ currentUser }) => {
     createdAt: u.created_at ?? u.createdAt,
   });
 
-  const load = async () => { setLoading(true); const raw = await dbListUsers(); setUsers((raw||[]).map(normalizeUser)); setLoading(false); };
+  const callUsersApi = async (body) => {
+    const token = getSession()?.token;
+    const r = await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token?{Authorization:`Bearer ${token}`}:{}) },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(data.error || `Erro ${r.status}`);
+    return data;
+  };
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await callUsersApi({ action:"list" });
+      setUsers((data.users||[]).map(normalizeUser));
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
   useEffect(() => { load(); }, []);
 
   // User form state
@@ -8384,21 +8403,22 @@ const UsersModule = ({ currentUser }) => {
     try {
       if (modal==="new") {
         if (users.find(u=>u.username===form.username.toLowerCase())) { setErr("Usuário já existe"); setSaving(false); return; }
-        const rkey = await dbCreateUser(form.username.toLowerCase(), form.displayName||form.username, form.pwd, form.role);
-        // módulos customizados, se houver, num segundo passo (create_erp_user não recebe esse campo)
-        if (form.useCustom && form.customModules) {
-          const hash = await sha256(form.pwd);
-          const created = await dbVerifyLogin(form.username.toLowerCase(), hash);
-          if (created) await dbUpdateUserProfile(created.id, form.displayName||form.username, form.role, form.customModules);
-        }
-        setOk(`✅ Usuário criado! Chave de recuperação: ${rkey}`);
+        const hash = await sha256(form.pwd);
+        const data = await callUsersApi({
+          action:"create", username:form.username.toLowerCase(), displayName:form.displayName||form.username,
+          passwordHash:hash, role:form.role,
+        });
+        setOk(`✅ Usuário criado! Chave de recuperação: ${data.recoveryKey}`);
         load();
         setForm(emptyForm);
       } else {
-        await dbUpdateUserProfile(modal.id, form.displayName||modal.displayName, form.role, form.useCustom?form.customModules:null);
+        await callUsersApi({
+          action:"updateProfile", id:modal.id, displayName:form.displayName||modal.displayName,
+          role:form.role, customModules: form.useCustom?form.customModules:null,
+        });
         if (form.pwd.length>=6) {
           const newHash = await sha256(form.pwd);
-          await dbSetUserPassword(modal.id, newHash);
+          await callUsersApi({ action:"setPassword", id:modal.id, passwordHash:newHash });
         }
         setOk("✅ Usuário atualizado!"); load();
       }
@@ -8407,7 +8427,7 @@ const UsersModule = ({ currentUser }) => {
   };
 
   const toggleActive = async (u) => {
-    await dbToggleUserActive(u.id, !u.active);
+    try { await callUsersApi({ action:"toggleActive", id:u.id, active:!u.active }); } catch(e) { console.error(e); }
     load();
   };
 
