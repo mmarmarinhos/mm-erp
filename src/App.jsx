@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.9.3";
+const APP_VERSION = "3.9.4";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -98,7 +98,6 @@ const SEG_STYLES = {
   "VIP":            { bg: "bg-yellow-100", text: "text-yellow-700", dot: "bg-yellow-500" },
   "Regular":        { bg: "bg-indigo-100", text: "text-indigo-700", dot: "bg-indigo-500" },
   "Novo":           { bg: "bg-purple-100", text: "text-purple-700", dot: "bg-purple-500" },
-  "default":        { bg: "bg-gray-100",   text: "text-gray-500",   dot: "bg-gray-400"   },
   "default":        { bg: "bg-gray-100",   text: "text-gray-500",   dot: "bg-gray-400"   },
 };
 const AVATAR_COLORS = ["bg-indigo-500","bg-purple-500","bg-pink-500","bg-orange-500",

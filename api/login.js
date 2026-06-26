@@ -77,6 +77,6 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('Erro em /api/login:', err);
-    return res.status(500).json({ error: 'Erro interno: ' + err.message });
+    return res.status(500).json({ error: 'Erro interno' });
   }
 }
