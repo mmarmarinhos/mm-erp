@@ -44,7 +44,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.11.0";
+const APP_VERSION = "3.11.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9486,8 +9486,21 @@ const LogoMark = ({ size = 40, className = "" }) => {
       style={{ width:size, height:size, objectFit:"contain", borderRadius:8 }}/>
   );
   return (
-    <div className={`bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold ${className}`}
-      style={{ width:size, height:size, fontSize: size * 0.4 }}>M</div>
+    <svg viewBox="0 0 100 100" width={size} height={size} className={className} role="img" aria-label="MM ERP">
+      <defs>
+        <linearGradient id="mmLogoGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#4f46e5"/>
+          <stop offset="100%" stopColor="#7c3aed"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="100" height="100" rx="22" fill="url(#mmLogoGrad)"/>
+      {/* "M" desenhado como ponto de costura (linha pontilhada), remetendo a linha/agulha */}
+      <path d="M 25 72 L 25 28 L 50 56 L 75 28 L 75 72"
+        fill="none" stroke="white" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"
+        strokeDasharray="7 6"/>
+      {/* "olho da agulha" no início do ponto, pequeno detalhe */}
+      <circle cx="25" cy="28" r="4.5" fill="none" stroke="white" strokeWidth="3.2"/>
+    </svg>
   );
 };
 
