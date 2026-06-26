@@ -100,6 +100,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Ação não reconhecida' });
   } catch (err) {
     console.error('Erro em /api/users:', err);
-    return res.status(500).json({ error: 'Erro interno' });
+    return res.status(500).json({ error: 'Erro interno: ' + err.message });
   }
 }
