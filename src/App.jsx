@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.12.1";
+const APP_VERSION = "3.12.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2025,9 +2025,31 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
   const ordersReceitas = paidOrdersInPeriod.reduce((s,o) => s+valorRecebidoOrder(o), 0);
   const multaJurosRecebidosPeriodo = paidOrdersInPeriod.reduce((s,o) => s+(o.pagoComAtraso ? (o.valorMulta||0)+(o.valorJuros||0) : 0), 0);
 
+  // Despesas das compras pagas no período (mesma lógica usada pras receitas dos pedidos)
+  const paidPurchasesInPeriod = (purchases||[]).filter(p => {
+    if (!p.paidDate || p.status === "Cancelado") return false;
+    const dateToCheck = p.paidDate;
+    if (filterMode === "todos") return true;
+    if (filterMode === "mes") return dateToCheck.startsWith(period);
+    if (filterMode === "ano") return dateToCheck.startsWith(period.split("-")[0]);
+    if (filterMode === "personalizado") {
+      if (dateFrom && dateToCheck < dateFrom) return false;
+      if (dateTo   && dateToCheck > dateTo)   return false;
+      return true;
+    }
+    if (filterMode === "trimestre") {
+      const [y,m] = period.split("-").map(Number);
+      const months = [m, m===1?12:m-1, m<=2?m+10:m-2].map(x=>String(x).padStart(2,"0"));
+      return months.some(mo => dateToCheck.startsWith(String(y)+"-"+mo));
+    }
+    return true;
+  });
+  const purchasesDespesas = paidPurchasesInPeriod.reduce((s,p) => s+(p.total||0), 0);
+
   const periodReceitasManual = periodActive.filter(t => t.type === "receita").reduce((s,t) => s+t.amount, 0);
   const periodReceitas = periodReceitasManual + ordersReceitas;
-  const periodDespesas = periodActive.filter(t => t.type === "despesa").reduce((s,t) => s+t.amount, 0);
+  const periodDespesasManual = periodActive.filter(t => t.type === "despesa").reduce((s,t) => s+t.amount, 0);
+  const periodDespesas = periodDespesasManual + purchasesDespesas;
   const periodResult   = periodReceitas - periodDespesas;
 
   const prevMonth = () => {
@@ -2186,7 +2208,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
         <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
           <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Despesas</p>
           <p className="text-2xl font-bold text-red-500 mt-1">{fmt(periodDespesas)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{periodActive.filter(t=>t.type==="despesa").length} lançamentos</p>
+          <p className="text-xs text-gray-400 mt-0.5">{periodActive.filter(t=>t.type==="despesa").length + paidPurchasesInPeriod.length} lançamentos</p>
         </div>
         <div className={`rounded-xl p-4 border shadow-sm ${periodResult >= 0 ? "bg-indigo-50 border-indigo-100" : "bg-red-50 border-red-100"}`}>
           <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Resultado</p>
