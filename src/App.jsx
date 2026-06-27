@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.15.8";
+const APP_VERSION = "3.15.9";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -193,10 +193,10 @@ async function saveCaixa(c) { try { await window.storage.set(CAIXA_KEY, JSON.str
 
 // ─── Fiscal Constants ─────────────────────────────────────────────────────
 const NF_TIPOS    = ["NF-e","NFC-e","NFS-e"];
-const NF_STATUSES = ["Autorizada","Rascunho","Cancelada","Inutilizada","Denegada"];
+const NF_STATUSES = ["Autorizada","Em Aberto","Cancelada","Inutilizada","Denegada"];
 const NF_STATUS_STYLES = {
   "Autorizada":  { bg:"bg-green-100",  text:"text-green-700",  dot:"bg-green-500"  },
-  "Rascunho":    { bg:"bg-gray-100",   text:"text-gray-600",   dot:"bg-gray-400"   },
+  "Em Aberto":   { bg:"bg-gray-100",   text:"text-gray-600",   dot:"bg-gray-400"   },
   "Cancelada":   { bg:"bg-red-100",    text:"text-red-700",    dot:"bg-red-500"    },
   "Inutilizada": { bg:"bg-orange-100", text:"text-orange-700", dot:"bg-orange-400" },
   "Denegada":    { bg:"bg-red-100",    text:"text-red-700",    dot:"bg-red-600"    },
@@ -6179,7 +6179,7 @@ const NfeModal = ({ nfe, onClose, onSave }) => {
     numero:"", serie:"1", tipo:"NF-e", dataEmissao:today(),
     destinatario:"", cpfCnpj:"", cfop:"5102", ncm:"5205.11.00",
     descricao:"", valorProdutos:"", valorFrete:"0", valorDesconto:"0",
-    icms:"", pis:"", cofins:"", status:"Rascunho", chave:"", notes:""
+    icms:"", pis:"", cofins:"", status:"Em Aberto", chave:"", notes:""
   });
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const valorTotal = (Number(form.valorProdutos)||0)+(Number(form.valorFrete)||0)-(Number(form.valorDesconto)||0);
@@ -6382,7 +6382,7 @@ const FiscalModule = ({ nfes, setNfes }) => {
   const nfAuth    = nfes.filter(n=>n.status==="Autorizada");
   const totalFat  = nfAuth.reduce((s,n)=>s+n.valorTotal,0);
   const totalImp  = nfAuth.reduce((s,n)=>s+(n.icms+n.pis+n.cofins),0);
-  const rascunhos = nfes.filter(n=>n.status==="Rascunho").length;
+  const rascunhos = nfes.filter(n=>n.status==="Em Aberto").length;
 
   const nextNfeId = (ns) => { const nums=ns.map(n=>parseInt(n.id.replace("NFE-",""))||0); return `NFE-${String(Math.max(0,...nums)+1).padStart(3,"0")}`; };
 
@@ -6478,7 +6478,7 @@ const FiscalModule = ({ nfes, setNfes }) => {
               { label:"NF-es Emitidas",   value:nfAuth.length,        sub:"autorizadas",        color:"text-gray-900",  bg:"bg-white" },
               { label:"Faturamento",      value:fmt(totalFat),        sub:"notas autorizadas",  color:"text-indigo-700",bg:"bg-white" },
               { label:"Total de Impostos",value:fmt(totalImp),        sub:"ICMS+PIS+COFINS",    color:"text-red-600",   bg:"bg-white" },
-              { label:"Rascunhos",        value:rascunhos,            sub:"aguardando emissão", color:rascunhos>0?"text-amber-600":"text-gray-400", bg:rascunhos>0?"bg-amber-50":"bg-white" },
+              { label:"Em Aberto",        value:rascunhos,            sub:"aguardando emissão", color:rascunhos>0?"text-amber-600":"text-gray-400", bg:rascunhos>0?"bg-amber-50":"bg-white" },
             ].map(k=>(
               <div key={k.label} className={`${k.bg} rounded-xl p-4 border border-gray-100 shadow-sm`}>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">{k.label}</p>
@@ -6559,7 +6559,7 @@ const FiscalModule = ({ nfes, setNfes }) => {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {filteredNfes.map(n=>{
-                      const ns = NF_STATUS_STYLES[n.status]||NF_STATUS_STYLES["Rascunho"];
+                      const ns = NF_STATUS_STYLES[n.status]||NF_STATUS_STYLES["Em Aberto"];
                       return (
                         <tr key={n.id} className="hover:bg-gray-50/50 transition-colors">
                           <td className="px-4 py-3">
@@ -10050,9 +10050,9 @@ const REGIMES = ["Simples Nacional","Lucro Presumido","Lucro Real","MEI","Imune/
 
 
 // ─── Cotação Module ───────────────────────────────────────────────────────
-const COT_STATUS     = ["Rascunho","Enviada","Aprovada","Recusada","Expirada","Convertida"];
+const COT_STATUS     = ["Em Aberto","Enviada","Aprovada","Recusada","Expirada","Convertida"];
 const COT_STATUS_ST  = {
-  "Rascunho":   { bg:"bg-gray-100",   text:"text-gray-600"   },
+  "Em Aberto":  { bg:"bg-gray-100",   text:"text-gray-600"   },
   "Enviada":    { bg:"bg-blue-100",   text:"text-blue-700"   },
   "Aprovada":   { bg:"bg-green-100",  text:"text-green-700"  },
   "Recusada":   { bg:"bg-red-100",    text:"text-red-600"    },
@@ -10076,7 +10076,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
   const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, discount:0, discountType:"%", total:0 });
   const [form, setForm] = useState(cotacao ? { ...cotacao } : {
     customer:"", channel:"WhatsApp", date:today(), validUntil:addDaysISO(today(), params?.vendas?.validadeCotacaoDias || 10),
-    status:"Rascunho", payment:"Pix", freight:0, discount:0,
+    status:"Em Aberto", payment:"Pix", freight:0, discount:0,
     items:[emptyItem()], notes:"", orderId:null, representanteId:"",
   });
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
@@ -10660,7 +10660,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
     .sort((a,b)=>b.date.localeCompare(a.date));
 
   const counts = COT_STATUS.reduce((acc,s)=>({...acc,[s]:cotacoes.filter(c=>c.status===s).length}),{});
-  const totalAberto = cotacoes.filter(c=>["Rascunho","Enviada","Aprovada"].includes(c.status)).reduce((s,c)=>s+c.total,0);
+  const totalAberto = cotacoes.filter(c=>["Em Aberto","Enviada","Aprovada"].includes(c.status)).reduce((s,c)=>s+c.total,0);
 
   const st = (s) => COT_STATUS_ST[s]||{bg:"bg-gray-100",text:"text-gray-600"};
 
@@ -10729,7 +10729,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
                 {!["Convertida","Recusada","Expirada"].includes(detail.status) && (
                   <div className="flex flex-wrap gap-2">
                     <p className="text-xs font-semibold text-gray-400 uppercase w-full">Alterar Status</p>
-                    {["Rascunho","Enviada","Aprovada","Recusada"].filter(s=>s!==detail.status).map(s=>(
+                    {["Em Aberto","Enviada","Aprovada","Recusada"].filter(s=>s!==detail.status).map(s=>(
                       <button key={s} onClick={()=>{setCotacoes(prev=>prev.map(c=>c.id===detail.id?{...c,status:s}:c));setDetail(d=>({...d,status:s}));}}
                         className={`px-3 py-1.5 rounded-xl text-xs font-semibold border ${st2(s).bg} ${st2(s).text}`}>{s}</button>
                     ))}
