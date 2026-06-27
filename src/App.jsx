@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.14.3";
+const APP_VERSION = "3.14.4";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9286,6 +9286,7 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
   const [result, setResult] = useState(null);
   const [err, setErr] = useState("");
   const skuInputRef = useRef(null);
+  const qtyInputRefs = useRef({});
   const [askAddItem, setAskAddItem] = useState(false);
   const naoItemRef = useRef(null);
   const simItemRef = useRef(null);
@@ -9308,7 +9309,10 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
       return [...prev, { _prodId:p.id, sku:p.sku||"", description:p.name, ncm:p.ncm||"", cfop:"5102", unitPrice, qty:1, total:unitPrice }];
     });
     setSkuSearch("");
-    setAskAddItem(true);
+    setTimeout(()=>{
+      const el = qtyInputRefs.current[p.id];
+      if (el) { el.focus(); el.select(); }
+    }, 50);
   };
 
   const updateQty = (prodId, qty) => {
@@ -9447,6 +9451,9 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
                   <p className="text-xs text-gray-400">{fmt(item.unitPrice)} cada</p>
                 </div>
                 <input type="number" min="1" value={item.qty} onChange={e=>updateQty(item._prodId, e.target.value)}
+                  ref={el=>qtyInputRefs.current[item._prodId]=el}
+                  onFocus={e=>e.target.select()}
+                  onKeyDown={e=>{ if (e.key==="Enter") { e.preventDefault(); setAskAddItem(true); } }}
                   className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-sm text-center"/>
                 <p className="w-20 text-right text-sm font-semibold text-gray-800">{fmt(item.total)}</p>
                 <button onClick={()=>removeItem(item._prodId)} className="text-gray-300 hover:text-red-500 px-1">✕</button>
