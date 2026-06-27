@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.15.1";
+const APP_VERSION = "3.15.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8753,6 +8753,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
   // Supplier autocomplete
   const [supSearch, setSupSearch] = useState(purchase?.supplierName||"");
   const [showSupList, setShowSupList] = useState(false);
+  const [supHighlight, setSupHighlight] = useState(0);
   const filteredSups = suppliers
     .filter(s=>s.status==="Ativo"||s.status==="Desenvolvimento")
     .filter(s=>s.name?.toLowerCase().includes(supSearch.toLowerCase()))
@@ -8859,15 +8860,24 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
               <label className="text-xs font-medium text-gray-600 mb-1 block">Fornecedor *</label>
               <input className={inp} ref={supInputRef}
                 value={supSearch}
-                onChange={e=>{ setSupSearch(e.target.value); setForm(f=>({...f,supplierName:e.target.value})); setShowSupList(true); }}
+                onChange={e=>{ setSupSearch(e.target.value); setForm(f=>({...f,supplierName:e.target.value})); setShowSupList(true); setSupHighlight(0); }}
                 onFocus={()=>setShowSupList(true)}
                 onBlur={()=>setTimeout(()=>setShowSupList(false),150)}
+                onKeyDown={e=>{
+                  if (e.key==="ArrowDown") { e.preventDefault(); setShowSupList(true); setSupHighlight(i=>Math.min(i+1, filteredSups.length-1)); }
+                  else if (e.key==="ArrowUp") { e.preventDefault(); setSupHighlight(i=>Math.max(i-1,0)); }
+                  else if (e.key==="Enter") { if (showSupList && filteredSups[supHighlight]) { e.preventDefault(); selectSupplier(filteredSups[supHighlight]); } }
+                  else if (e.key==="Tab" && showSupList && filteredSups.length>0) {
+                    const exact = filteredSups.find(s=>(s.name||"").toLowerCase()===supSearch.trim().toLowerCase());
+                    selectSupplier(exact||filteredSups[supHighlight]||filteredSups[0]);
+                  }
+                }}
                 placeholder="Digite o nome do fornecedor..."/>
               {showSupList && filteredSups.length>0 && supSearch && (
                 <div className="absolute z-50 w-full bg-white border border-gray-200 rounded-xl shadow-lg mt-1 max-h-48 overflow-y-auto">
-                  {filteredSups.map(s=>(
-                    <button key={s.id} type="button" onMouseDown={()=>selectSupplier(s)}
-                      className="w-full text-left px-3 py-2.5 hover:bg-indigo-50 border-b border-gray-50 last:border-0">
+                  {filteredSups.map((s,idx)=>(
+                    <button key={s.id} type="button" onMouseDown={()=>selectSupplier(s)} onMouseEnter={()=>setSupHighlight(idx)}
+                      className={`w-full text-left px-3 py-2.5 border-b border-gray-50 last:border-0 ${idx===supHighlight?"bg-indigo-50":"hover:bg-indigo-50"}`}>
                       <p className="text-sm font-medium text-gray-800">{s.name}</p>
                       <p className="text-[10px] text-gray-400">{s.cnpj||""} {s.paymentTerms?`· Prazo: ${s.paymentTerms} dias`:""}</p>
                     </button>
