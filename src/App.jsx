@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.14.5";
+const APP_VERSION = "3.15.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -3930,11 +3930,10 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
   const isNew = !supplier;
   const [activeTab, setActiveTab] = useState("dados");
   const [form, setForm] = useState(supplier
-    ? { ...supplier, tagsInput: supplier.tags.join(", ") }
+    ? { ...supplier }
     : { name:"", cnpj:"", contact:"", phone:"", email:"", website:"",
         city:"", state:"", cep:"", rua:"", numero:"", complemento:"", bairro:"",
-        category:"Linhas / Fios", status:"Ativo", rating:3, paymentTerms:"30 dias",
-        minOrder:"", discount:"", tagsInput:"", notes:"" });
+        category:"Linhas / Fios", status:"Ativo", paymentTerms:"30 dias", notes:"" });
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
 
   // Duplicate CNPJ check
@@ -3949,9 +3948,7 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
   const handleSave = () => {
     if (!form.name.trim()) return;
     if (cnpjDuplicate) return;
-    const tags = form.tagsInput.split(",").map(t=>t.trim()).filter(Boolean);
-    onSave({ ...form, tags, rating:Number(form.rating), minOrder:Number(form.minOrder)||0, discount:Number(form.discount)||0,
-      totalPurchased:supplier?.totalPurchased||0, lastPurchase:supplier?.lastPurchase||"" });
+    onSave({ ...form, totalPurchased:supplier?.totalPurchased||0, lastPurchase:supplier?.lastPurchase||"" });
   };
 
   // Financial data for this supplier
@@ -4074,30 +4071,6 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
                     {SUP_STATUSES.map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
-              </div>
-              {/* 8. Ped. Mínimo + Desconto */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">Ped. Mínimo (R$)</label>
-                  <input type="number" min="0" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    value={form.minOrder} onChange={e=>set("minOrder",e.target.value)} placeholder="0"/>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">Desconto %</label>
-                  <input type="number" min="0" max="100" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    value={form.discount} onChange={e=>set("discount",e.target.value)} placeholder="0"/>
-                </div>
-              </div>
-              {/* 9. Avaliação */}
-              <div>
-                <label className="text-xs font-medium text-gray-600 mb-2 block">Avaliação</label>
-                <StarRating value={form.rating} onChange={v=>set("rating",v)}/>
-              </div>
-              {/* 10. Tags */}
-              <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Tags <span className="text-gray-400 font-normal">(separar por vírgula)</span></label>
-                <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  value={form.tagsInput} onChange={e=>set("tagsInput",e.target.value)} placeholder="confiável, atacado, industrial..."/>
               </div>
               {/* 11. Observações */}
               <div>
@@ -4330,19 +4303,10 @@ const SupplierDetailPanel = ({ supplier, finance, purchases, onUpdatePurchase, o
             ))}
           </div>
 
-          {/* Avaliação + Desde */}
-          <div className="flex items-center justify-between">
-            <StarRating value={supplier.rating} readOnly/>
+          {/* Desde */}
+          <div className="flex items-center justify-end">
             <span className="text-xs text-gray-400">Desde {supplier.createdAt}</span>
           </div>
-
-          {/* Desconto negociado */}
-          {supplier.discount > 0 && (
-            <div className="bg-green-50 border border-green-100 rounded-xl px-3 py-2 flex items-center gap-2">
-              <span className="text-green-500 text-base font-bold">%</span>
-              <span className="text-sm text-green-700 font-medium">Desconto negociado: <strong>{supplier.discount}%</strong></span>
-            </div>
-          )}
 
           {/* Bloco de contato — mesma estrutura do cliente */}
           <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-2.5">
@@ -4398,31 +4362,13 @@ const SupplierDetailPanel = ({ supplier, finance, purchases, onUpdatePurchase, o
             )}
           </div>
 
-          {/* Prazo + Ped. Mínimo */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
-              <p className="text-[10px] text-indigo-500 uppercase tracking-wide font-medium">Prazo Pgto.</p>
-              <p className="text-sm font-bold text-indigo-700 mt-0.5">
-                {Number(supplier.paymentTerms)>0 ? `${supplier.paymentTerms} dias` : "À vista"}
-              </p>
-            </div>
-            <div className="bg-gray-50 border border-gray-100 rounded-xl p-3">
-              <p className="text-[10px] text-gray-400 uppercase tracking-wide">Ped. Mínimo</p>
-              <p className="text-sm font-bold text-gray-800 mt-0.5">
-                {supplier.minOrder ? fmt(supplier.minOrder) : "Sem mínimo"}
-              </p>
-            </div>
+          {/* Prazo de Pagamento */}
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+            <p className="text-[10px] text-indigo-500 uppercase tracking-wide font-medium">Prazo Pgto.</p>
+            <p className="text-sm font-bold text-indigo-700 mt-0.5">
+              {Number(supplier.paymentTerms)>0 ? `${supplier.paymentTerms} dias` : "À vista"}
+            </p>
           </div>
-
-          {/* Tags */}
-          {supplier.tags?.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tags</p>
-              <div className="flex flex-wrap gap-1.5">
-                {supplier.tags.map(t=><span key={t} className="px-2.5 py-1 bg-indigo-50 text-indigo-600 text-xs rounded-full font-medium">#{t}</span>)}
-              </div>
-            </div>
-          )}
 
           {/* Observações */}
           {supplier.notes && (
@@ -4544,7 +4490,6 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
 
   const ativos   = suppliers.filter(s=>s.status==="Ativo").length;
   const totalBought = purchases.filter(p=>p.status!=="Cancelado").reduce((s,p)=>s+(p.total||0), 0);
-  const avgRating = suppliers.length ? (suppliers.reduce((s,x)=>s+x.rating,0)/suppliers.length).toFixed(1) : "—";
 
   const filtered = useMemo(() => suppliers
     .filter(s => filterCat    === "Todas" || s.category === filterCat)
@@ -4596,7 +4541,7 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
           <p className="text-xs text-gray-500 uppercase tracking-wide">Total</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{suppliers.length}</p>
@@ -4605,10 +4550,6 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
         <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
           <p className="text-xs text-gray-500 uppercase tracking-wide">Total Comprado</p>
           <p className="text-2xl font-bold text-indigo-700 mt-1">{fmt(totalBought)}</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-          <p className="text-xs text-gray-500 uppercase tracking-wide">Avaliação Média</p>
-          <p className="text-2xl font-bold text-amber-500 mt-1">⭐ {avgRating}</p>
         </div>
         <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
           <p className="text-xs text-gray-500 uppercase tracking-wide">Em Avaliação</p>
