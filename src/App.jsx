@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.15.7";
+const APP_VERSION = "3.15.8";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -141,9 +141,9 @@ async function saveSuppliers(s) {
   try { await window.storage.set(FOR_KEY, JSON.stringify(s)); } catch(_){} }
 
 // ─── Purchase Orders Seed & Storage ──────────────────────────────────────
-const PC_STATUS = ["Rascunho","Enviado","Confirmado","Recebido Parcial","Recebido","Cancelado"];
+const PC_STATUS = ["Em Aberto","Enviado","Confirmado","Recebido Parcial","Recebido","Cancelado"];
 const PC_STATUS_STYLES = {
-  "Rascunho":        { bg:"bg-gray-100",   text:"text-gray-600"   },
+  "Em Aberto":       { bg:"bg-gray-100",   text:"text-gray-600"   },
   "Enviado":         { bg:"bg-blue-100",   text:"text-blue-700"   },
   "Confirmado":      { bg:"bg-indigo-100", text:"text-indigo-700" },
   "Recebido Parcial":{ bg:"bg-amber-100",  text:"text-amber-700"  },
@@ -8680,7 +8680,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
 
   const [form, setForm] = useState(purchase ? { ...purchase } : {
     supplierId:"", supplierName:"", date:today(), expectedDate:"", receivedDate:"",
-    status:"Rascunho", paymentTerms:"30 dias", freight:0, discount:0,
+    status:"Em Aberto", paymentTerms:"30 dias", freight:0, discount:0,
     dueDate:"", nfNumber:"", notes:"", items:[emptyItem()], subtotal:0, total:0,
   });
 
