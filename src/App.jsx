@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.14.0";
+const APP_VERSION = "3.14.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9285,6 +9285,7 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
   const [finalizing, setFinalizing] = useState(false);
   const [result, setResult] = useState(null);
   const [err, setErr] = useState("");
+  const skuInputRef = useRef(null);
 
   const getPdvPrice = (prod) => {
     const cp = prod.channelPrices?.["Loja Própria"];
@@ -9406,6 +9407,15 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
         <div className="relative">
           <input type="text" autoFocus value={skuSearch} onChange={e=>setSkuSearch(e.target.value)}
+            ref={skuInputRef}
+            onKeyDown={e=>{
+              if (e.key==="Tab" && filteredProducts.length>0) {
+                e.preventDefault();
+                const exact = filteredProducts.find(p=>(p.sku||"").toLowerCase()===skuSearch.trim().toLowerCase());
+                addToCart(exact||filteredProducts[0]);
+                setTimeout(()=>skuInputRef.current?.focus(), 0);
+              }
+            }}
             placeholder="Buscar produto por SKU ou nome..."
             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
           {filteredProducts.length>0 && (
