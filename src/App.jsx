@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.15.10";
+const APP_VERSION = "3.15.11";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8836,10 +8836,8 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
               )}
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
-              <select className={inp} value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
-                {PC_STATUS.map(s=><option key={s}>{s}</option>)}
-              </select>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Número da NF</label>
+              <input className={inp} value={form.nfNumber||""} onChange={e=>setForm(f=>({...f,nfNumber:e.target.value}))} placeholder="NF-e 000000"/>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Previsão de Entrega</label>
@@ -8978,11 +8976,13 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
             </div>
           </div>
 
-          {/* NF + Observações */}
+          {/* Status + Observações */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Número da NF</label>
-              <input className={inp} value={form.nfNumber||""} onChange={e=>setForm(f=>({...f,nfNumber:e.target.value}))} placeholder="NF-e 000000"/>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
+              <select className={inp} value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
+                {PC_STATUS.map(s=><option key={s}>{s}</option>)}
+              </select>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Observações</label>
