@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.12.2";
+const APP_VERSION = "3.12.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -490,7 +490,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
                   const newCh=e.target.value;
                   setForm(f=>{
                     const itemsList=(f.itemsList||[]).map(it=>{
-                      const prod=products.find(p=>p.id===it._prodId);
+                      const prod=products.find(p=>String(p.id)===String(it._prodId));
                       if(!prod)return it;
                       const cp=prod.channelPrices?.[newCh];
                       const price=cp?(typeof cp==='object'?cp.price:cp):0;
@@ -621,17 +621,20 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">🚚 Frete (R$)</label>
                 <input type="number" min="0" step="0.01" className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                  value={form.freight||0} onChange={e=>set("freight",e.target.value)} placeholder="0,00"/>
+                  value={form.freight===0||form.freight===""?"":form.freight} onChange={e=>set("freight",e.target.value)}
+                  onBlur={e=>{ if (e.target.value==="") set("freight",0); }} placeholder="0,00"/>
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">🏪 Taxa Canal (R$)</label>
                 <input type="number" min="0" step="0.01" className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                  value={form.channelFee||0} onChange={e=>set("channelFee",e.target.value)} placeholder="0,00"/>
+                  value={form.channelFee===0||form.channelFee===""?"":form.channelFee} onChange={e=>set("channelFee",e.target.value)}
+                  onBlur={e=>{ if (e.target.value==="") set("channelFee",0); }} placeholder="0,00"/>
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">➕ Outras (R$)</label>
                 <input type="number" min="0" step="0.01" className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                  value={form.otherFees||0} onChange={e=>set("otherFees",e.target.value)} placeholder="0,00"/>
+                  value={form.otherFees===0||form.otherFees===""?"":form.otherFees} onChange={e=>set("otherFees",e.target.value)}
+                  onBlur={e=>{ if (e.target.value==="") set("otherFees",0); }} placeholder="0,00"/>
               </div>
             </div>
             <div className="flex items-center justify-between border-t border-gray-200 pt-2">
@@ -2076,14 +2079,16 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
       const label = d.toLocaleDateString("pt-BR", { month:"short" }).replace(".","");
       const txs = activeFin.filter(t => t.date.startsWith(key));
       const ordersRec = (orders||[]).filter(o => o.paidDate && o.paidDate.startsWith(key) && o.status !== "Cancelado");
+      const purchasesRec = (purchases||[]).filter(p => p.paidDate && p.paidDate.startsWith(key) && p.status !== "Cancelado");
       return {
         label,
         receitas: txs.filter(t => t.type==="receita").reduce((s,t) => s+t.amount, 0)
                 + ordersRec.reduce((s,o) => s+valorRecebidoOrder(o), 0),
-        despesas: txs.filter(t => t.type==="despesa").reduce((s,t) => s+t.amount, 0),
+        despesas: txs.filter(t => t.type==="despesa").reduce((s,t) => s+t.amount, 0)
+                + purchasesRec.reduce((s,p) => s+(p.total||0), 0),
       };
     });
-  }, [finance, orders]);
+  }, [finance, orders, purchases]);
 
   // ── DRE categories for current period ──
   const dreData = useMemo(() => {
@@ -2097,8 +2102,13 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
       if (!cats[cat]) cats[cat] = { cat, type:"receita", total:0 };
       cats[cat].total += valorRecebidoOrder(o);
     });
+    paidPurchasesInPeriod.forEach(p => {
+      const cat = p.supplier || "Compras";
+      if (!cats[cat]) cats[cat] = { cat, type:"despesa", total:0 };
+      cats[cat].total += (p.total||0);
+    });
     return Object.values(cats).sort((a,b) => b.total-a.total);
-  }, [periodActive, paidOrdersInPeriod]);
+  }, [periodActive, paidOrdersInPeriod, paidPurchasesInPeriod]);
 
   // ── Filtered list ──
   const allCats = ["Todas", ...INCOME_CATS, ...EXPENSE_CATS];
@@ -4666,13 +4676,20 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
     orders.filter(o => o.status !== "Cancelado" && filterByDate(o.date))
   , [orders, filterMode, period, dateFrom, dateTo]);
 
+  const periodPurchases = useMemo(() =>
+    (purchases||[]).filter(p => p.status !== "Cancelado" && filterByDate(p.date))
+  , [purchases, filterMode, period, dateFrom, dateTo]);
+
   // KPIs
   const receitasFin    = activeFin.filter(f=>f.type==="receita").reduce((s,f)=>s+f.amount,0);
-  const totalDespesas  = activeFin.filter(f=>f.type==="despesa").reduce((s,f)=>s+f.amount,0);
+  const despesasFin    = activeFin.filter(f=>f.type==="despesa").reduce((s,f)=>s+f.amount,0);
   const totalPedidos   = periodOrders.length;
   const receitasOrders = periodOrders.filter(o=>o.status!=="Cancelado").reduce((s,o)=>s+o.total,0);
+  const despesasCompras = periodPurchases.reduce((s,p)=>s+(p.total||0),0);
   // Receita total = pedidos do período + lançamentos financeiros de receita (sem dupla contagem)
   const totalReceitas  = receitasOrders + receitasFin;
+  // Despesa total = compras do período + lançamentos financeiros de despesa (mesmo raciocínio)
+  const totalDespesas  = despesasCompras + despesasFin;
   const resultado      = totalReceitas - totalDespesas;
   const margem         = totalReceitas > 0 ? resultado/totalReceitas*100 : 0;
   const ticketMedio    = totalPedidos > 0 ? receitasOrders/totalPedidos : 0;
@@ -9848,7 +9865,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                   // Re-price items that have channel-specific prices
                   const items = f.items.map(it => {
                     if (!it._prodId) return {...it, [Symbol.for("skip")]:true};
-                    const prod = products.find(p=>p.id===it._prodId);
+                    const prod = products.find(p=>String(p.id)===String(it._prodId));
                     if (!prod) return it;
                     const cpRaw2 = prod.channelPrices?.[newChannel];
                     const channelPrice = cpRaw2 ? (typeof cpRaw2==='object' ? cpRaw2.price : cpRaw2) : 0;
