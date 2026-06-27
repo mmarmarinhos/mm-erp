@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.13.1";
+const APP_VERSION = "3.14.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -186,6 +186,10 @@ async function loadProducts()  { try { const r = await window.storage.get(PRD_KE
 async function saveProducts(p) { try { await window.storage.set(PRD_KEY, JSON.stringify(p)); } catch(_){} }
 async function loadMovements() { try { const r = await window.storage.get(MOV_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){} return SEED_MOVEMENTS; }
 async function saveMovements(m){ try { await window.storage.set(MOV_KEY, JSON.stringify(m)); } catch(_){} }
+
+const CAIXA_KEY = "erp-mmarmarinhos-caixa";
+async function loadCaixa()  { try { const r = await window.storage.get(CAIXA_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){} return []; }
+async function saveCaixa(c) { try { await window.storage.set(CAIXA_KEY, JSON.stringify(c)); } catch(_){} }
 
 // ─── Fiscal Constants ─────────────────────────────────────────────────────
 const NF_TIPOS    = ["NF-e","NFC-e","NFS-e"];
@@ -8184,7 +8188,7 @@ const SyncOperationsPanel = ({ orders, setOrders, backendUrl }) => {
 };
 
 // ─── Roles & Permissions ─────────────────────────────────────────────────
-const ALL_MODULES = ["dashboard","orders","cotacao","inventory","pricing","pricehunt",
+const ALL_MODULES = ["dashboard","orders","cotacao","inventory","pricing","pricehunt","pdv",
                      "finance","fiscal","crm","suppliers","purchases","reports","movimentos","cadastros","parametros"];
 
 const ROLES_DEF = {
@@ -9206,6 +9210,286 @@ const StockEntryModal = ({ purchase, products = [], onClose, onConfirm }) => {
           </button>
         </div>
       </div>
+    </div>
+  );
+};
+
+const AbrirCaixaModal = ({ onClose, onConfirm }) => {
+  const [valor, setValor] = useState("");
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <h3 className="font-bold text-gray-900">🔓 Abrir Caixa</h3>
+        <div>
+          <label className="text-xs font-medium text-gray-600 mb-1 block">Valor inicial em dinheiro (R$)</label>
+          <input type="number" min="0" step="0.01" autoFocus className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            value={valor} onChange={e=>setValor(e.target.value)} placeholder="0,00"/>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button onClick={()=>onConfirm(valor)} className="flex-1 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700">Abrir Caixa</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const FecharCaixaModal = ({ caixaAtual, vendas, onClose, onConfirm }) => {
+  const [valorContado, setValorContado] = useState("");
+  const totalPorForma = (forma) => vendas.filter(o=>o.payment===forma).reduce((s,o)=>s+(o.total||0),0);
+  const totalDinheiro = totalPorForma("dinheiro");
+  const totalCredito  = totalPorForma("credito");
+  const totalDebito   = totalPorForma("debito");
+  const totalPix      = totalPorForma("pix");
+  const esperadoDinheiro = (Number(caixaAtual.valorInicial)||0) + totalDinheiro;
+  const diferenca = valorContado!=="" ? (Number(valorContado)||0) - esperadoDinheiro : null;
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <h3 className="font-bold text-gray-900">🔒 Fechar Caixa</h3>
+        <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-1">
+          <div className="flex justify-between"><span className="text-gray-500">Abertura</span><span>{fmt(caixaAtual.valorInicial)}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">💵 Dinheiro</span><span>{fmt(totalDinheiro)}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">💳 Crédito</span><span>{fmt(totalCredito)}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">💳 Débito</span><span>{fmt(totalDebito)}</span></div>
+          <div className="flex justify-between"><span className="text-gray-500">📱 Pix</span><span>{fmt(totalPix)}</span></div>
+          <div className="flex justify-between font-bold border-t border-gray-200 pt-1 mt-1"><span>Esperado em dinheiro</span><span>{fmt(esperadoDinheiro)}</span></div>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-600 mb-1 block">Dinheiro contado na gaveta (R$)</label>
+          <input type="number" min="0" step="0.01" autoFocus className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            value={valorContado} onChange={e=>setValorContado(e.target.value)} placeholder="0,00"/>
+          {diferenca!==null && (
+            <p className={`text-xs mt-1 font-semibold ${diferenca===0?"text-green-600":diferenca>0?"text-blue-600":"text-red-500"}`}>
+              {diferenca===0 ? "✅ Caixa exato" : diferenca>0 ? `🔵 Sobra de ${fmt(diferenca)}` : `🔴 Falta de ${fmt(Math.abs(diferenca))}`}
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button onClick={()=>onConfirm(valorContado)} className="flex-1 py-2 bg-rose-600 text-white rounded-xl text-sm font-semibold hover:bg-rose-700">Fechar Caixa</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movements = [], setMovements, customers = [], caixa = [], setCaixa, params, currentUser }) => {
+  const caixaAtual = caixa.find(c => c.status === "aberto");
+  const [skuSearch, setSkuSearch] = useState("");
+  const [cart, setCart] = useState([]);
+  const [payment, setPayment] = useState("dinheiro");
+  const [showAbrirCaixa, setShowAbrirCaixa] = useState(false);
+  const [showFecharCaixa, setShowFecharCaixa] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [result, setResult] = useState(null);
+  const [err, setErr] = useState("");
+
+  const getPdvPrice = (prod) => {
+    const cp = prod.channelPrices?.["Loja Própria"];
+    const channelPrice = cp ? (typeof cp==="object" ? Number(cp.price)||0 : Number(cp)||0) : 0;
+    return channelPrice>0 ? channelPrice : (Number(prod.price)||0);
+  };
+
+  const filteredProducts = skuSearch.trim().length>0
+    ? products.filter(p => (p.sku||"").toLowerCase().includes(skuSearch.toLowerCase()) || (p.name||"").toLowerCase().includes(skuSearch.toLowerCase())).slice(0,6)
+    : [];
+
+  const addToCart = (p) => {
+    setCart(prev => {
+      const existing = prev.find(i => String(i._prodId)===String(p.id));
+      if (existing) return prev.map(i => String(i._prodId)===String(p.id) ? {...i, qty:i.qty+1, total:(i.qty+1)*i.unitPrice} : i);
+      const unitPrice = getPdvPrice(p);
+      return [...prev, { _prodId:p.id, sku:p.sku||"", description:p.name, ncm:p.ncm||"", cfop:"5102", unitPrice, qty:1, total:unitPrice }];
+    });
+    setSkuSearch("");
+  };
+
+  const updateQty = (prodId, qty) => {
+    const q = Math.max(1, parseInt(qty)||1);
+    setCart(prev => prev.map(i => String(i._prodId)===String(prodId) ? {...i, qty:q, total:q*i.unitPrice} : i));
+  };
+  const removeItem = (prodId) => setCart(prev => prev.filter(i=>String(i._prodId)!==String(prodId)));
+  const cartTotal = cart.reduce((s,i)=>s+i.total, 0);
+
+  const handleAbrirCaixa = (valorInicial) => {
+    setCaixa(prev => [...prev, {
+      id: `CX-${Date.now()}`, dataAbertura: new Date().toISOString(), valorInicial: Number(valorInicial)||0,
+      usuarioAbertura: currentUser?.displayName||currentUser?.username||"", status: "aberto",
+    }]);
+    setShowAbrirCaixa(false);
+  };
+
+  const vendasDoCaixa = caixaAtual ? orders.filter(o => o.channel==="PDV" && o.caixaId===caixaAtual.id) : [];
+
+  const handleFecharCaixa = (valorContado) => {
+    setCaixa(prev => prev.map(c => c.id===caixaAtual.id ? {
+      ...c, status:"fechado", dataFechamento: new Date().toISOString(), valorContado: Number(valorContado)||0,
+      usuarioFechamento: currentUser?.displayName||currentUser?.username||"",
+      totalVendas: vendasDoCaixa.reduce((s,o)=>s+(o.total||0),0),
+    } : c));
+    setShowFecharCaixa(false);
+  };
+
+  const handleFinalizar = async () => {
+    if (!cart.length || finalizing) return;
+    setErr(""); setFinalizing(true);
+    try {
+      const newId = nextId(orders);
+      const newOrder = {
+        id: newId, customer: "Consumidor", channel: "PDV", status: "Entregue",
+        total: cartTotal, subtotal: cartTotal, date: today(), payment, paidDate: today(),
+        itemsList: cart, caixaId: caixaAtual?.id || null,
+      };
+
+      setProducts(prev => prev.map(prod => {
+        const it = cart.find(i => String(i._prodId)===String(prod.id));
+        if (!it) return prod;
+        return { ...prod, stock: Math.max(0, (prod.stock||0)-(it.qty||0)) };
+      }));
+      setMovements(prev => {
+        const nums = prev.map(m=>parseInt(String(m.id).replace("MOV-",""))||0);
+        const base = Math.max(0,...nums,0);
+        const novas = cart.filter(i=>i._prodId).map((i,idx)=>({
+          id:`MOV-${String(base+idx+1).padStart(3,"0")}`, productId:i._prodId, type:"saida",
+          qty:i.qty, date: today(), reason:"Venda PDV", notes:`Venda PDV ${newId}`,
+        }));
+        return [...prev, ...novas];
+      });
+
+      let nfceResult = null;
+      if (params?.fiscal?.provider === "focus") {
+        const token = getSession()?.token;
+        const r = await fetch("/api/nfe-issue", {
+          method: "POST",
+          headers: { "Content-Type":"application/json", ...(token?{Authorization:`Bearer ${token}`}:{}) },
+          body: JSON.stringify({ order:newOrder, ref:`${newId}-${Date.now()}`, tipo:"nfce" }),
+        });
+        nfceResult = await r.json().catch(()=>({ ok:false, error:"Erro de comunicação" }));
+        if (nfceResult.ok) {
+          newOrder.nfceStatus = nfceResult.status; newOrder.nfceChave = nfceResult.chave;
+          newOrder.nfcePdfUrl = nfceResult.pdfUrl; newOrder.nfceQrcode = nfceResult.qrcodeUrl;
+        }
+      }
+
+      setOrders(prev => [...prev, newOrder]);
+      setResult({ order:newOrder, nfce:nfceResult });
+      setCart([]);
+    } catch(e) { setErr("Erro: "+e.message); }
+    setFinalizing(false);
+  };
+
+  if (!caixaAtual) {
+    return (
+      <div className="flex items-center justify-center" style={{minHeight:"60vh"}}>
+        <div className="text-center">
+          <p className="text-5xl mb-3">🔒</p>
+          <p className="text-gray-500 mb-4">Nenhum caixa aberto. Abra o caixa pra começar a vender.</p>
+          <button onClick={()=>setShowAbrirCaixa(true)} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700">🔓 Abrir Caixa</button>
+        </div>
+        {showAbrirCaixa && <AbrirCaixaModal onClose={()=>setShowAbrirCaixa(false)} onConfirm={handleAbrirCaixa}/>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+        <div>
+          <p className="text-sm font-semibold text-gray-800">🟢 Caixa aberto</p>
+          <p className="text-xs text-gray-400">Desde {new Date(caixaAtual.dataAbertura).toLocaleString("pt-BR")} · {vendasDoCaixa.length} venda(s) · {fmt(vendasDoCaixa.reduce((s,o)=>s+(o.total||0),0))}</p>
+        </div>
+        <button onClick={()=>setShowFecharCaixa(true)} className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-sm font-medium hover:bg-rose-100">🔒 Fechar Caixa</button>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
+        <div className="relative">
+          <input type="text" autoFocus value={skuSearch} onChange={e=>setSkuSearch(e.target.value)}
+            placeholder="Buscar produto por SKU ou nome..."
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
+          {filteredProducts.length>0 && (
+            <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+              {filteredProducts.map(p=>(
+                <button key={p.id} onClick={()=>addToCart(p)} className="w-full text-left px-4 py-2.5 hover:bg-indigo-50 flex items-center justify-between border-b border-gray-50 last:border-0">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{p.name}</p>
+                    <p className="text-xs text-gray-400">{p.sku}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-indigo-600">{fmt(getPdvPrice(p))}</p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {cart.length===0 ? (
+          <p className="text-sm text-gray-400 text-center py-10">Carrinho vazio — busque um produto acima</p>
+        ) : (
+          <div className="space-y-2">
+            {cart.map(item=>(
+              <div key={item._prodId} className="flex items-center gap-2 bg-gray-50 rounded-xl p-2.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{item.description}</p>
+                  <p className="text-xs text-gray-400">{fmt(item.unitPrice)} cada</p>
+                </div>
+                <input type="number" min="1" value={item.qty} onChange={e=>updateQty(item._prodId, e.target.value)}
+                  className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-sm text-center"/>
+                <p className="w-20 text-right text-sm font-semibold text-gray-800">{fmt(item.total)}</p>
+                <button onClick={()=>removeItem(item._prodId)} className="text-gray-300 hover:text-red-500 px-1">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {cart.length>0 && (
+          <>
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <p className="text-sm font-semibold text-gray-600">Total</p>
+              <p className="text-2xl font-bold text-gray-900">{fmt(cartTotal)}</p>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {[["dinheiro","💵 Dinheiro"],["credito","💳 Crédito"],["debito","💳 Débito"],["pix","📱 Pix"]].map(([id,label])=>(
+                <button key={id} onClick={()=>setPayment(id)}
+                  className={`py-2 rounded-xl text-xs font-semibold border-2 transition-colors ${payment===id?"border-indigo-500 bg-indigo-50 text-indigo-700":"border-gray-100 text-gray-500"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {err && <p className="text-red-500 text-xs">{err}</p>}
+            <button onClick={handleFinalizar} disabled={finalizing}
+              className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50">
+              {finalizing ? "Finalizando..." : "✅ Finalizar Venda"}
+            </button>
+          </>
+        )}
+      </div>
+
+      {showAbrirCaixa && <AbrirCaixaModal onClose={()=>setShowAbrirCaixa(false)} onConfirm={handleAbrirCaixa}/>}
+      {showFecharCaixa && <FecharCaixaModal caixaAtual={caixaAtual} vendas={vendasDoCaixa} onClose={()=>setShowFecharCaixa(false)} onConfirm={handleFecharCaixa}/>}
+
+      {result && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-3 text-center">
+            <p className="text-4xl">✅</p>
+            <p className="font-bold text-gray-900">Venda {result.order.id} finalizada!</p>
+            <p className="text-2xl font-bold text-emerald-600">{fmt(result.order.total)}</p>
+            {result.nfce && (
+              result.nfce.ok ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-sm text-emerald-800">
+                  <p className="font-semibold">🧾 NFC-e autorizada — nº {result.nfce.numero}</p>
+                  {result.nfce.pdfUrl && <a href={result.nfce.pdfUrl} target="_blank" rel="noreferrer" className="underline block mt-1">Ver cupom (DANFCe)</a>}
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
+                  ⚠️ Venda registrada, mas a NFC-e não foi emitida: {result.nfce.error}
+                </div>
+              )
+            )}
+            <button onClick={()=>setResult(null)} className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700">Próxima venda</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -12149,6 +12433,7 @@ const NAV = [
   { id: "suppliers",  label: "Fornecedores",     icon: "suppliers"  },
   { id: "purchases",  label: "Compras",          icon: "orders"     },
   { id: "inventory",  label: "Estoque",          icon: "inventory"  },
+  { id: "pdv",        label: "🛒 PDV",           icon: "orders"     },
   { id: "fiscal",     label: "Fiscal",           icon: "finance"    },
   { id: "pricing",    label: "Tabela de Preços",  icon: "tag"        },
   { id: "pricehunt",  label: "PriceHunt",        icon: "search"     },
@@ -12244,6 +12529,7 @@ function ERPApp({ currentUser, onLogout }) {
   const [suppliers, setSuppliers]   = useState([]);
   const [products, setProducts]     = useState([]);
   const [movements, setMovements]   = useState([]);
+  const [caixa, setCaixaState]      = useState([]);
   const [nfes, setNfes]             = useState([]);
   const [purchases, setPurchases]   = useState([]);
   const [cotacoes,  setCotacoes]    = useState([]);
@@ -12269,12 +12555,13 @@ function ERPApp({ currentUser, onLogout }) {
 
   useEffect(() => {
     Promise.all([loadOrders(),loadFinance(),loadCustomers(),loadSuppliers(),loadProducts(),loadMovements(),loadNfes(),loadPurchases(),loadCotacoes(),loadParams(),
-      loadRepresentantes(),loadContas(),loadFormasPagamento(),loadVariantCatalogs(),loadFechamentos(),
+      loadRepresentantes(),loadContas(),loadFormasPagamento(),loadVariantCatalogs(),loadFechamentos(),loadCaixa(),
       window.storage.get(EMPRESA_KEY).catch(()=>null)])
-      .then(([o,f,c,s,p,m,n,pc,cot,prm,reps,ctas,fps,vcats,fechs,emp]) => {
+      .then(([o,f,c,s,p,m,n,pc,cot,prm,reps,ctas,fps,vcats,fechs,cx,emp]) => {
         setOrders(o);setFinance(f);setSuppliers(s);setProducts(p);setMovements(m);setNfes(n);setPurchases(pc);setCotacoes(cot);
         if (prm) setParamsState(prm);
         setRepresentantes_(reps); setContas_(ctas); setFormasPagamento_(fps); setVariantCatalogs_(vcats); setFechamentos_(fechs);
+        setCaixaState(cx);
         if (emp?.value) setEmpresaForm(JSON.parse(emp.value));
 
         // ── Automação: inativar clientes sem compras há 30+ dias ──
@@ -12402,6 +12689,14 @@ function ERPApp({ currentUser, onLogout }) {
     });
   }, []);
 
+  const updateCaixa = useCallback((updater) => {
+    setCaixaState(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      saveCaixa(next);
+      return next;
+    });
+  }, []);
+
   const updateNfes = useCallback((updater) => {
     setNfes(prev => {
       const next = typeof updater === "function" ? updater(prev) : updater;
@@ -12493,6 +12788,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases}/>;
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements}/>;
+      case "pdv": return <PdvModule products={products} setProducts={updateProducts} orders={orders} setOrders={updateOrders} movements={movements} setMovements={updateMovements} customers={customers} caixa={caixa} setCaixa={updateCaixa} params={params} currentUser={currentUser}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
       case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento} variantCatalogs={variantCatalogs} setVariantCatalogs={updateVariantCatalogs}/>;
       case "parametros": return <ParamsModule params={params} setParams={updateParams} onSaveEmpresa={(data)=>setEmpresaForm(data)} orders={orders} setOrders={updateOrders}/>;

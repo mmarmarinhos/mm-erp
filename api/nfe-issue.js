@@ -126,6 +126,59 @@ async function issueViaFocusNFe({ token, ambiente, empresa, order, ref }) {
   return { ok:false, error: data.mensagem || `Erro ${r.status}`, detalhes: data.erros, raw: data };
 }
 
+// ───────────────────────── Focus NFC-e (venda no balcão) ─────────────────────────
+// Forma de pagamento (tPag): 01 Dinheiro / 03 Crédito / 04 Débito / 20 Pix estático.
+// Usamos Pix "estático" (20) em vez do "dinâmico" (17) porque o último passou a
+// exigir dados de maquininha/TEF integrados (NT 2025.001) que não temos hoje.
+const FORMA_PAGAMENTO_NFCE = { dinheiro: "01", credito: "03", debito: "04", pix: "20" };
+
+async function issueViaFocusNFCe({ token, ambiente, empresa, order, ref }) {
+  const baseUrl = ambiente === "producao" ? "https://api.focusnfe.com.br/v2" : "https://homologacao.focusnfe.com.br/v2";
+  const auth = "Basic " + Buffer.from(token + ":").toString("base64");
+
+  const payload = {
+    cnpj_emitente: soNumeros(empresa.cnpj),
+    data_emissao: new Date().toISOString(),
+    presenca_comprador: "1", // presencial (balcão)
+    modalidade_frete: "9",
+    local_destino: "1",
+    natureza_operacao: "VENDA AO CONSUMIDOR",
+    items: (order.itemsList||[]).map((it, i) => ({
+      numero_item: String(i+1),
+      codigo_ncm: (it.ncm||"00000000").replace(/\D/g,""),
+      codigo_produto: it.sku || it._prodId || String(i+1),
+      descricao: it.description || it.name,
+      quantidade_comercial: Number(it.qty)||1,
+      quantidade_tributavel: Number(it.qty)||1,
+      cfop: it.cfop || "5102",
+      valor_unitario_comercial: Number(it.unitPrice)||0,
+      valor_unitario_tributavel: Number(it.unitPrice)||0,
+      valor_bruto: Number(it.total)||0,
+      unidade_comercial: "UN", unidade_tributavel: "UN",
+      icms_origem: "0",
+      icms_situacao_tributaria: empresa.regime === "Simples Nacional" ? "102" : "41",
+    })),
+    formas_pagamento: [{
+      forma_pagamento: FORMA_PAGAMENTO_NFCE[order.payment] || "99",
+      valor_pagamento: Number(order.total)||0,
+      tipo_integracao: "2", // não integrado (sem maquininha conectada ao sistema)
+    }],
+  };
+
+  const r = await fetch(`${baseUrl}/nfce?ref=${encodeURIComponent(ref)}`, {
+    method: "POST",
+    headers: { Authorization: auth, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await r.json().catch(()=>({}));
+  if (r.status === 201 && data.status === "autorizado") {
+    return { ok:true, status:"autorizado", chave: data.chave_nfe, numero: data.numero, serie: data.serie,
+      pdfUrl: data.caminho_danfe ? `https://api.focusnfe.com.br${data.caminho_danfe}` : null,
+      qrcodeUrl: data.qrcode_url || null, raw: data };
+  }
+  return { ok:false, error: data.mensagem_sefaz || data.mensagem || `Erro ${r.status}`, raw: data };
+}
+
 // ───────────────────────── NFe.io ─────────────────────────
 async function issueViaNFeIo({ token, ambiente, empresa, order, ref }) {
   const baseUrl = "https://api.nfe.io/v1";
@@ -184,8 +237,9 @@ export default async function handler(req, res) {
   if (!session) return res.status(401).json({ error: "Sessão inválida ou expirada, faça login novamente" });
 
   try {
-    const { order, ref } = req.body || {};
+    const { order, ref, tipo } = req.body || {};
     if (!order) return res.status(400).json({ error: "Informe os dados do pedido" });
+    const docTipo = tipo === "nfce" ? "nfce" : "nfe";
 
     const fiscalCfg = await getKv("erp-mmarmarinhos-params"); // params completo
     const fiscal = fiscalCfg?.fiscal;
@@ -201,7 +255,10 @@ export default async function handler(req, res) {
     const args = { token: fiscal.token, ambiente: fiscal.ambiente||"homologacao", empresa, order, ref: ref || `mmerp-${Date.now()}` };
 
     let result;
-    if (fiscal.provider === "focus") result = await issueViaFocusNFe(args);
+    if (docTipo === "nfce") {
+      if (fiscal.provider !== "focus") return res.status(400).json({ error: "Emissão de NFC-e hoje só está disponível pelo fornecedor Focus NFe." });
+      result = await issueViaFocusNFCe(args);
+    } else if (fiscal.provider === "focus") result = await issueViaFocusNFe(args);
     else if (fiscal.provider === "nfeio") result = await issueViaNFeIo(args);
     else return res.status(400).json({ error: "Fornecedor de NF-e não reconhecido" });
 
