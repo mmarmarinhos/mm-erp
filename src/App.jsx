@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.15.4";
+const APP_VERSION = "3.15.5";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -5447,21 +5447,23 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], variantC
                 {INV_CATS.map(c=><option key={c}>{c}</option>)}
               </select>
             </div>
-            <div className="relative">
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Unidade</label>
-              <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                value={form.unit} onChange={e=>set("unit",e.target.value)}>
-                {INV_UNITS.map(u=><option key={u}>{u}</option>)}
-              </select>
-            </div>
           </div>
           {/* Prices */}
           <div className="border-t border-gray-100 pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Preços</p>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Custo (R$)</label>
-              <input type="number" min="0" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                value={form.cost} onChange={e=>set("cost",e.target.value)} placeholder="0,00"/>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Custo (R$)</label>
+                <input type="number" min="0" step="0.01" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  value={form.cost} onChange={e=>set("cost",e.target.value)} placeholder="0,00"/>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Unidade</label>
+                <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  value={form.unit} onChange={e=>set("unit",e.target.value)}>
+                  {INV_UNITS.map(u=><option key={u}>{u}</option>)}
+                </select>
+              </div>
             </div>
           </div>
           {/* Stock */}
