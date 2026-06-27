@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.14.2";
+const APP_VERSION = "3.14.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9286,6 +9286,9 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
   const [result, setResult] = useState(null);
   const [err, setErr] = useState("");
   const skuInputRef = useRef(null);
+  const [askAddItem, setAskAddItem] = useState(false);
+  const naoItemRef = useRef(null);
+  const simItemRef = useRef(null);
 
   const getPdvPrice = (prod) => {
     const cp = prod.channelPrices?.["Loja Própria"];
@@ -9305,7 +9308,7 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
       return [...prev, { _prodId:p.id, sku:p.sku||"", description:p.name, ncm:p.ncm||"", cfop:"5102", unitPrice, qty:1, total:unitPrice }];
     });
     setSkuSearch("");
-    setTimeout(()=>skuInputRef.current?.focus(), 0);
+    setAskAddItem(true);
   };
 
   const updateQty = (prodId, qty) => {
@@ -9477,6 +9480,30 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
 
       {showAbrirCaixa && <AbrirCaixaModal onClose={()=>setShowAbrirCaixa(false)} onConfirm={handleAbrirCaixa}/>}
       {showFecharCaixa && <FecharCaixaModal caixaAtual={caixaAtual} vendas={vendasDoCaixa} onClose={()=>setShowFecharCaixa(false)} onConfirm={handleFecharCaixa}/>}
+
+      {askAddItem && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onKeyDown={e=>{
+            if (e.key==="Escape") { setAskAddItem(false); return; }
+            if (e.key==="Tab") { e.preventDefault(); (document.activeElement===simItemRef.current ? naoItemRef : simItemRef).current?.focus(); }
+          }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 text-center">
+            <p className="text-3xl mb-2">➕</p>
+            <p className="font-semibold text-gray-900 mb-1">Adicionar outro item?</p>
+            <p className="text-sm text-gray-500 mb-4">Você pode continuar incluindo produtos nessa venda.</p>
+            <div className="flex gap-2">
+              <button ref={naoItemRef} onClick={()=>setAskAddItem(false)}
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+                Não, ir pro pagamento
+              </button>
+              <button ref={simItemRef} autoFocus onClick={()=>{ setAskAddItem(false); setTimeout(()=>skuInputRef.current?.focus(),50); }}
+                className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+                Sim, adicionar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {result && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
