@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.12.0";
+const APP_VERSION = "3.12.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -7279,29 +7279,40 @@ const TabelaPrecos = ({ products, setProducts }) => {
       if (p.id !== productId) return p;
       const unitCost  = Number(p.cost)||0;
       const current   = getData(p, ch);
-      const numVal    = field==="qtd" ? Math.max(1, parseInt(value)||1) : parseFloat(value)||0;
+      const isEmpty   = value === "";
+      const numVal    = isEmpty ? "" : (field==="qtd" ? Math.max(1, parseInt(value)||1) : parseFloat(value)||0);
       const updated   = { ...current, [field]: numVal };
-      const custoBase = unitCost * (updated.qtd||1);
+      const sn         = (v) => Number(v)||0; // leitura segura, mesmo se "" durante a digitação
+      const custoBase = unitCost * (sn(updated.qtd)||1);
 
       if (field === "price") {
         // Preço digitado → recalcula margem
-        updated.margin = calcMargin(updated.price, custoBase, updated.freight, updated.taxaPerc, updated.otherCosts);
+        updated.margin = calcMargin(sn(updated.price), custoBase, sn(updated.freight), sn(updated.taxaPerc), sn(updated.otherCosts));
       } else if (field === "margin") {
         // Margem digitada (incluindo 0) → recalcula preço apenas se margem > 0
-        if (numVal > 0) {
-          updated.price = calcPrice(custoBase, numVal, updated.freight, updated.taxaPerc, updated.otherCosts);
+        if (sn(numVal) > 0) {
+          updated.price = calcPrice(custoBase, sn(numVal), sn(updated.freight), sn(updated.taxaPerc), sn(updated.otherCosts));
         }
         // Se margem = 0, mantém o preço atual sem recalcular
       } else {
         // Qtd, frete, taxa, outros → recalcula preço se já tem margem definida, senão recalcula margem
-        if (updated.margin > 0) {
-          updated.price = calcPrice(custoBase, updated.margin, updated.freight, updated.taxaPerc, updated.otherCosts);
-        } else if (updated.price > 0) {
-          updated.margin = calcMargin(updated.price, custoBase, updated.freight, updated.taxaPerc, updated.otherCosts);
+        if (sn(updated.margin) > 0) {
+          updated.price = calcPrice(custoBase, sn(updated.margin), sn(updated.freight), sn(updated.taxaPerc), sn(updated.otherCosts));
+        } else if (sn(updated.price) > 0) {
+          updated.margin = calcMargin(sn(updated.price), custoBase, sn(updated.freight), sn(updated.taxaPerc), sn(updated.otherCosts));
         }
       }
 
       return { ...p, channelPrices: { ...(p.channelPrices||{}), [ch]: updated } };
+    }));
+  };
+
+  const setFieldBlur = (productId, ch, field) => {
+    setProducts(prev => prev.map(p => {
+      if (p.id !== productId) return p;
+      const current = getData(p, ch);
+      if (current[field] !== "") return p;
+      return { ...p, channelPrices: { ...(p.channelPrices||{}), [ch]: { ...current, [field]: 0 } } };
     }));
   };
 
@@ -7365,7 +7376,7 @@ const TabelaPrecos = ({ products, setProducts }) => {
             const cost = Number(p.cost)||0;
             const hasVariants = !p.parentId && products.some(x=>x.parentId===p.id);
             return (
-              <PriceTableRow key={p.id} p={p} cost={cost} getData={getData} setField={setField} CHANNELS={CHANNELS} CHANNEL_STYLES={CHANNEL_STYLES} fmt={fmt}
+              <PriceTableRow key={p.id} p={p} cost={cost} getData={getData} setField={setField} setFieldBlur={setFieldBlur} CHANNELS={CHANNELS} CHANNEL_STYLES={CHANNEL_STYLES} fmt={fmt}
                 hasVariants={hasVariants} onPropagate={()=>handlePropagateToVariants(p.id)}/>
             );
           })}
@@ -7376,7 +7387,7 @@ const TabelaPrecos = ({ products, setProducts }) => {
 };
 
 // ─── PriceTableRow — linha colapsável da tabela de preços ────────────────────
-const PriceTableRow = ({ p, cost, getData, setField, CHANNELS, CHANNEL_STYLES, fmt, hasVariants, onPropagate }) => {
+const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHANNEL_STYLES, fmt, hasVariants, onPropagate }) => {
   const [open, setOpen] = useState(false);
   const [propagated, setPropagated] = useState(false);
   const handlePropagateClick = (e) => {
@@ -7468,7 +7479,8 @@ const PriceTableRow = ({ p, cost, getData, setField, CHANNELS, CHANNEL_STYLES, f
                         <span className="text-[10px] text-gray-400">R$</span>
                         <input type="number" min="0" step="0.01"
                           className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
-                          value={d.price??""} placeholder="0,00" onChange={e=>setField(p.id, ch, "price", e.target.value)}/>
+                          value={d.price===0?"":d.price} placeholder="0,00" onChange={e=>setField(p.id, ch, "price", e.target.value)}
+                          onBlur={()=>setFieldBlur(p.id, ch, "price")}/>
                       </div>
                     </div>
                     <div>
@@ -7476,7 +7488,8 @@ const PriceTableRow = ({ p, cost, getData, setField, CHANNELS, CHANNEL_STYLES, f
                       <div className="flex items-center gap-0.5">
                         <input type="number" min="0" max="99" step="0.1"
                           className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
-                          value={d.margin??""} placeholder="0" onChange={e=>setField(p.id, ch, "margin", e.target.value)}/>
+                          value={d.margin===0?"":d.margin} placeholder="0" onChange={e=>setField(p.id, ch, "margin", e.target.value)}
+                          onBlur={()=>setFieldBlur(p.id, ch, "margin")}/>
                         <span className="text-[10px] text-gray-400">%</span>
                       </div>
                     </div>
@@ -7489,7 +7502,8 @@ const PriceTableRow = ({ p, cost, getData, setField, CHANNELS, CHANNEL_STYLES, f
                         <span className="text-[10px] text-gray-400">R$</span>
                         <input type="number" min="0" step="0.01"
                           className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
-                          value={d.freight??""} placeholder="0" onChange={e=>setField(p.id, ch, "freight", e.target.value)}/>
+                          value={d.freight===0?"":d.freight} placeholder="0" onChange={e=>setField(p.id, ch, "freight", e.target.value)}
+                          onBlur={()=>setFieldBlur(p.id, ch, "freight")}/>
                       </div>
                     </div>
                     <div>
@@ -7497,7 +7511,8 @@ const PriceTableRow = ({ p, cost, getData, setField, CHANNELS, CHANNEL_STYLES, f
                       <div className="flex items-center gap-0.5">
                         <input type="number" min="0" max="99" step="0.01"
                           className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
-                          value={d.taxaPerc??""} placeholder="0" onChange={e=>setField(p.id, ch, "taxaPerc", e.target.value)}/>
+                          value={d.taxaPerc===0?"":d.taxaPerc} placeholder="0" onChange={e=>setField(p.id, ch, "taxaPerc", e.target.value)}
+                          onBlur={()=>setFieldBlur(p.id, ch, "taxaPerc")}/>
                         <span className="text-[10px] text-gray-400">%</span>
                       </div>
                     </div>
@@ -7507,7 +7522,8 @@ const PriceTableRow = ({ p, cost, getData, setField, CHANNELS, CHANNEL_STYLES, f
                         <span className="text-[10px] text-gray-400">R$</span>
                         <input type="number" min="0" step="0.01"
                           className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
-                          value={d.otherCosts??""} placeholder="0" onChange={e=>setField(p.id, ch, "otherCosts", e.target.value)}/>
+                          value={d.otherCosts===0?"":d.otherCosts} placeholder="0" onChange={e=>setField(p.id, ch, "otherCosts", e.target.value)}
+                          onBlur={()=>setFieldBlur(p.id, ch, "otherCosts")}/>
                       </div>
                     </div>
                   </div>
