@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.15.9";
+const APP_VERSION = "3.15.10";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8836,22 +8836,22 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
               )}
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Previsão de Entrega</label>
-              <input type="date" className={inp} value={form.expectedDate||""} onChange={e=>setForm(f=>({...f,expectedDate:e.target.value}))}/>
-            </div>
-            <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
               <select className={inp} value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
                 {PC_STATUS.map(s=><option key={s}>{s}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Vencimento do Boleto</label>
-              <input type="date" className={inp} value={form.dueDate||""} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))}/>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Previsão de Entrega</label>
+              <input type="date" className={inp} value={form.expectedDate||""} onChange={e=>setForm(f=>({...f,expectedDate:e.target.value}))}/>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Data de Recebimento</label>
               <input type="date" className={inp} value={form.receivedDate||""} onChange={e=>setForm(f=>({...f,receivedDate:e.target.value}))}/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Vencimento do Boleto</label>
+              <input type="date" className={inp} value={form.dueDate||""} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))}/>
             </div>
           </div>
 
