@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.15.0";
+const APP_VERSION = "3.15.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -5411,6 +5411,17 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], variantC
   const margin = form.price && form.cost ? ((Number(form.price)-Number(form.cost))/Number(form.price)*100).toFixed(1) : null;
   const [nameErr, setNameErr] = useState(false);
 
+  // Busca de fornecedor com navegação por teclado (setas, Enter, Tab)
+  const [supSearch, setSupSearch] = useState(form.supplierName || "");
+  const [showSupList, setShowSupList] = useState(false);
+  const [supHighlight, setSupHighlight] = useState(0);
+  const filteredSups = suppliers.filter(s => (s.name||"").toLowerCase().includes(supSearch.toLowerCase())).slice(0,8);
+  const selectSupplier = (s) => {
+    setForm(f=>({...f, supplierId:s.id, supplierName:s.name}));
+    setSupSearch(s.name);
+    setShowSupList(false);
+  };
+
   const handleSave = () => {
     if (!form.name.trim()) { setNameErr(true); return; }
     const sup = suppliers.find(s=>s.id===form.supplierId);
@@ -5449,13 +5460,33 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], variantC
                 {INV_CATS.map(c=><option key={c}>{c}</option>)}
               </select>
             </div>
-            <div>
+            <div className="relative">
               <label className="text-xs font-medium text-gray-600 mb-1 block">Fornecedor</label>
-              <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                value={form.supplierId} onChange={e=>set("supplierId",e.target.value)}>
-                <option value="">Selecione...</option>
-                {suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                value={supSearch}
+                onChange={e=>{ setSupSearch(e.target.value); setShowSupList(true); setSupHighlight(0); if(!e.target.value) set("supplierId",""); }}
+                onFocus={()=>setShowSupList(true)}
+                onBlur={()=>setTimeout(()=>setShowSupList(false),150)}
+                onKeyDown={e=>{
+                  if (e.key==="ArrowDown") { e.preventDefault(); setShowSupList(true); setSupHighlight(i=>Math.min(i+1, filteredSups.length-1)); }
+                  else if (e.key==="ArrowUp") { e.preventDefault(); setSupHighlight(i=>Math.max(i-1,0)); }
+                  else if (e.key==="Enter") { if (showSupList && filteredSups[supHighlight]) { e.preventDefault(); selectSupplier(filteredSups[supHighlight]); } }
+                  else if (e.key==="Tab" && showSupList && filteredSups.length>0) {
+                    const exact = filteredSups.find(s=>(s.name||"").toLowerCase()===supSearch.trim().toLowerCase());
+                    selectSupplier(exact||filteredSups[supHighlight]||filteredSups[0]);
+                  }
+                }}
+                placeholder="Digite pra buscar..."/>
+              {showSupList && filteredSups.length>0 && supSearch && (
+                <div className="absolute z-50 w-full bg-white border border-gray-200 rounded-xl shadow-lg mt-1 max-h-48 overflow-y-auto">
+                  {filteredSups.map((s,idx)=>(
+                    <button key={s.id} type="button" onMouseDown={()=>selectSupplier(s)} onMouseEnter={()=>setSupHighlight(idx)}
+                      className={`w-full text-left px-3 py-2 border-b border-gray-50 last:border-0 ${idx===supHighlight?"bg-indigo-50":"hover:bg-indigo-50"}`}>
+                      <p className="text-sm font-medium text-gray-800">{s.name}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Unidade</label>
