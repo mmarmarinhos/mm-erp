@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.15.3";
+const APP_VERSION = "3.15.4";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -5401,10 +5401,10 @@ const StockMovementModal = ({ product, onClose, onSave }) => {
 // ─── Product Modal ────────────────────────────────────────────────────────
 const ProductModal = ({ product, suppliers, products: allProducts = [], variantCatalogs = [], onApplyCatalog, onClose, onSave }) => {
   const isNew = !product;
-  const [form, setForm] = useState(product ? { ...product, tagsInput:product.tags.join(", ") } : {
+  const [form, setForm] = useState(product ? { ...product } : {
     name:"", sku:"", category:"Linhas / Fios",
     channels:[], price:"", cost:"", stock:"", minStock:"", unit:"un", status:"Ativo",
-    description:"", tagsInput:"", parentId:"", variantLabel:""
+    description:"", parentId:"", variantLabel:""
   });
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const toggleCh = (c) => setForm(f=>({...f, channels: f.channels.includes(c)?f.channels.filter(x=>x!==c):[...f.channels,c]}));
@@ -5413,7 +5413,7 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], variantC
 
   const handleSave = () => {
     if (!form.name.trim()) { setNameErr(true); return; }
-    onSave({ ...form, tags:form.tagsInput.split(",").map(t=>t.trim()).filter(Boolean),
+    onSave({ ...form, tags:[],
       price:Number(form.price)||0, cost:Number(form.cost)||0,
       stock: isNew ? (Number(form.stock)||0) : product.stock,
       minStock:Number(form.minStock)||0,
@@ -5517,11 +5517,6 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], variantC
             )}
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600 mb-1 block">Tags</label>
-            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              value={form.tagsInput} onChange={e=>set("tagsInput",e.target.value)} placeholder="sacaria, algodão, bordado..."/>
-          </div>
-          <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">Descrição</label>
             <textarea rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
               value={form.description} onChange={e=>set("description",e.target.value)} placeholder="Descrição do produto..."/>
@@ -5613,13 +5608,6 @@ const ProductDetailPanel = ({ product, movements, onClose, onEdit, onDelete, onM
             )}
             {product.description && <div className="flex gap-2 text-sm"><span className="w-4">📝</span><span className="text-gray-600 text-xs">{product.description}</span></div>}
           </div>
-
-          {/* Tags */}
-          {product.tags?.length>0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {product.tags.map(t=><span key={t} className="px-2.5 py-1 bg-indigo-50 text-indigo-600 text-xs rounded-full font-medium">#{t}</span>)}
-            </div>
-          )}
 
           {/* Movement stats */}
           <div className="grid grid-cols-2 gap-2">
@@ -5830,7 +5818,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
       return true;
     })
     .filter(p => filterStatus === "Todos" || p.status === filterStatus)
-    .filter(p => !search || [p.name,p.sku,p.category,...p.tags].some(f=>f?.toLowerCase().includes(search.toLowerCase())))
+    .filter(p => !search || [p.name,p.sku,p.category].some(f=>f?.toLowerCase().includes(search.toLowerCase())))
     .filter(p => filterByDate(p.createdAt||""))
   , [products, filterCat, filterStock, filterStatus, search, filterMode, period, dateFrom, dateTo]);
 
@@ -5882,7 +5870,6 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
         unit: parent.unit || "un",
         status: "Ativo",
         description: "",
-        tags: [...(parent.tags||[])],
         parentId: parent.id,
         variantLabel: code,
         createdAt: today(),
@@ -6122,7 +6109,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
                             <Icon name="edit" size={13}/>
                           </button>
                           {!p.parentId && (
-                            <button onClick={()=>setModal({name:"",sku:"",category:p.category,channels:[...p.channels],price:"",cost:p.cost||"",stock:"",minStock:p.minStock||"",unit:p.unit||"un",status:"Ativo",description:"",tags:[],tagsInput:"",parentId:p.id,variantLabel:""})}
+                            <button onClick={()=>setModal({name:"",sku:"",category:p.category,channels:[...p.channels],price:"",cost:p.cost||"",stock:"",minStock:p.minStock||"",unit:p.unit||"un",status:"Ativo",description:"",parentId:p.id,variantLabel:""})}
                               className="p-1.5 rounded-lg text-violet-400 hover:text-violet-600 hover:bg-violet-50 transition-colors text-xs font-bold" title="Criar variante deste produto">
                               +V
                             </button>
