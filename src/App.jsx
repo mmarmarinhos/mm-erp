@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.12.3";
+const APP_VERSION = "3.13.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -862,7 +862,89 @@ const gerarPedidoPDF = async (order) => {
   if (w) { w.document.write(html); w.document.close(); }
 };
 
-const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance, representantes = [], formasPagamento = [] }) => {
+const EmitNfeModal = ({ order, onClose, onIssued }) => {
+  const [cpfCnpj, setCpfCnpj] = useState(order.cpfCnpj || "");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  const [result, setResult] = useState(null);
+
+  const handleEmit = async () => {
+    setErr("");
+    const digits = String(cpfCnpj).replace(/\D/g,"");
+    if (digits.length !== 11 && digits.length !== 14) { setErr("Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido"); return; }
+    setLoading(true);
+    try {
+      const token = getSession()?.token;
+      const r = await fetch("/api/nfe-issue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token?{Authorization:`Bearer ${token}`}:{}) },
+        body: JSON.stringify({ order: { ...order, cpfCnpj: digits }, ref: `${order.id}-${Date.now()}` }),
+      });
+      const data = await r.json().catch(()=>({}));
+      if (!r.ok || !data.ok) {
+        setErr(data.error || "Erro ao emitir a nota fiscal");
+        if (data.detalhes) setErr(prev => prev + " — " + data.detalhes.map(d=>d.mensagem).join("; "));
+        setLoading(false);
+        return;
+      }
+      setResult(data);
+      onIssued({
+        cpfCnpj: digits,
+        nfNumero: data.numero || "",
+        nfeStatus: data.status,
+        nfeChave: data.chave || "",
+        nfeXmlUrl: data.xmlUrl || "",
+        nfePdfUrl: data.pdfUrl || "",
+      });
+    } catch(e) { setErr("Erro: "+e.message); }
+    setLoading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-gray-900">🧾 Emitir Nota Fiscal</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+        <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-0.5">
+          <p className="font-mono font-bold text-indigo-600 text-xs">{order.id}</p>
+          <p className="text-gray-700">{order.customer}</p>
+          <p className="font-bold text-gray-900">{fmt(order.total)}</p>
+          <p className="text-xs text-gray-400">{(order.itemsList||[]).length} item(ns)</p>
+        </div>
+        {!result && (
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">CPF ou CNPJ do destinatário</label>
+            <input type="text" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              value={cpfCnpj} onChange={e=>setCpfCnpj(e.target.value)} placeholder="Só números"/>
+          </div>
+        )}
+        {err && <p className="text-red-500 text-xs">{err}</p>}
+        {result && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-sm text-emerald-800 space-y-1">
+            <p className="font-semibold">{result.status==="autorizado" ? "✅ Nota autorizada!" : "⏳ Nota em processamento — confirme em alguns minutos no painel do fornecedor"}</p>
+            {result.numero && <p>Número: {result.numero}</p>}
+            {result.pdfUrl && <a href={result.pdfUrl} target="_blank" rel="noreferrer" className="underline block">Ver DANFE (PDF)</a>}
+          </div>
+        )}
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
+            {result ? "Fechar" : "Cancelar"}
+          </button>
+          {!result && (
+            <button onClick={handleEmit} disabled={loading}
+              className="flex-1 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50">
+              {loading?"Emitindo...":"Emitir"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance, representantes = [], formasPagamento = [], params }) => {
   const [search, setSearch] = useState("");
   const [filterChannel, setFilterChannel] = useState("Todos");
   const [filterStatus, setFilterStatus] = useState("Todos");
@@ -870,6 +952,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
   const [detailOrder, setDetailOrder] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [devolucaoModal, setDevolucaoModal] = useState(null);
+  const [emitNfeOrder, setEmitNfeOrder] = useState(null);
   const [filterMode, setFilterMode] = useState("todos"); // mes | personalizado | todos
   const [period, setPeriod] = useState(() => {
     const n = new Date();
@@ -1370,6 +1453,12 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
                 className="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-600 text-sm font-medium hover:bg-indigo-100 flex items-center gap-1.5">
                 🖨️ PDF
               </button>
+              {params?.fiscal?.provider && (
+                <button onClick={() => { setEmitNfeOrder(detailOrder); setDetailOrder(null); }}
+                  className="px-4 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 flex items-center gap-1.5">
+                  🧾 {detailOrder.nfNumero ? `NF-e ${detailOrder.nfNumero}` : "Emitir NF-e"}
+                </button>
+              )}
               {["Enviado","Entregue"].includes(detailOrder.status) && (
                 <button onClick={() => { setDevolucaoModal(detailOrder); setDetailOrder(null); }}
                   className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 text-sm font-medium hover:bg-rose-100 flex items-center gap-1.5">
@@ -1414,6 +1503,14 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
             </div>
           </div>
         </div>
+      )}
+
+      {emitNfeOrder && (
+        <EmitNfeModal order={emitNfeOrder} onClose={()=>setEmitNfeOrder(null)}
+          onIssued={(updated)=>{
+            setOrders(prev => prev.map(o => o.id===emitNfeOrder.id ? {...o, ...updated} : o));
+            setEmitNfeOrder(null);
+          }}/>
       )}
 
       {/* Delete confirm */}
@@ -9663,6 +9760,7 @@ const PARAMS_DEFAULT = {
   },
   vendas: { validadeCotacaoDias: 10, multaAtrasoPercent: 2, jurosAtrasoPercentMes: 1 },
   compras: {},
+  fiscal: { provider: "", token: "", ambiente: "homologacao" },
 };
 async function loadParams() {
   try {
@@ -9677,6 +9775,7 @@ async function loadParams() {
         sincronizacao: { ...PARAMS_DEFAULT.sincronizacao, ...(saved.sincronizacao||{}) },
         vendas: { ...PARAMS_DEFAULT.vendas, ...(saved.vendas||{}) },
         compras: { ...PARAMS_DEFAULT.compras, ...(saved.compras||{}) },
+        fiscal: { ...PARAMS_DEFAULT.fiscal, ...(saved.fiscal||{}) },
       };
     }
   } catch(_) {}
@@ -11402,6 +11501,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
   const [alertas, setAlertas] = useState(params?.alertas       || PARAMS_DEFAULT.alertas);
   const [sync,    setSync]    = useState(params?.sincronizacao || PARAMS_DEFAULT.sincronizacao);
   const [vendas,  setVendas]  = useState(params?.vendas        || PARAMS_DEFAULT.vendas);
+  const [fiscal,  setFiscal]  = useState(params?.fiscal        || PARAMS_DEFAULT.fiscal);
   const [compras, setCompras] = useState(params?.compras       || PARAMS_DEFAULT.compras);
 
   useEffect(() => {
@@ -11471,6 +11571,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
   const setC = (ch,k,v) => setCanais(prev=>({...prev,[ch]:{...prev[ch],[k]:v}}));
   const setA = (k,v) => setAlertas(prev=>({...prev,[k]:v}));
   const setV = (k,v) => setVendas(prev=>({...prev,[k]:v}));
+  const setFisc = (k,v) => setFiscal(prev=>({...prev,[k]:v}));
   const setS = (plat,k,v) => setSync(prev =>
     k==="backendUrl" ? {...prev,backendUrl:v} : {...prev,[plat]:{...prev[plat],[k]:v}}
   );
@@ -11506,7 +11607,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-2xl p-1.5 overflow-x-auto">
-        {[["empresa","🏢 Empresa"],["canais","💳 Canais"],["vendas","🛒 Vendas"],["compras","📦 Compras"],["alertas","🔔 Alertas"],["sync","🔗 Sincronização"],["automacao","🤖 Automação"]].map(([id,label])=>(
+        {[["empresa","🏢 Empresa"],["canais","💳 Canais"],["vendas","🛒 Vendas"],["compras","📦 Compras"],["fiscal","📄 Fiscal"],["alertas","🔔 Alertas"],["sync","🔗 Sincronização"],["automacao","🤖 Automação"]].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)}
             className={`shrink-0 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${tab===id?"bg-white text-gray-900 shadow-sm":"text-gray-500 hover:text-gray-700"}`}>
             {label}
@@ -11743,6 +11844,59 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
         <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
           <p className="text-3xl mb-2">📦</p>
           <p className="text-sm text-gray-400">Nenhuma configuração de Compras ainda</p>
+        </div>
+      )}
+
+      {tab==="fiscal" && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">📄 Emissão de Nota Fiscal</p>
+            <p className="text-xs text-gray-400 -mt-2">
+              Escolha o fornecedor de emissão fiscal que você já contratou e cole o token de acesso fornecido por ele. Cada empresa configura o seu próprio, de forma independente.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {[
+                {id:"", label:"Nenhum", desc:"Sem emissão integrada"},
+                {id:"focus", label:"Focus NFe", desc:"focusnfe.com.br"},
+                {id:"nfeio", label:"NFe.io", desc:"nfe.io"},
+              ].map(p=>(
+                <button key={p.id} onClick={()=>setFisc("provider",p.id)}
+                  className={`text-left p-3 rounded-xl border-2 transition-colors ${fiscal.provider===p.id?"border-indigo-500 bg-indigo-50":"border-gray-100 hover:border-gray-200"}`}>
+                  <p className="text-sm font-semibold text-gray-800">{p.label}</p>
+                  <p className="text-xs text-gray-400">{p.desc}</p>
+                </button>
+              ))}
+            </div>
+
+            {fiscal.provider && (
+              <>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Token de acesso</label>
+                  <input type="password" className={inp} value={fiscal.token} onChange={e=>setFisc("token",e.target.value)}
+                    placeholder="Cole aqui o token fornecido pelo painel do fornecedor"/>
+                  <p className="text-[10px] text-gray-400 mt-1">Guardado de forma protegida — nunca é exibido nem enviado ao navegador depois de salvo.</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Ambiente</label>
+                  <div className="flex gap-2">
+                    {[["homologacao","🧪 Testes (Homologação)"],["producao","✅ Produção (notas reais)"]].map(([id,label])=>(
+                      <button key={id} onClick={()=>setFisc("ambiente",id)}
+                        className={`flex-1 py-2 rounded-xl text-xs font-semibold border-2 transition-colors ${fiscal.ambiente===id?"border-indigo-500 bg-indigo-50 text-indigo-700":"border-gray-100 text-gray-500"}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">Comece em "Testes" pra validar a integração sem gerar nota fiscal de verdade. Troque pra "Produção" só quando tiver certeza que está tudo certo.</p>
+                </div>
+              </>
+            )}
+
+            <button onClick={()=>mergeAndSave({fiscal}).then(()=>showToast("✅ Configuração fiscal salva!"))}
+              className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+              💾 Salvar Fiscal
+            </button>
+          </div>
         </div>
       )}
 
@@ -12328,7 +12482,7 @@ function ERPApp({ currentUser, onLogout }) {
   const renderModule = () => {
     switch (active) {
       case "dashboard": return <DashboardModule orders={orders} />;
-      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento}/>;
+      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
