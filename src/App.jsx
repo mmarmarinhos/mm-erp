@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.15.5";
+const APP_VERSION = "3.15.6";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8795,7 +8795,12 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
       <div ref={modalRef} onKeyDown={e=>trapTabFocus(e, modalRef)} className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
           <h2 className="font-semibold text-gray-800">{isNew ? "📦 Novo Pedido de Compra" : `Editar ${purchase.id||""}`}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon name="x"/></button>
+          <div className="flex items-start gap-3">
+            <div className="text-right text-xs text-gray-400 leading-relaxed">
+              <p>📅 {form.date ? new Date(form.date+"T00:00:00").toLocaleDateString("pt-BR") : "—"}</p>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon name="x"/></button>
+          </div>
         </div>
 
         <div className="overflow-y-auto p-5 space-y-4 flex-1">
@@ -8829,10 +8834,6 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
                   ))}
                 </div>
               )}
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Data do Pedido</label>
-              <input type="date" className={inp} value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))}/>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Previsão de Entrega</label>
