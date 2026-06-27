@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.15.2";
+const APP_VERSION = "3.15.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -5402,7 +5402,7 @@ const StockMovementModal = ({ product, onClose, onSave }) => {
 const ProductModal = ({ product, suppliers, products: allProducts = [], variantCatalogs = [], onApplyCatalog, onClose, onSave }) => {
   const isNew = !product;
   const [form, setForm] = useState(product ? { ...product, tagsInput:product.tags.join(", ") } : {
-    name:"", sku:"", category:"Linhas / Fios", supplierId:"", supplierName:"",
+    name:"", sku:"", category:"Linhas / Fios",
     channels:[], price:"", cost:"", stock:"", minStock:"", unit:"un", status:"Ativo",
     description:"", tagsInput:"", parentId:"", variantLabel:""
   });
@@ -5411,25 +5411,12 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], variantC
   const margin = form.price && form.cost ? ((Number(form.price)-Number(form.cost))/Number(form.price)*100).toFixed(1) : null;
   const [nameErr, setNameErr] = useState(false);
 
-  // Busca de fornecedor com navegação por teclado (setas, Enter, Tab)
-  const [supSearch, setSupSearch] = useState(form.supplierName || "");
-  const [showSupList, setShowSupList] = useState(false);
-  const [supHighlight, setSupHighlight] = useState(0);
-  const filteredSups = suppliers.filter(s => (s.name||"").toLowerCase().includes(supSearch.toLowerCase())).slice(0,8);
-  const selectSupplier = (s) => {
-    setForm(f=>({...f, supplierId:s.id, supplierName:s.name}));
-    setSupSearch(s.name);
-    setShowSupList(false);
-  };
-
   const handleSave = () => {
     if (!form.name.trim()) { setNameErr(true); return; }
-    const sup = suppliers.find(s=>s.id===form.supplierId);
     onSave({ ...form, tags:form.tagsInput.split(",").map(t=>t.trim()).filter(Boolean),
       price:Number(form.price)||0, cost:Number(form.cost)||0,
       stock: isNew ? (Number(form.stock)||0) : product.stock,
       minStock:Number(form.minStock)||0,
-      supplierName: sup?.name || form.supplierName || "",
     });
   };
 
@@ -5461,34 +5448,6 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], variantC
               </select>
             </div>
             <div className="relative">
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Fornecedor</label>
-              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                value={supSearch}
-                onChange={e=>{ setSupSearch(e.target.value); setShowSupList(true); setSupHighlight(0); if(!e.target.value) set("supplierId",""); }}
-                onFocus={()=>setShowSupList(true)}
-                onBlur={()=>setTimeout(()=>setShowSupList(false),150)}
-                onKeyDown={e=>{
-                  if (e.key==="ArrowDown") { e.preventDefault(); setShowSupList(true); setSupHighlight(i=>Math.min(i+1, filteredSups.length-1)); }
-                  else if (e.key==="ArrowUp") { e.preventDefault(); setSupHighlight(i=>Math.max(i-1,0)); }
-                  else if (e.key==="Enter") { if (showSupList && filteredSups[supHighlight]) { e.preventDefault(); selectSupplier(filteredSups[supHighlight]); } }
-                  else if (e.key==="Tab" && showSupList && filteredSups.length>0) {
-                    const exact = filteredSups.find(s=>(s.name||"").toLowerCase()===supSearch.trim().toLowerCase());
-                    selectSupplier(exact||filteredSups[supHighlight]||filteredSups[0]);
-                  }
-                }}
-                placeholder="Digite pra buscar..."/>
-              {showSupList && filteredSups.length>0 && supSearch && (
-                <div className="absolute z-50 w-full bg-white border border-gray-200 rounded-xl shadow-lg mt-1 max-h-48 overflow-y-auto">
-                  {filteredSups.map((s,idx)=>(
-                    <button key={s.id} type="button" onMouseDown={()=>selectSupplier(s)} onMouseEnter={()=>setSupHighlight(idx)}
-                      className={`w-full text-left px-3 py-2 border-b border-gray-50 last:border-0 ${idx===supHighlight?"bg-indigo-50":"hover:bg-indigo-50"}`}>
-                      <p className="text-sm font-medium text-gray-800">{s.name}</p>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Unidade</label>
               <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                 value={form.unit} onChange={e=>set("unit",e.target.value)}>
@@ -5644,7 +5603,6 @@ const ProductDetailPanel = ({ product, movements, onClose, onEdit, onDelete, onM
           {/* Info */}
           <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-2">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Informações</p>
-            {product.supplierName && <div className="flex gap-2 text-sm"><span className="w-4">🏭</span><span className="text-gray-700">{product.supplierName}</span></div>}
             {product.channels?.length>0 && (
               <div className="flex items-start gap-2 text-sm">
                 <span className="w-4 mt-0.5">🛒</span>
@@ -5872,7 +5830,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
       return true;
     })
     .filter(p => filterStatus === "Todos" || p.status === filterStatus)
-    .filter(p => !search || [p.name,p.sku,p.category,p.supplierName,...p.tags].some(f=>f?.toLowerCase().includes(search.toLowerCase())))
+    .filter(p => !search || [p.name,p.sku,p.category,...p.tags].some(f=>f?.toLowerCase().includes(search.toLowerCase())))
     .filter(p => filterByDate(p.createdAt||""))
   , [products, filterCat, filterStock, filterStatus, search, filterMode, period, dateFrom, dateTo]);
 
@@ -5916,8 +5874,6 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
         name: `${parent.name} - ${code}`,
         sku,
         category: parent.category,
-        supplierId: parent.supplierId,
-        supplierName: parent.supplierName,
         channels: [...(parent.channels||[])],
         price: 0,
         cost: parent.cost || 0,
@@ -6166,7 +6122,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
                             <Icon name="edit" size={13}/>
                           </button>
                           {!p.parentId && (
-                            <button onClick={()=>setModal({name:"",sku:"",category:p.category,supplierId:p.supplierId,supplierName:p.supplierName,channels:[...p.channels],price:"",cost:p.cost||"",stock:"",minStock:p.minStock||"",unit:p.unit||"un",status:"Ativo",description:"",tags:[],tagsInput:"",parentId:p.id,variantLabel:""})}
+                            <button onClick={()=>setModal({name:"",sku:"",category:p.category,channels:[...p.channels],price:"",cost:p.cost||"",stock:"",minStock:p.minStock||"",unit:p.unit||"un",status:"Ativo",description:"",tags:[],tagsInput:"",parentId:p.id,variantLabel:""})}
                               className="p-1.5 rounded-lg text-violet-400 hover:text-violet-600 hover:bg-violet-50 transition-colors text-xs font-bold" title="Criar variante deste produto">
                               +V
                             </button>
