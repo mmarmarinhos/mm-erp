@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.14.1";
+const APP_VERSION = "3.14.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9305,6 +9305,7 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
       return [...prev, { _prodId:p.id, sku:p.sku||"", description:p.name, ncm:p.ncm||"", cfop:"5102", unitPrice, qty:1, total:unitPrice }];
     });
     setSkuSearch("");
+    setTimeout(()=>skuInputRef.current?.focus(), 0);
   };
 
   const updateQty = (prodId, qty) => {
@@ -9413,7 +9414,6 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
                 e.preventDefault();
                 const exact = filteredProducts.find(p=>(p.sku||"").toLowerCase()===skuSearch.trim().toLowerCase());
                 addToCart(exact||filteredProducts[0]);
-                setTimeout(()=>skuInputRef.current?.focus(), 0);
               }
             }}
             placeholder="Buscar produto por SKU ou nome..."
