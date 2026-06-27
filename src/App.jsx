@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.15.6";
+const APP_VERSION = "3.15.7";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8844,10 +8844,6 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
               <select className={inp} value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
                 {PC_STATUS.map(s=><option key={s}>{s}</option>)}
               </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Condição de Pagamento</label>
-              <input className={inp} value={form.paymentTerms} onChange={e=>setForm(f=>({...f,paymentTerms:e.target.value}))} placeholder="Ex: 30 dias"/>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Vencimento do Boleto</label>
