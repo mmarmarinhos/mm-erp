@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.15.11";
+const APP_VERSION = "3.16.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8674,8 +8674,9 @@ const UsersModule = ({ currentUser }) => {
 };
 
 // ─── Purchase Order Modal ────────────────────────────────────────────────
-const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) => {
+const PurchaseModal = ({ purchase, suppliers, products = [], params, onClose, onSave }) => {
   const isNew = !purchase;
+  const statusOptions = (params?.compras?.statusList?.length ? params.compras.statusList : PC_STATUS);
   const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, discount:0, discountType:"%", total:0, _prodId:null });
 
   const [form, setForm] = useState(purchase ? { ...purchase } : {
@@ -8981,7 +8982,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], onClose, onSave }) 
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
               <select className={inp} value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
-                {PC_STATUS.map(s=><option key={s}>{s}</option>)}
+                {statusOptions.map(s=><option key={s}>{s}</option>)}
               </select>
             </div>
             <div>
@@ -9462,7 +9463,7 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
   );
 };
 
-const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], setProducts, movements = [], setMovements }) => {
+const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], setProducts, movements = [], setMovements, params }) => {
   const [modal,      setModal]      = useState(null);
   const [detail,     setDetail]     = useState(null);
   const [stockEntry, setStockEntry] = useState(false);
@@ -9641,7 +9642,8 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
     .filter(p => filterByDate(p))
     .sort((a,b) => b.date.localeCompare(a.date));
 
-  const statusCounts = PC_STATUS.reduce((acc,s) => ({ ...acc, [s]: purchases.filter(p=>p.status===s).length }), {});
+  const statusOptions = (params?.compras?.statusList?.length ? params.compras.statusList : PC_STATUS);
+  const statusCounts = statusOptions.reduce((acc,s) => ({ ...acc, [s]: purchases.filter(p=>p.status===s).length }), {});
   const totalPending = purchases.filter(p=>!["Recebido","Cancelado"].includes(p.status)).reduce((s,p)=>s+p.total,0);
   const st = (s) => PC_STATUS_STYLES[s] || { bg:"bg-gray-100", text:"text-gray-600" };
 
@@ -9741,7 +9743,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
           </table>
         </div>
 
-        {modal && <PurchaseModal purchase={modal} suppliers={suppliers} products={products||[]} onClose={()=>setModal(null)} onSave={handleSave}/>}
+        {modal && <PurchaseModal purchase={modal} suppliers={suppliers} products={products||[]} params={params} onClose={()=>setModal(null)} onSave={handleSave}/>}
         {stockEntry && detail && (
           <StockEntryModal
             purchase={detail}
@@ -9780,7 +9782,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
       </div>
 
       <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-        {PC_STATUS.map(s=>(
+        {statusOptions.map(s=>(
           <button key={s} onClick={()=>setFilterStatus(filterStatus===s?"Todos":s)}
             className={`rounded-xl px-3 py-2 text-center transition-all border ${filterStatus===s?"border-indigo-300 shadow-sm":"border-transparent"} ${st(s).bg}`}>
             <p className={`text-lg font-bold ${st(s).text}`}>{statusCounts[s]||0}</p>
@@ -9864,7 +9866,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
           );
         })}
       </div>
-      {modal && <PurchaseModal purchase={modal==="new"?null:modal} suppliers={suppliers} products={products||[]} onClose={()=>setModal(null)} onSave={handleSave}/>}
+      {modal && <PurchaseModal purchase={modal==="new"?null:modal} suppliers={suppliers} products={products||[]} params={params} onClose={()=>setModal(null)} onSave={handleSave}/>}
     </div>
   );
 };
@@ -10011,7 +10013,7 @@ const PARAMS_DEFAULT = {
     backendUrl: "",
   },
   vendas: { validadeCotacaoDias: 10, multaAtrasoPercent: 2, jurosAtrasoPercentMes: 1 },
-  compras: {},
+  compras: { statusList: ["Em Aberto","Enviado","Confirmado","Recebido Parcial","Recebido","Cancelado"] },
   fiscal: { provider: "", token: "", ambiente: "homologacao" },
 };
 async function loadParams() {
@@ -12093,9 +12095,53 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
       )}
 
       {tab==="compras" && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
-          <p className="text-3xl mb-2">📦</p>
-          <p className="text-sm text-gray-400">Nenhuma configuração de Compras ainda</p>
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">📦 Status do Pedido de Compra</p>
+            <p className="text-xs text-gray-400 -mt-2">
+              Personalize os status que aparecem nos Pedidos de Compra. Eles não afetam outros módulos (Nota Fiscal, Cotação, Pedidos de venda continuam com seus próprios status).
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {(compras.statusList||[]).map((s,idx)=>(
+                <span key={idx} className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-full pl-3 pr-2 py-1.5">
+                  {s}
+                  <button onClick={()=>setCompras(prev=>({...prev, statusList: prev.statusList.filter((_,i)=>i!==idx)}))}
+                    className="text-indigo-400 hover:text-red-500 font-bold">✕</button>
+                </span>
+              ))}
+              {(!compras.statusList || compras.statusList.length===0) && <p className="text-xs text-gray-400 italic">Nenhum status configurado — usando os padrões do sistema.</p>}
+            </div>
+
+            <div className="flex gap-2">
+              <input id="novo-status-compra" className={inp} placeholder="Ex: Aguardando Pagamento"
+                onKeyDown={e=>{
+                  if (e.key==="Enter") {
+                    e.preventDefault();
+                    const val = e.target.value.trim();
+                    if (val && !(compras.statusList||[]).includes(val)) {
+                      setCompras(prev=>({...prev, statusList:[...(prev.statusList||[]), val]}));
+                    }
+                    e.target.value = "";
+                  }
+                }}/>
+              <button onClick={()=>{
+                const el = document.getElementById("novo-status-compra");
+                const val = el.value.trim();
+                if (val && !(compras.statusList||[]).includes(val)) {
+                  setCompras(prev=>({...prev, statusList:[...(prev.statusList||[]), val]}));
+                }
+                el.value = "";
+              }} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 whitespace-nowrap">
+                + Adicionar
+              </button>
+            </div>
+
+            <button onClick={()=>mergeAndSave({compras}).then(()=>showToast("✅ Status de Compras salvos!"))}
+              className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+              💾 Salvar Status de Compras
+            </button>
+          </div>
         </div>
       )}
 
@@ -12755,7 +12801,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params}/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases}/>;
-      case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements}/>;
+      case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} params={params}/>;
       case "pdv": return <PdvModule products={products} setProducts={updateProducts} orders={orders} setOrders={updateOrders} movements={movements} setMovements={updateMovements} customers={customers} caixa={caixa} setCaixa={updateCaixa} params={params} currentUser={currentUser}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
       case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento} variantCatalogs={variantCatalogs} setVariantCatalogs={updateVariantCatalogs}/>;
