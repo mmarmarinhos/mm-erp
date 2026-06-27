@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.13.0";
+const APP_VERSION = "3.13.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -11853,6 +11853,9 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">📄 Emissão de Nota Fiscal</p>
             <p className="text-xs text-gray-400 -mt-2">
               Escolha o fornecedor de emissão fiscal que você já contratou e cole o token de acesso fornecido por ele. Cada empresa configura o seu próprio, de forma independente.
+            </p>
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 -mt-1">
+              ℹ️ <b>IBS/CBS (Reforma Tributária):</b> calculados automaticamente conforme o regime cadastrado em Parâmetros &gt; Empresa. Empresas do <b>Simples Nacional</b> ainda não precisam declarar (exigência só a partir de jan/2027); <b>Lucro Presumido/Real</b> já recebem os campos com as alíquotas-teste de 2026. Recomendamos validar com seu contador antes de emitir em Produção.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">

@@ -75,20 +75,38 @@ async function issueViaFocusNFe({ token, ambiente, empresa, order, ref }) {
     valor_total: Number(order.total)||0,
     valor_produtos: Number(order.subtotal)||Number(order.total)||0,
     modalidade_frete: 9,
-    items: (order.itemsList||[]).map((it, i) => ({
-      numero_item: i+1,
-      codigo_produto: it.sku || it._prodId || String(i+1),
-      descricao: it.description || it.name,
-      cfop: it.cfop || "5102",
-      quantidade_comercial: Number(it.qty)||1,
-      valor_unitario_comercial: Number(it.unitPrice)||0,
-      valor_bruto: Number(it.total)||0,
-      codigo_ncm: (it.ncm || "00000000").replace(/\D/g,""),
-      unidade_comercial: "UN", unidade_tributavel: "UN",
-      inclui_no_total: 1,
-      icms_origem: 0,
-      icms_situacao_tributaria: empresa.regime === "Simples Nacional" ? "102" : "41",
-    })),
+    items: (order.itemsList||[]).map((it, i) => {
+      const valorBruto = Number(it.total)||0;
+      const isRegimeNormal = empresa.regime === "Lucro Presumido" || empresa.regime === "Lucro Real";
+      // IBS/CBS só é obrigatório pra Regime Normal em 2026 (LC 214/2025, art. 348);
+      // Simples Nacional/MEI só entram nessa exigência a partir de jan/2027.
+      // Alíquotas-teste de 2026 (simbólicas, sem efeito de caixa: CBS 0,9% / IBS-UF 0,1% / IBS-Mun 0%).
+      // cClassTrib "000001" = operação tributada integralmente (padrão pra venda comum) — VALIDAR
+      // com o contador se algum produto tiver tratamento diferente (isento, ZFM, monofásico, etc).
+      const ibsCbs = isRegimeNormal ? {
+        ibs_cbs_situacao_tributaria: "000",
+        ibs_cbs_classificacao_tributaria: "000001",
+        ibs_cbs_base_calculo: valorBruto,
+        cbs_aliquota: 0.9, cbs_valor: Number((valorBruto*0.009).toFixed(2)),
+        ibs_uf_aliquota: 0.1, ibs_uf_valor: Number((valorBruto*0.001).toFixed(2)),
+        ibs_mun_aliquota: 0, ibs_mun_valor: 0,
+      } : {};
+      return {
+        numero_item: i+1,
+        codigo_produto: it.sku || it._prodId || String(i+1),
+        descricao: it.description || it.name,
+        cfop: it.cfop || "5102",
+        quantidade_comercial: Number(it.qty)||1,
+        valor_unitario_comercial: Number(it.unitPrice)||0,
+        valor_bruto: valorBruto,
+        codigo_ncm: (it.ncm || "00000000").replace(/\D/g,""),
+        unidade_comercial: "UN", unidade_tributavel: "UN",
+        inclui_no_total: 1,
+        icms_origem: 0,
+        icms_situacao_tributaria: empresa.regime === "Simples Nacional" ? "102" : "41",
+        ...ibsCbs,
+      };
+    }),
   };
 
   const r = await fetch(`${baseUrl}/nfe?ref=${encodeURIComponent(ref)}`, {
