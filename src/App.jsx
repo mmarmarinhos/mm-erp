@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.18.0";
+const APP_VERSION = "3.18.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9865,7 +9865,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
           <button onClick={()=>setDetail(null)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500">←</button>
           <div className="flex-1">
             <h1 className="text-xl font-bold text-gray-900">{detail.id}</h1>
-            <p className="text-sm text-gray-500">{detail.supplierName} · {detail.date}</p>
+            <p className="text-sm text-gray-500">{detail.supplierName} · {detail.date ? new Date(detail.date+"T12:00:00").toLocaleDateString("pt-BR") : "—"}</p>
           </div>
           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${st(detail.status).bg} ${st(detail.status).text}`}>{detail.status}</span>
           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${fs.bg} ${fs.text}`}>{fs.icon} {fs.label}</span>
@@ -9889,8 +9889,8 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[["📋 Emissão",      detail.date],
-            ["🧾 Emissão da NF", detail.nfEmissionDate||"—"],
+          {[["📋 Emissão",      detail.date ? new Date(detail.date+"T12:00:00").toLocaleDateString("pt-BR") : "—"],
+            ["🧾 Emissão da NF", detail.nfEmissionDate ? new Date(detail.nfEmissionDate+"T12:00:00").toLocaleDateString("pt-BR") : "—"],
             ["📅 Vencimento",    detail.dueDate ? new Date(detail.dueDate+"T12:00:00").toLocaleDateString("pt-BR") : "—"],
             ["✅ Pagamento",     detail.paidDate ? new Date(detail.paidDate+"T12:00:00").toLocaleDateString("pt-BR") : "Pendente"],
           ].map(([label,val])=>(
@@ -10061,7 +10061,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${fs.bg} ${fs.text}`}>{fs.icon} {fs.label}</span>
                   </div>
                   <div className="flex gap-3 mt-1 text-xs text-gray-400 flex-wrap">
-                    <span>📋 {pc.date}</span>
+                    <span>📋 {pc.date ? new Date(pc.date+"T12:00:00").toLocaleDateString("pt-BR") : "—"}</span>
                     {pc.dueDate && <span>📅 Venc. {new Date(pc.dueDate+"T12:00:00").toLocaleDateString("pt-BR")}</span>}
                     {pc.paidDate && <span className="text-green-600">✅ Pago {new Date(pc.paidDate+"T12:00:00").toLocaleDateString("pt-BR")}</span>}
                     <span>💳 {pc.paymentTerms}</span>
