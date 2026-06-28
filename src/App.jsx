@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.18.2";
+const APP_VERSION = "3.18.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2784,11 +2784,11 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
 const CustomerModal = ({ customer, onClose, onSave, orders = [], customers = [] }) => {
   const isNew = !customer;
   const [activeTab, setActiveTab] = useState("dados");
-  const [form, setForm] = useState(customer ? { ...customer, tagsInput: customer.tags.join(", "), paymentTerms: customer.paymentTerms || "" } : {
+  const [form, setForm] = useState(customer ? { ...customer, paymentTerms: customer.paymentTerms || "" } : {
     name:"", phone:"", email:"", cpfCnpj:"", city:"", state:"",
     cep:"", rua:"", numero:"", complemento:"", bairro:"",
     channel:"Mercado Livre", segment:"Ativo",
-    totalOrders:0, totalSpent:0, lastPurchase:"", tagsInput:"", notes:"", paymentTerms:""
+    totalOrders:0, totalSpent:0, lastPurchase:"", notes:"", paymentTerms:""
   });
   const set = (k,v) => setForm(f => ({ ...f, [k]:v }));
 
@@ -2805,8 +2805,7 @@ const CustomerModal = ({ customer, onClose, onSave, orders = [], customers = [] 
   const handleSave = () => {
     if (!form.name.trim()) return;
     if (cpfCnpjDuplicate) return; // block duplicate
-    const tags = form.tagsInput.split(",").map(t=>t.trim()).filter(Boolean);
-    onSave({ ...form, tags, totalOrders: Number(form.totalOrders), totalSpent: Number(form.totalSpent) });
+    onSave({ ...form, tags:[], totalOrders: Number(form.totalOrders), totalSpent: Number(form.totalSpent) });
   };
 
   // Financial data for this customer
@@ -2913,11 +2912,6 @@ const CustomerModal = ({ customer, onClose, onSave, orders = [], customers = [] 
                     {SEGMENTS.map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Tags <span className="text-gray-400 font-normal">(separar por vírgula)</span></label>
-                <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  value={form.tagsInput} onChange={e=>set("tagsInput",e.target.value)} placeholder="fiel, atacado, B2B..."/>
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Observações</label>
@@ -3379,18 +3373,6 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
             )}
           </div>
 
-          {/* Tags */}
-          {customer.tags?.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tags</p>
-              <div className="flex flex-wrap gap-1.5">
-                {customer.tags.map(tag => (
-                  <span key={tag} className="px-2.5 py-1 bg-indigo-50 text-indigo-600 text-xs rounded-full font-medium">#{tag}</span>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Notes */}
           {customer.notes && (
             <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
@@ -3602,7 +3584,7 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
   const filtered = useMemo(() => customers
     .filter(c => filterSeg === "Todos" || c.segment === filterSeg)
     .filter(c => filterCh  === "Todos" || c.channel  === filterCh)
-    .filter(c => !search || [c.name, c.email, c.phone, ...c.tags].some(f => f?.toLowerCase().includes(search.toLowerCase())))
+    .filter(c => !search || [c.name, c.email, c.phone].some(f => f?.toLowerCase().includes(search.toLowerCase())))
     .sort((a,b) => {
       if (sortBy === "name")         return a.name.localeCompare(b.name);
       if (sortBy === "totalOrders")  return getStats(b.name).totalOrders - getStats(a.name).totalOrders;
@@ -3793,9 +3775,6 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
                           </div>
                           <div>
                             <p className="font-medium text-gray-800 text-sm">{c.name}</p>
-                            {c.tags.length > 0 && (
-                              <p className="text-[10px] text-indigo-400">#{c.tags.slice(0,2).join(" #")}</p>
-                            )}
                           </div>
                         </div>
                       </td>
