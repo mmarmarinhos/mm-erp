@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.16.1";
+const APP_VERSION = "3.16.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8685,6 +8685,14 @@ const PurchaseModal = ({ purchase, suppliers, products = [], params, onClose, on
     dueDate:"", nfNumber:"", notes:"", items:[emptyItem()], subtotal:0, total:0,
   });
 
+  // Vencimento do boleto = Data de Emissão da NF + prazo de pagamento do fornecedor
+  useEffect(() => {
+    if (!form.nfEmissionDate) return;
+    const dias = parseInt(form.paymentTerms) || 0;
+    const calculado = addDaysISO(form.nfEmissionDate, dias);
+    setForm(f => f.dueDate === calculado ? f : { ...f, dueDate: calculado });
+  }, [form.nfEmissionDate, form.paymentTerms]);
+
   const calcItemTotal = (it) => {
     const gross = (it.qty||0)*(it.unitPrice||0);
     const disc = it.discountType==="%"?gross*((it.discount||0)/100):(it.discount||0);
@@ -8851,6 +8859,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], params, onClose, on
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Vencimento do Boleto</label>
               <input type="date" className={inp} value={form.dueDate||""} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))}/>
+              <p className="text-[10px] text-gray-400 mt-1">Calculado automaticamente (Emissão da NF + prazo do fornecedor) — pode ajustar manualmente se precisar.</p>
             </div>
           </div>
 
