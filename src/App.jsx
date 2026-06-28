@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.17.1";
+const APP_VERSION = "3.18.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9732,20 +9732,51 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
     const purchase = baixaPedido;
     if (!purchase) return;
 
-    // 1. Atualiza as quantidades recebidas (acumulado) e o status do pedido
-    const updatedItems = purchase.items.map((it,i) => ({
-      ...it, receivedQty: Math.min((it.receivedQty||0) + (data.qtys[i]||0), it.qty||0),
-    }));
-    const totalmenteRecebido = updatedItems.every(it => (it.receivedQty||0) >= (it.qty||0));
-    const algumRecebido = updatedItems.some(it => (it.receivedQty||0) > 0);
-    const newStatus = totalmenteRecebido ? "Baixado" : (algumRecebido ? "Baixado Parcial" : purchase.status);
+    const calcItemTotal = (it) => {
+      const gross = (it.qty||0)*(it.unitPrice||0);
+      const disc = it.discountType==="%" ? gross*((it.discount||0)/100) : (it.discount||0);
+      return Math.max(0, gross-disc);
+    };
 
+    // Itens efetivamente recebidos nesta baixa → ficam no pedido atual, que vira "Baixado"
+    const itensRecebidos = purchase.items
+      .map((it,i) => { const qty = data.qtys[i]||0; const u = {...it, qty, receivedQty:qty}; u.total = calcItemTotal(u); return u; })
+      .filter(it => it.qty > 0);
+
+    // Itens com saldo restante → vão pra um NOVO pedido complementar, "Em Aberto"
+    const itensRestantes = purchase.items
+      .map((it,i) => { const qty = Math.max(0, (it.qty||0)-(data.qtys[i]||0)); const u = {...it, qty, receivedQty:0}; u.total = calcItemTotal(u); return u; })
+      .filter(it => it.qty > 0);
+
+    const subtotalRecebido = itensRecebidos.reduce((s,it)=>s+(it.total||0),0);
+
+    // 1a. Pedido atual passa a refletir só o que foi recebido nesta baixa, e fica "Baixado"
     const updatedPurchase = {
-      ...purchase, items: updatedItems, status: newStatus,
+      ...purchase, items: itensRecebidos, status: "Baixado",
+      subtotal: subtotalRecebido, total: subtotalRecebido + (Number(purchase.freight)||0) - (Number(purchase.discount)||0),
       nfNumber: data.nfNumber, nfEmissionDate: data.nfEmissionDate,
       receivedDate: data.receivedDate, dueDate: data.dueDate,
+      notes: itensRestantes.length>0 ? `${purchase.notes||""} (saldo transferido pra novo pedido)`.trim() : purchase.notes,
     };
-    setPurchases(prev => prev.map(p => p.id===purchase.id ? updatedPurchase : p));
+
+    let novoPedidoComplementar = null;
+    if (itensRestantes.length > 0) {
+      const subtotalRestante = itensRestantes.reduce((s,it)=>s+(it.total||0),0);
+      const novoId = `PC-${String(Math.max(0,...purchases.map(p=>parseInt(p.id.replace("PC-",""))||0))+1).padStart(3,"0")}`;
+      novoPedidoComplementar = {
+        ...purchase, id: novoId, items: itensRestantes, status: "Em Aberto",
+        subtotal: subtotalRestante, total: subtotalRestante, freight: 0, discount: 0,
+        nfNumber: "", nfEmissionDate: "", receivedDate: "", dueDate: "",
+        notes: `Saldo do pedido ${purchase.id}`, createdAt: today(),
+      };
+    }
+
+    setPurchases(prev => {
+      const semOriginal = prev.filter(p => p.id !== purchase.id);
+      return novoPedidoComplementar
+        ? [...semOriginal, updatedPurchase, novoPedidoComplementar]
+        : [...semOriginal, updatedPurchase];
+    });
     setDetail(updatedPurchase);
 
     // 2. Dá entrada no estoque só da quantidade recebida NESTA baixa (não duplica em baixas futuras)
