@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.18.1";
+const APP_VERSION = "3.18.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -141,11 +141,9 @@ async function saveSuppliers(s) {
   try { await window.storage.set(FOR_KEY, JSON.stringify(s)); } catch(_){} }
 
 // ─── Purchase Orders Seed & Storage ──────────────────────────────────────
-const PC_STATUS = ["Em Aberto","Enviado","Confirmado","Baixado Parcial","Baixado","Cancelado"];
+const PC_STATUS = ["Em Aberto","Baixado Parcial","Baixado","Cancelado"];
 const PC_STATUS_STYLES = {
   "Em Aberto":       { bg:"bg-gray-100",   text:"text-gray-600"   },
-  "Enviado":         { bg:"bg-blue-100",   text:"text-blue-700"   },
-  "Confirmado":      { bg:"bg-indigo-100", text:"text-indigo-700" },
   "Baixado Parcial": { bg:"bg-amber-100",  text:"text-amber-700"  },
   "Baixado":         { bg:"bg-green-100",  text:"text-green-700"  },
   "Cancelado":       { bg:"bg-red-100",    text:"text-red-600"    },
@@ -10222,7 +10220,7 @@ const PARAMS_DEFAULT = {
     backendUrl: "",
   },
   vendas: { validadeCotacaoDias: 10, multaAtrasoPercent: 2, jurosAtrasoPercentMes: 1 },
-  compras: { statusList: ["Em Aberto","Enviado","Confirmado","Baixado Parcial","Baixado","Cancelado"] },
+  compras: { statusList: ["Em Aberto","Baixado Parcial","Baixado","Cancelado"] },
   fiscal: { provider: "", token: "", ambiente: "homologacao" },
 };
 async function loadParams() {
