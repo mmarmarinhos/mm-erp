@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.16.0";
+const APP_VERSION = "3.16.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8680,7 +8680,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], params, onClose, on
   const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, discount:0, discountType:"%", total:0, _prodId:null });
 
   const [form, setForm] = useState(purchase ? { ...purchase } : {
-    supplierId:"", supplierName:"", date:today(), expectedDate:"", receivedDate:"",
+    supplierId:"", supplierName:"", date:today(), nfEmissionDate:"", receivedDate:"",
     status:"Em Aberto", paymentTerms:"30 dias", freight:0, discount:0,
     dueDate:"", nfNumber:"", notes:"", items:[emptyItem()], subtotal:0, total:0,
   });
@@ -8841,8 +8841,8 @@ const PurchaseModal = ({ purchase, suppliers, products = [], params, onClose, on
               <input className={inp} value={form.nfNumber||""} onChange={e=>setForm(f=>({...f,nfNumber:e.target.value}))} placeholder="NF-e 000000"/>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Previsão de Entrega</label>
-              <input type="date" className={inp} value={form.expectedDate||""} onChange={e=>setForm(f=>({...f,expectedDate:e.target.value}))}/>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Data de Emissão da NF</label>
+              <input type="date" className={inp} value={form.nfEmissionDate||""} onChange={e=>setForm(f=>({...f,nfEmissionDate:e.target.value}))}/>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Data de Recebimento</label>
@@ -9692,7 +9692,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[["📋 Emissão",      detail.date],
-            ["🚚 Prev. Entrega", detail.expectedDate||"—"],
+            ["🧾 Emissão da NF", detail.nfEmissionDate||"—"],
             ["📅 Vencimento",    detail.dueDate ? new Date(detail.dueDate+"T12:00:00").toLocaleDateString("pt-BR") : "—"],
             ["✅ Pagamento",     detail.paidDate ? new Date(detail.paidDate+"T12:00:00").toLocaleDateString("pt-BR") : "Pendente"],
           ].map(([label,val])=>(
