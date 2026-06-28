@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.17.0";
+const APP_VERSION = "3.17.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -141,13 +141,13 @@ async function saveSuppliers(s) {
   try { await window.storage.set(FOR_KEY, JSON.stringify(s)); } catch(_){} }
 
 // ─── Purchase Orders Seed & Storage ──────────────────────────────────────
-const PC_STATUS = ["Em Aberto","Enviado","Confirmado","Recebido Parcial","Recebido","Cancelado"];
+const PC_STATUS = ["Em Aberto","Enviado","Confirmado","Baixado Parcial","Baixado","Cancelado"];
 const PC_STATUS_STYLES = {
   "Em Aberto":       { bg:"bg-gray-100",   text:"text-gray-600"   },
   "Enviado":         { bg:"bg-blue-100",   text:"text-blue-700"   },
   "Confirmado":      { bg:"bg-indigo-100", text:"text-indigo-700" },
-  "Recebido Parcial":{ bg:"bg-amber-100",  text:"text-amber-700"  },
-  "Recebido":        { bg:"bg-green-100",  text:"text-green-700"  },
+  "Baixado Parcial": { bg:"bg-amber-100",  text:"text-amber-700"  },
+  "Baixado":         { bg:"bg-green-100",  text:"text-green-700"  },
   "Cancelado":       { bg:"bg-red-100",    text:"text-red-600"    },
 };
 
@@ -8779,10 +8779,10 @@ const PurchaseModal = ({ purchase, suppliers, products = [], params, onClose, on
   const handleSave = () => {
     if (!form.supplierName.trim() || (form.items||[]).length===0) return;
     // Se status = Recebido, todos os itens devem ter _prodId
-    if (form.status === "Recebido") {
+    if (form.status === "Baixado") {
       const unlinked = (form.items||[]).filter(it => !it._prodId);
       if (unlinked.length > 0) {
-        setSaveError(`${unlinked.length} item(ns) sem vínculo com o catálogo de produtos. Selecione cada produto pelo campo de busca (autocomplete) antes de marcar como Recebido.`);
+        setSaveError(`${unlinked.length} item(ns) sem vínculo com o catálogo de produtos. Selecione cada produto pelo campo de busca (autocomplete) antes de marcar como Baixado.`);
         return;
       }
     }
@@ -9608,8 +9608,8 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
 
   const handleSave = (data) => {
     const oldPurchase = data.id ? purchases.find(p => p.id === data.id) : null;
-    const wasReceived = oldPurchase?.status === "Recebido";
-    const isReceived  = data.status === "Recebido";
+    const wasReceived = oldPurchase?.status === "Baixado";
+    const isReceived  = data.status === "Baixado";
 
     if (data.id) setPurchases(prev => prev.map(p => p.id===data.id ? data : p));
     else         setPurchases(prev => [...prev, { ...data, id:nextPcId(prev), createdAt:today() }]);
@@ -9738,7 +9738,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
     }));
     const totalmenteRecebido = updatedItems.every(it => (it.receivedQty||0) >= (it.qty||0));
     const algumRecebido = updatedItems.some(it => (it.receivedQty||0) > 0);
-    const newStatus = totalmenteRecebido ? "Recebido" : (algumRecebido ? "Recebido Parcial" : purchase.status);
+    const newStatus = totalmenteRecebido ? "Baixado" : (algumRecebido ? "Baixado Parcial" : purchase.status);
 
     const updatedPurchase = {
       ...purchase, items: updatedItems, status: newStatus,
@@ -9805,7 +9805,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
 
   const statusOptions = (params?.compras?.statusList?.length ? params.compras.statusList : PC_STATUS);
   const statusCounts = statusOptions.reduce((acc,s) => ({ ...acc, [s]: purchases.filter(p=>p.status===s).length }), {});
-  const totalPending = purchases.filter(p=>!["Recebido","Cancelado"].includes(p.status)).reduce((s,p)=>s+p.total,0);
+  const totalPending = purchases.filter(p=>!["Baixado","Cancelado"].includes(p.status)).reduce((s,p)=>s+p.total,0);
   const st = (s) => PC_STATUS_STYLES[s] || { bg:"bg-gray-100", text:"text-gray-600" };
 
   // Financial status helper
@@ -9838,19 +9838,19 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
           </div>
           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${st(detail.status).bg} ${st(detail.status).text}`}>{detail.status}</span>
           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${fs.bg} ${fs.text}`}>{fs.icon} {fs.label}</span>
-          {detail.status !== "Recebido" && detail.status !== "Cancelado" && (
+          {detail.status !== "Baixado" && detail.status !== "Cancelado" && (
             <button onClick={() => setBaixaPedido(detail)}
               className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 flex items-center gap-1.5">
               ✅ Baixar Pedido
             </button>
           )}
-          {detail.status === "Recebido" && detail.items.some(it => !it._prodId) && (
+          {detail.status === "Baixado" && detail.items.some(it => !it._prodId) && (
             <button onClick={() => setStockEntry(true)}
               className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 flex items-center gap-1.5">
               📦 Dar Entrada no Estoque
             </button>
           )}
-          {detail.status === "Recebido" && detail.items.every(it => !!it._prodId) && (
+          {detail.status === "Baixado" && detail.items.every(it => !!it._prodId) && (
             <span className="px-3 py-2 bg-green-50 text-green-700 rounded-xl text-xs font-semibold border border-green-200">✓ Estoque atualizado</span>
           )}
           <button onClick={()=>setModal(detail)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700">Editar</button>
@@ -10191,7 +10191,7 @@ const PARAMS_DEFAULT = {
     backendUrl: "",
   },
   vendas: { validadeCotacaoDias: 10, multaAtrasoPercent: 2, jurosAtrasoPercentMes: 1 },
-  compras: { statusList: ["Em Aberto","Enviado","Confirmado","Recebido Parcial","Recebido","Cancelado"] },
+  compras: { statusList: ["Em Aberto","Enviado","Confirmado","Baixado Parcial","Baixado","Cancelado"] },
   fiscal: { provider: "", token: "", ambiente: "homologacao" },
 };
 async function loadParams() {
