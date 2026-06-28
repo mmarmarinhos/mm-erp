@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.16.3";
+const APP_VERSION = "3.17.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8677,21 +8677,13 @@ const UsersModule = ({ currentUser }) => {
 const PurchaseModal = ({ purchase, suppliers, products = [], params, onClose, onSave }) => {
   const isNew = !purchase;
   const statusOptions = (params?.compras?.statusList?.length ? params.compras.statusList : PC_STATUS);
-  const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, discount:0, discountType:"%", total:0, _prodId:null });
+  const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, discount:0, discountType:"%", total:0, _prodId:null, receivedQty:0 });
 
   const [form, setForm] = useState(purchase ? { ...purchase } : {
     supplierId:"", supplierName:"", date:today(), nfEmissionDate:"", receivedDate:"",
     status:"Em Aberto", paymentTerms:"30 dias", freight:0, discount:0,
     dueDate:"", nfNumber:"", notes:"", items:[emptyItem()], subtotal:0, total:0,
   });
-
-  // Vencimento do boleto = Data de Emissão da NF + prazo de pagamento do fornecedor
-  useEffect(() => {
-    if (!form.nfEmissionDate) return;
-    const dias = parseInt(form.paymentTerms) || 0;
-    const calculado = addDaysISO(form.nfEmissionDate, dias);
-    setForm(f => f.dueDate === calculado ? f : { ...f, dueDate: calculado });
-  }, [form.nfEmissionDate, form.paymentTerms]);
 
   const calcItemTotal = (it) => {
     const gross = (it.qty||0)*(it.unitPrice||0);
@@ -8845,23 +8837,6 @@ const PurchaseModal = ({ purchase, suppliers, products = [], params, onClose, on
                 </div>
               )}
             </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Número da NF</label>
-              <input className={inp} value={form.nfNumber||""} onChange={e=>setForm(f=>({...f,nfNumber:e.target.value}))} placeholder="NF-e 000000"/>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Data de Emissão da NF</label>
-              <input type="date" className={inp} value={form.nfEmissionDate||""} onChange={e=>setForm(f=>({...f,nfEmissionDate:e.target.value}))}/>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Data de Recebimento</label>
-              <input type="date" className={inp} value={form.receivedDate||""} onChange={e=>setForm(f=>({...f,receivedDate:e.target.value}))}/>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Vencimento do Boleto</label>
-              <input type="date" className={inp} value={form.dueDate||""} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))}/>
-              <p className="text-[10px] text-gray-400 mt-1">Calculado automaticamente (Emissão da NF + prazo do fornecedor) — pode ajustar manualmente se precisar.</p>
-            </div>
           </div>
 
           {/* Items */}
@@ -8997,18 +8972,10 @@ const PurchaseModal = ({ purchase, suppliers, products = [], params, onClose, on
             </div>
           </div>
 
-          {/* Status + Observações */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
-              <select className={inp} value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
-                {statusOptions.map(s=><option key={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Observações</label>
-              <input className={inp} value={form.notes||""} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="Observações internas..."/>
-            </div>
+          {/* Observações */}
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Observações</label>
+            <input className={inp} value={form.notes||""} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="Observações internas..."/>
           </div>
         </div>
 
@@ -9483,10 +9450,115 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
   );
 };
 
-const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], setProducts, movements = [], setMovements, params }) => {
+const BaixarPedidoModal = ({ purchase, onClose, onConfirm }) => {
+  const [nfNumber, setNfNumber] = useState(purchase.nfNumber || "");
+  const [nfEmissionDate, setNfEmissionDate] = useState(purchase.nfEmissionDate || today());
+  const [receivedDate, setReceivedDate] = useState(purchase.receivedDate || today());
+  const [dueDate, setDueDate] = useState(purchase.dueDate || "");
+  const [qtys, setQtys] = useState((purchase.items||[]).map(it => Math.max(0, (it.qty||0)-(it.receivedQty||0))));
+  const [err, setErr] = useState("");
+
+  // Vencimento do boleto = Emissão da NF + prazo do fornecedor (recalcula, mas pode ajustar manualmente depois)
+  useEffect(() => {
+    if (!nfEmissionDate) return;
+    const dias = parseInt(purchase.paymentTerms) || 0;
+    setDueDate(addDaysISO(nfEmissionDate, dias));
+  }, [nfEmissionDate]);
+
+  const setQty = (i, v) => setQtys(prev => prev.map((q,idx)=>idx===i?v:q));
+
+  const totalRecebendoAgora = (purchase.items||[]).reduce((s,it,i)=>s+((Number(qtys[i])||0)*(it.unitPrice||0)), 0);
+  const algumRecebido = qtys.some(q => (Number(q)||0) > 0);
+
+  const handleConfirm = () => {
+    if (!algumRecebido) { setErr("Informe a quantidade recebida de ao menos um item"); return; }
+    onConfirm({ nfNumber, nfEmissionDate, receivedDate, dueDate, qtys: qtys.map(q=>Number(q)||0) });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
+          <h2 className="font-semibold text-gray-800">✅ Baixar Pedido {purchase.id}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon name="x"/></button>
+        </div>
+
+        <div className="overflow-y-auto p-5 space-y-4 flex-1">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Número da NF</label>
+              <input className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                value={nfNumber} onChange={e=>setNfNumber(e.target.value)} placeholder="NF-e 000000"/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Data de Emissão da NF</label>
+              <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                value={nfEmissionDate} onChange={e=>setNfEmissionDate(e.target.value)}/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Data de Recebimento</label>
+              <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                value={receivedDate} onChange={e=>setReceivedDate(e.target.value)}/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Vencimento do Boleto</label>
+              <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                value={dueDate} onChange={e=>setDueDate(e.target.value)}/>
+              <p className="text-[10px] text-gray-400 mt-1">Calculado automaticamente (Emissão da NF + prazo do fornecedor) — pode ajustar.</p>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Quantidade Recebida</p>
+            <div className="space-y-2">
+              {(purchase.items||[]).map((it,i)=>{
+                const jaRecebido = it.receivedQty||0;
+                const restante = Math.max(0, (it.qty||0)-jaRecebido);
+                return (
+                  <div key={i} className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{it.description}</p>
+                      <p className="text-[10px] text-gray-400">
+                        Pedido: {it.qty||0} {it.unit||"un"}
+                        {jaRecebido>0 && <> · já recebido: {jaRecebido} · restante: {restante}</>}
+                      </p>
+                    </div>
+                    <div className="w-24 shrink-0">
+                      <input type="number" min="0" max={restante} step="any"
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                        value={qtys[i]===0?"":qtys[i]} placeholder="0"
+                        onChange={e=>setQty(i, e.target.value===""?0:Math.min(Number(e.target.value)||0, restante))}/>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex items-center justify-between">
+            <p className="text-sm text-indigo-700 font-medium">Valor recebido nesta baixa</p>
+            <p className="text-lg font-bold text-indigo-700">{fmt(totalRecebendoAgora)}</p>
+          </div>
+
+          {err && <p className="text-red-500 text-xs">{err}</p>}
+        </div>
+
+        <div className="p-5 border-t border-gray-100 shrink-0 flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button onClick={handleConfirm} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700">
+            ✅ Confirmar Baixa
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance, params }) => {
   const [modal,      setModal]      = useState(null);
   const [detail,     setDetail]     = useState(null);
   const [stockEntry, setStockEntry] = useState(false);
+  const [baixaPedido, setBaixaPedido] = useState(null);
   const [filterStatus, setFilterStatus] = useState("Todos");
   const [search,   setSearch]   = useState("");
   const [delConfirm, setDelConfirm] = useState(null);
@@ -9656,6 +9728,75 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
     setStockEntry(false);
   };
 
+  const handleBaixarPedido = (data) => {
+    const purchase = baixaPedido;
+    if (!purchase) return;
+
+    // 1. Atualiza as quantidades recebidas (acumulado) e o status do pedido
+    const updatedItems = purchase.items.map((it,i) => ({
+      ...it, receivedQty: Math.min((it.receivedQty||0) + (data.qtys[i]||0), it.qty||0),
+    }));
+    const totalmenteRecebido = updatedItems.every(it => (it.receivedQty||0) >= (it.qty||0));
+    const algumRecebido = updatedItems.some(it => (it.receivedQty||0) > 0);
+    const newStatus = totalmenteRecebido ? "Recebido" : (algumRecebido ? "Recebido Parcial" : purchase.status);
+
+    const updatedPurchase = {
+      ...purchase, items: updatedItems, status: newStatus,
+      nfNumber: data.nfNumber, nfEmissionDate: data.nfEmissionDate,
+      receivedDate: data.receivedDate, dueDate: data.dueDate,
+    };
+    setPurchases(prev => prev.map(p => p.id===purchase.id ? updatedPurchase : p));
+    setDetail(updatedPurchase);
+
+    // 2. Dá entrada no estoque só da quantidade recebida NESTA baixa (não duplica em baixas futuras)
+    const movimentos = [];
+    if (setProducts) {
+      setProducts(prev => prev.map(prod => {
+        const idx = purchase.items.findIndex(it => (String(it._prodId)===String(prod.id) || (it.sku && it.sku===prod.sku)));
+        if (idx === -1) return prod;
+        const qtd = data.qtys[idx]||0;
+        if (qtd <= 0) return prod;
+        const preco = purchase.items[idx].unitPrice || 0;
+        const estAtual = prod.stock || 0;
+        const custoAtual = prod.cost || 0;
+        const novoCusto = estAtual > 0
+          ? parseFloat(((estAtual*custoAtual + qtd*preco) / (estAtual+qtd)).toFixed(4))
+          : preco;
+        movimentos.push({
+          productId: prod.id, type: "entrada", qty: qtd, date: data.receivedDate || today(),
+          reason: "Entrada por compra", notes: `Pedido ${purchase.id} · ${purchase.supplierName||""}`.trim(),
+        });
+        return { ...prod, stock: estAtual+qtd, cost: novoCusto, lastPurchasePrice: preco };
+      }));
+    }
+    if (setMovements && movimentos.length > 0) {
+      setMovements(prev => {
+        const n = prev.map(x => parseInt((x.id||"").replace("MOV-",""))||0);
+        const base = Math.max(0,...n,0);
+        return [...prev, ...movimentos.map((m,i)=>({ ...m, id:`MOV-${String(base+i+1).padStart(3,"0")}` }))];
+      });
+    }
+
+    // 3. Cria o lançamento em Contas a Pagar com o valor recebido nesta baixa
+    if (setFinance) {
+      const valorBaixa = purchase.items.reduce((s,it,i)=>s+((data.qtys[i]||0)*(it.unitPrice||0)), 0);
+      if (valorBaixa > 0) {
+        setFinance(prev => {
+          const n = prev.map(f=>parseInt((f.id||"").replace("FIN-",""))||0);
+          const newId = `FIN-${String(Math.max(0,...n,0)+1).padStart(3,"0")}`;
+          return [{
+            id:newId, type:"despesa", category:"Fornecedores",
+            description:`Pedido ${purchase.id} · NF ${data.nfNumber||"—"} · ${purchase.supplierName||""}`,
+            amount:valorBaixa, date:data.nfEmissionDate||today(), dueDate:data.dueDate||"",
+            status:"pendente", notes:"", supplierId:purchase.supplierId,
+          }, ...prev];
+        });
+      }
+    }
+
+    setBaixaPedido(null);
+  };
+
   const filtered = purchases
     .filter(p => filterStatus==="Todos" || p.status===filterStatus)
     .filter(p => !search || p.supplierName.toLowerCase().includes(search.toLowerCase()) || p.id.toLowerCase().includes(search.toLowerCase()))
@@ -9697,6 +9838,12 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
           </div>
           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${st(detail.status).bg} ${st(detail.status).text}`}>{detail.status}</span>
           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${fs.bg} ${fs.text}`}>{fs.icon} {fs.label}</span>
+          {detail.status !== "Recebido" && detail.status !== "Cancelado" && (
+            <button onClick={() => setBaixaPedido(detail)}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 flex items-center gap-1.5">
+              ✅ Baixar Pedido
+            </button>
+          )}
           {detail.status === "Recebido" && detail.items.some(it => !it._prodId) && (
             <button onClick={() => setStockEntry(true)}
               className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 flex items-center gap-1.5">
@@ -9739,6 +9886,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
               <tr className="text-xs text-gray-500">
                 <th className="text-left px-4 py-2">Descrição</th>
                 <th className="text-center px-3 py-2">Qtd</th>
+                <th className="text-center px-3 py-2">Recebido</th>
                 <th className="text-center px-3 py-2">Un</th>
                 <th className="text-right px-3 py-2">Preço Un.</th>
                 <th className="text-right px-4 py-2">Total</th>
@@ -9749,6 +9897,13 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
                 <tr key={i} className="border-t border-gray-50">
                   <td className="px-4 py-2.5 text-gray-800">{it.description}</td>
                   <td className="px-3 py-2.5 text-center text-gray-600">{it.qty}</td>
+                  <td className="px-3 py-2.5 text-center text-xs">
+                    {(it.receivedQty||0) >= (it.qty||0) && (it.qty||0)>0
+                      ? <span className="text-green-600 font-semibold">✓ {it.receivedQty}</span>
+                      : (it.receivedQty||0) > 0
+                        ? <span className="text-amber-600 font-semibold">{it.receivedQty}/{it.qty}</span>
+                        : <span className="text-gray-300">—</span>}
+                  </td>
                   <td className="px-3 py-2.5 text-center text-gray-400 text-xs">{it.unit}</td>
                   <td className="px-3 py-2.5 text-right text-gray-600">{fmt(it.unitPrice)}</td>
                   <td className="px-4 py-2.5 text-right font-medium text-gray-800">{fmt(it.total)}</td>
@@ -9756,14 +9911,17 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
               ))}
             </tbody>
             <tfoot className="bg-gray-50 border-t border-gray-100">
-              {detail.freight>0 && <tr><td colSpan={4} className="px-4 py-1.5 text-right text-xs text-gray-500">Frete</td><td className="px-4 py-1.5 text-right text-xs text-gray-600">+{fmt(detail.freight)}</td></tr>}
-              {detail.discount>0 && <tr><td colSpan={4} className="px-4 py-1.5 text-right text-xs text-gray-500">Desconto</td><td className="px-4 py-1.5 text-right text-xs text-green-600">-{fmt(detail.discount)}</td></tr>}
-              <tr><td colSpan={4} className="px-4 py-2 text-right font-bold text-gray-800 text-sm">Total</td><td className="px-4 py-2 text-right font-bold text-indigo-700 text-sm">{fmt(detail.total)}</td></tr>
+              {detail.freight>0 && <tr><td colSpan={5} className="px-4 py-1.5 text-right text-xs text-gray-500">Frete</td><td className="px-4 py-1.5 text-right text-xs text-gray-600">+{fmt(detail.freight)}</td></tr>}
+              {detail.discount>0 && <tr><td colSpan={5} className="px-4 py-1.5 text-right text-xs text-gray-500">Desconto</td><td className="px-4 py-1.5 text-right text-xs text-green-600">-{fmt(detail.discount)}</td></tr>}
+              <tr><td colSpan={5} className="px-4 py-2 text-right font-bold text-gray-800 text-sm">Total</td><td className="px-4 py-2 text-right font-bold text-indigo-700 text-sm">{fmt(detail.total)}</td></tr>
             </tfoot>
           </table>
         </div>
 
         {modal && <PurchaseModal purchase={modal} suppliers={suppliers} products={products||[]} params={params} onClose={()=>setModal(null)} onSave={handleSave}/>}
+        {baixaPedido && (
+          <BaixarPedidoModal purchase={baixaPedido} onClose={()=>setBaixaPedido(null)} onConfirm={handleBaixarPedido}/>
+        )}
         {stockEntry && detail && (
           <StockEntryModal
             purchase={detail}
@@ -12821,7 +12979,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params}/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases}/>;
-      case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} params={params}/>;
+      case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} params={params}/>;
       case "pdv": return <PdvModule products={products} setProducts={updateProducts} orders={orders} setOrders={updateOrders} movements={movements} setMovements={updateMovements} customers={customers} caixa={caixa} setCaixa={updateCaixa} params={params} currentUser={currentUser}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
       case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento} variantCatalogs={variantCatalogs} setVariantCatalogs={updateVariantCatalogs}/>;
