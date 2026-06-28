@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.16.2";
+const APP_VERSION = "3.16.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8723,6 +8723,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], params, onClose, on
   // SKU/Product autocomplete per item
   const [skuSearch, setSkuSearch] = useState((purchase?.items||[emptyItem()]).map(it=>it.sku||""));
   const [showSkuList, setShowSkuList] = useState((purchase?.items||[emptyItem()]).map(()=>false));
+  const [skuDropdownRect, setSkuDropdownRect] = useState({});
   const [askAddItem, setAskAddItem] = useState(false);
   const naoItemRef = useRef(null);
   const modalRef = useRef(null);
@@ -8886,8 +8887,17 @@ const PurchaseModal = ({ purchase, suppliers, products = [], params, onClose, on
                         <p className="text-[10px] text-gray-400 mb-0.5">SKU</p>
                         <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 font-mono"
                           value={sq}
-                          onChange={e=>{const ss=[...skuSearch];ss[i]=e.target.value;setSkuSearch(ss);setItem(i,"sku",e.target.value);const sl=[...showSkuList];sl[i]=true;setShowSkuList(sl);}}
-                          onFocus={()=>{const sl=[...showSkuList];sl[i]=true;setShowSkuList(sl);}}
+                          onChange={e=>{
+                            const ss=[...skuSearch];ss[i]=e.target.value;setSkuSearch(ss);setItem(i,"sku",e.target.value);
+                            const sl=[...showSkuList];sl[i]=true;setShowSkuList(sl);
+                            const r=e.target.getBoundingClientRect();
+                            setSkuDropdownRect(prev=>({...prev,[i]:{top:r.bottom+2, left:r.left, width:Math.max(r.width,256)}}));
+                          }}
+                          onFocus={e=>{
+                            const sl=[...showSkuList];sl[i]=true;setShowSkuList(sl);
+                            const r=e.target.getBoundingClientRect();
+                            setSkuDropdownRect(prev=>({...prev,[i]:{top:r.bottom+2, left:r.left, width:Math.max(r.width,256)}}));
+                          }}
                           onBlur={()=>setTimeout(()=>{const sl=[...showSkuList];sl[i]=false;setShowSkuList(sl);},150)}
                           onKeyDown={e=>{
                             if (e.key==="Tab" && showSkuList[i] && filtProd.length>0) {
@@ -8897,8 +8907,9 @@ const PurchaseModal = ({ purchase, suppliers, products = [], params, onClose, on
                           }}
                           ref={el=>skuInputRefs.current[i]=el}
                           placeholder="SKU"/>
-                        {showSkuList[i] && sq.length>0 && filtProd.length>0 && (
-                          <div className="absolute z-50 top-full left-0 w-64 bg-white border border-gray-200 rounded-lg shadow-lg mt-0.5 max-h-40 overflow-y-auto">
+                        {showSkuList[i] && sq.length>0 && filtProd.length>0 && skuDropdownRect[i] && (
+                          <div className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg mt-0.5 max-h-40 overflow-y-auto"
+                            style={{top:skuDropdownRect[i].top, left:skuDropdownRect[i].left, width:skuDropdownRect[i].width}}>
                             {filtProd.map(p=>(
                               <button key={p.id} type="button" onMouseDown={()=>selectProduct(i,p)}
                                 className="w-full text-left px-2 py-1.5 hover:bg-indigo-50 border-b border-gray-50 last:border-0">
