@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.18.3";
+const APP_VERSION = "3.18.4";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9428,6 +9428,7 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
 };
 
 const BaixarPedidoModal = ({ purchase, onClose, onConfirm }) => {
+  const modalRef = useRef(null);
   const [nfNumber, setNfNumber] = useState(purchase.nfNumber || "");
   const [nfEmissionDate, setNfEmissionDate] = useState(purchase.nfEmissionDate || today());
   const [receivedDate, setReceivedDate] = useState(purchase.receivedDate || today());
@@ -9454,7 +9455,7 @@ const BaixarPedidoModal = ({ purchase, onClose, onConfirm }) => {
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div ref={modalRef} onKeyDown={e=>trapTabFocus(e, modalRef)} className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
           <h2 className="font-semibold text-gray-800">✅ Baixar Pedido {purchase.id}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon name="x"/></button>
