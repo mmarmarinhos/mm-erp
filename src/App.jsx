@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.18.4";
+const APP_VERSION = "3.18.5";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9427,7 +9427,7 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
   );
 };
 
-const BaixarPedidoModal = ({ purchase, onClose, onConfirm }) => {
+const BaixarPedidoModal = ({ purchase, onClose, onConfirm, products = [] }) => {
   const modalRef = useRef(null);
   const [nfNumber, setNfNumber] = useState(purchase.nfNumber || "");
   const [nfEmissionDate, setNfEmissionDate] = useState(purchase.nfEmissionDate || today());
@@ -9450,6 +9450,20 @@ const BaixarPedidoModal = ({ purchase, onClose, onConfirm }) => {
 
   const handleConfirm = () => {
     if (!algumRecebido) { setErr("Informe a quantidade recebida de ao menos um item"); return; }
+    // Todo item que está recebendo quantidade nesta baixa precisa estar vinculado
+    // a um produto do catálogo (_prodId) ou ter SKU batendo com um produto existente —
+    // senão a entrada de estoque e o registro de movimentação são pulados em silêncio.
+    const semVinculo = (purchase.items||[]).filter((it,i) => {
+      const qtd = Number(qtys[i]) || 0;
+      if (qtd <= 0) return false;
+      const vinculado = !!it._prodId || (it.sku && products.some(p => p.sku === it.sku));
+      return !vinculado;
+    });
+    if (semVinculo.length > 0) {
+      setErr(`${semVinculo.length} item(ns) sem vínculo com o catálogo de produtos: ${semVinculo.map(it=>it.description).join(", ")}. Edite o pedido e selecione cada produto pelo campo de busca (autocomplete) antes de baixar — senão a entrada de estoque não é registrada.`);
+      return;
+    }
+    setErr("");
     onConfirm({ nfNumber, nfEmissionDate, receivedDate, dueDate, qtys: qtys.map(q=>Number(q)||0) });
   };
 
@@ -9929,7 +9943,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
 
         {modal && <PurchaseModal purchase={modal} suppliers={suppliers} products={products||[]} params={params} onClose={()=>setModal(null)} onSave={handleSave}/>}
         {baixaPedido && (
-          <BaixarPedidoModal purchase={baixaPedido} onClose={()=>setBaixaPedido(null)} onConfirm={handleBaixarPedido}/>
+          <BaixarPedidoModal purchase={baixaPedido} onClose={()=>setBaixaPedido(null)} onConfirm={handleBaixarPedido} products={products}/>
         )}
         {stockEntry && detail && (
           <StockEntryModal
