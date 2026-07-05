@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.1";
+const APP_VERSION = "3.19.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2333,7 +2333,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
-        {[["overview","📊 Visão Geral"],["receber","💰 Contas a Receber"],["pagar","💸 Contas a Pagar"]].map(([id,label]) => (
+        {[["overview","📊 Visão Geral"],["pagar","💸 Contas a Pagar"]].map(([id,label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`shrink-0 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${tab===id ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
             {label}
