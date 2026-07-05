@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.4";
+const APP_VERSION = "3.19.5";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8113,9 +8113,9 @@ const ROLES_DEF = {
 };
 
 const MOD_LABELS = {
-  dashboard:"Dashboard", orders:"Pedidos",
-  inventory:"Estoque", pricing:"Tabela de Preços", pricehunt:"PriceHunt",
-  finance:"Financeiro", fiscal:"Fiscal", crm:"Clientes",
+  dashboard:"Dashboard", orders:"Pedidos", cotacao:"Cotações",
+  inventory:"Estoque", pricing:"Tabela de Preços", pricehunt:"PriceHunt", pdv:"PDV",
+  finance:"Financeiro", receber:"Contas a Receber", pagar:"Contas a Pagar", fiscal:"Fiscal", crm:"Clientes",
   suppliers:"Fornecedores", purchases:"Compras", reports:"Relatórios", movimentos:"Movimentos", usuarios:"Usuários", cadastros:"Cadastros", parametros:"Parâmetros",
 };
 
