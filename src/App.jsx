@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.2";
+const APP_VERSION = "3.19.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2240,8 +2240,24 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
     setConfirmDelete(null);
   };
 
+  const standalone = initialTab !== "overview";
+
   return (
     <div className="space-y-4">
+      {standalone && (
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">{initialTab === "receber" ? "Contas a Receber" : "Contas a Pagar"}</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{initialTab === "receber" ? "Pedidos pendentes de recebimento" : "Despesas e compras pendentes de pagamento"}</p>
+          </div>
+          <button onClick={() => setModal("new")}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm">
+            <Icon name="plus" size={16}/> Lançamento
+          </button>
+        </div>
+      )}
+      {!standalone && (
+      <>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -2340,6 +2356,8 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
           </button>
         ))}
       </div>
+      </>
+      )}
 
       {/* ── TAB: Overview ── */}
       {tab === "overview" && (
