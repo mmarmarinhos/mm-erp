@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.18.5";
+const APP_VERSION = "3.19.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2045,8 +2045,8 @@ const FinPagModal = ({ item, onClose, onSave }) => {
   );
 };
 
-const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setPurchases, params }) => {
-  const [tab, setTab]         = useState("overview");
+const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setPurchases, params, initialTab = "overview" }) => {
+  const [tab, setTab]         = useState(initialTab);
   const [filterMode, setFilterMode] = useState("mes");  // mes | trimestre | ano | personalizado | todos
   const [period, setPeriod]   = useState(() => {
     const n = new Date();
@@ -12642,6 +12642,8 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
 const NAV = [
   { id: "dashboard",  label: "Dashboard",       icon: "dashboard"  },
   { id: "finance",    label: "Financeiro",       icon: "finance"    },
+  { id: "receber",    label: "Contas a Receber", icon: "arrowDown"  },
+  { id: "pagar",      label: "Contas a Pagar",   icon: "arrowUp"    },
   { id: "orders",     label: "Pedidos",          icon: "orders"     },
   { id: "cotacao",    label: "Cotações",         icon: "tag"        },
   { id: "crm",        label: "Clientes",         icon: "crm"        },
@@ -12999,7 +13001,9 @@ function ERPApp({ currentUser, onLogout }) {
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
-      case "finance":   return <FinanceModule finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params}/>;
+      case "finance":   return <FinanceModule key="fm-overview" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="overview"/>;
+      case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber"/>;
+      case "pagar":     return <FinanceModule key="fm-pagar" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="pagar"/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases}/>;
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} params={params}/>;
