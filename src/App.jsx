@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.3";
+const APP_VERSION = "3.19.4";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -12659,7 +12659,6 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
 // ─── Nav Items ────────────────────────────────────────────────────────────
 const NAV = [
   { id: "dashboard",  label: "Dashboard",       icon: "dashboard"  },
-  { id: "finance",    label: "Financeiro",       icon: "finance"    },
   { id: "receber",    label: "Contas a Receber", icon: "arrowDown"  },
   { id: "pagar",      label: "Contas a Pagar",   icon: "arrowUp"    },
   { id: "orders",     label: "Pedidos",          icon: "orders"     },
@@ -13019,7 +13018,6 @@ function ERPApp({ currentUser, onLogout }) {
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
-      case "finance":   return <FinanceModule key="fm-overview" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="overview"/>;
       case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber"/>;
       case "pagar":     return <FinanceModule key="fm-pagar" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="pagar"/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
