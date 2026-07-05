@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.5";
+const APP_VERSION = "3.19.6";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -8101,21 +8101,21 @@ const SyncOperationsPanel = ({ orders, setOrders, backendUrl }) => {
 
 // ─── Roles & Permissions ─────────────────────────────────────────────────
 const ALL_MODULES = ["dashboard","orders","cotacao","inventory","pricing","pricehunt","pdv",
-                     "finance","receber","pagar","fiscal","crm","suppliers","purchases","reports","movimentos","cadastros","parametros"];
+                     "receber","pagar","fiscal","crm","suppliers","purchases","reports","movimentos","cadastros","parametros"];
 
 const ROLES_DEF = {
   admin:      { label:"Administrador", color:"text-purple-700", bg:"bg-purple-100",  modules:[...ALL_MODULES,"usuarios"] },
   gerente:    { label:"Gerente",       color:"text-blue-700",   bg:"bg-blue-100",    modules:ALL_MODULES },
   vendedor:   { label:"Vendedor",      color:"text-green-700",  bg:"bg-green-100",   modules:["dashboard","orders","pricing","pricehunt","crm"] },
   estoque:    { label:"Estoque",       color:"text-amber-700",  bg:"bg-amber-100",   modules:["dashboard","inventory","purchases","suppliers"] },
-  financeiro: { label:"Financeiro",    color:"text-indigo-700", bg:"bg-indigo-100",  modules:["dashboard","finance","receber","pagar","fiscal","reports","movimentos"] },
+  financeiro: { label:"Financeiro",    color:"text-indigo-700", bg:"bg-indigo-100",  modules:["dashboard","receber","pagar","fiscal","reports","movimentos"] },
   viewer:     { label:"Visualizador",  color:"text-gray-600",   bg:"bg-gray-100",    modules:["dashboard","reports"] },
 };
 
 const MOD_LABELS = {
   dashboard:"Dashboard", orders:"Pedidos", cotacao:"Cotações",
   inventory:"Estoque", pricing:"Tabela de Preços", pricehunt:"PriceHunt", pdv:"PDV",
-  finance:"Financeiro", receber:"Contas a Receber", pagar:"Contas a Pagar", fiscal:"Fiscal", crm:"Clientes",
+  receber:"Contas a Receber", pagar:"Contas a Pagar", fiscal:"Fiscal", crm:"Clientes",
   suppliers:"Fornecedores", purchases:"Compras", reports:"Relatórios", movimentos:"Movimentos", usuarios:"Usuários", cadastros:"Cadastros", parametros:"Parâmetros",
 };
 
