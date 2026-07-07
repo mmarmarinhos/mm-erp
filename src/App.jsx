@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.6";
+const APP_VERSION = "3.19.7";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2655,17 +2655,11 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
       {tab === "pagar" && (() => {
         const today0 = new Date(); today0.setHours(0,0,0,0);
         const diffDays = (a,b) => Math.round((a-b)/86400000);
-        // Compras pendentes
-        const purchaseItems = (purchases||[])
-          .filter(p => p.status !== "Cancelado" && (showPaidPag ? true : !p.paidDate))
-          .map(p => ({
-            ...p,
-            _type: "compra",
-            amount: p.total,
-            description: p.supplier || p.description || "Compra",
-          }));
 
-        // Lançamentos manuais de despesa (pendentes ou pagos se showPaidPag)
+        // Contas a Pagar reflete SOMENTE lançamentos financeiros reais (finance),
+        // que só são criados no momento da baixa efetiva do pedido de compra
+        // (handleBaixarPedido), com o valor da quantidade realmente recebida —
+        // nunca pedidos "Em Aberto" com o valor total do pedido inteiro.
         const financeItems = (finance||[])
           .filter(t => t.type === "despesa" && t.status !== "cancelado" && (showPaidPag ? true : (t.status !== "pago" && !t.paidDate)))
           .map(t => ({
@@ -2676,7 +2670,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
             description: t.description || t.category || "Despesa",
           }));
 
-        const pagItems = [...purchaseItems, ...financeItems]
+        const pagItems = [...financeItems]
           .map(p => {
             const due = p.dueDate ? new Date(p.dueDate+"T12:00:00") : null;
             if (due) due.setHours(0,0,0,0);
