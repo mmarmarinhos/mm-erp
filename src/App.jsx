@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.13";
+const APP_VERSION = "3.19.14";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9838,26 +9838,31 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
     setDetail(updatedPurchase);
 
     // 2. Dá entrada no estoque só da quantidade recebida NESTA baixa (não duplica em baixas futuras)
+    // IMPORTANTE: o cálculo é feito de forma síncrona sobre o `products` atual (prop),
+    // não dentro do callback de setProducts(prev => ...) — o React não garante que esse
+    // callback rode antes da checagem seguinte, então gerar o array `movimentos` como
+    // efeito colateral ali dentro causava perda intermitente do histórico de movimentação
+    // (o estoque sempre atualizava certo, porque isso o React aplica de qualquer forma,
+    // mas a checagem "tem movimento pra salvar?" às vezes rodava antes do array ser populado).
     const movimentos = [];
-    if (setProducts) {
-      setProducts(prev => prev.map(prod => {
-        const idx = purchase.items.findIndex(it => (String(it._prodId)===String(prod.id) || (it.sku && it.sku===prod.sku)));
-        if (idx === -1) return prod;
-        const qtd = data.qtys[idx]||0;
-        if (qtd <= 0) return prod;
-        const preco = purchase.items[idx].unitPrice || 0;
-        const estAtual = prod.stock || 0;
-        const custoAtual = prod.cost || 0;
-        const novoCusto = estAtual > 0
-          ? parseFloat(((estAtual*custoAtual + qtd*preco) / (estAtual+qtd)).toFixed(4))
-          : preco;
-        movimentos.push({
-          productId: prod.id, type: "entrada", qty: qtd, date: data.receivedDate || today(),
-          reason: "Entrada por compra", notes: `Pedido ${purchase.id} · ${purchase.supplierName||""}`.trim(),
-        });
-        return { ...prod, stock: estAtual+qtd, cost: novoCusto, lastPurchasePrice: preco };
-      }));
-    }
+    const novosProdutos = (products||[]).map(prod => {
+      const idx = purchase.items.findIndex(it => (String(it._prodId)===String(prod.id) || (it.sku && it.sku===prod.sku)));
+      if (idx === -1) return prod;
+      const qtd = data.qtys[idx]||0;
+      if (qtd <= 0) return prod;
+      const preco = purchase.items[idx].unitPrice || 0;
+      const estAtual = prod.stock || 0;
+      const custoAtual = prod.cost || 0;
+      const novoCusto = estAtual > 0
+        ? parseFloat(((estAtual*custoAtual + qtd*preco) / (estAtual+qtd)).toFixed(4))
+        : preco;
+      movimentos.push({
+        productId: prod.id, type: "entrada", qty: qtd, date: data.receivedDate || today(),
+        reason: "Entrada por compra", notes: `Pedido ${purchase.id} · ${purchase.supplierName||""}`.trim(),
+      });
+      return { ...prod, stock: estAtual+qtd, cost: novoCusto, lastPurchasePrice: preco };
+    });
+    if (setProducts) setProducts(novosProdutos);
     if (setMovements && movimentos.length > 0) {
       setMovements(prev => {
         const n = prev.map(x => parseInt((x.id||"").replace("MOV-",""))||0);
