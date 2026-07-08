@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.14";
+const APP_VERSION = "3.19.15";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -10387,6 +10387,10 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
   // SKU autocomplete state per item
   const [skuSearch, setSkuSearch]   = useState([]);
   const [showSkuList, setShowSkuList] = useState([]);
+  // Posição calculada do dropdown de SKU do item — renderizado com position:fixed
+  // (fora do <div overflow-x-auto> da tabela de itens) pra não ser cortado pela
+  // rolagem horizontal/vertical daquele contêiner.
+  const [skuListPos, setSkuListPos] = useState({});
   const [askAddItem, setAskAddItem] = useState(false);
   const naoItemRef = useRef(null);
   const modalRef = useRef(null);
@@ -10565,8 +10569,17 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                         <p className="text-[10px] text-gray-400 mb-0.5">SKU</p>
                         <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 font-mono"
                           value={sq}
-                          onChange={e=>{ const ss=[...skuSearch]; ss[i]=e.target.value; setSkuSearch(ss); setItem(i,"sku",e.target.value); const sl=[...showSkuList]; sl[i]=true; setShowSkuList(sl); }}
-                          onFocus={()=>{ const sl=[...showSkuList]; sl[i]=true; setShowSkuList(sl); }}
+                          onChange={e=>{
+                            const ss=[...skuSearch]; ss[i]=e.target.value; setSkuSearch(ss); setItem(i,"sku",e.target.value);
+                            const sl=[...showSkuList]; sl[i]=true; setShowSkuList(sl);
+                            const r = skuInputRefs.current[i]?.getBoundingClientRect();
+                            if (r) setSkuListPos(p=>({...p,[i]:{top:r.bottom+4, left:r.left, width:Math.max(r.width,220)}}));
+                          }}
+                          onFocus={()=>{
+                            const sl=[...showSkuList]; sl[i]=true; setShowSkuList(sl);
+                            const r = skuInputRefs.current[i]?.getBoundingClientRect();
+                            if (r) setSkuListPos(p=>({...p,[i]:{top:r.bottom+4, left:r.left, width:Math.max(r.width,220)}}));
+                          }}
                           onBlur={()=>setTimeout(()=>{ const sl=[...showSkuList]; sl[i]=false; setShowSkuList(sl); },150)}
                           onKeyDown={e=>{
                             if (e.key==="Tab" && showSkuList[i] && filtProd.length>0) {
@@ -10577,7 +10590,13 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                           ref={el=>skuInputRefs.current[i]=el}
                           placeholder="SKU"/>
                         {showSkuList[i] && filtProd.length>0 && sq && (
-                          <div className="absolute z-50 left-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 w-64 max-h-48 overflow-y-auto">
+                          <div
+                            className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto"
+                            style={{
+                              top: (skuListPos[i]?.top ?? 0) + "px",
+                              left: (skuListPos[i]?.left ?? 0) + "px",
+                              width: (skuListPos[i]?.width ?? 256) + "px",
+                            }}>
                             {filtProd.map(p=>(
                               <button key={p.id} type="button" onMouseDown={()=>selectProduct(i,p)}
                                 className="w-full text-left px-3 py-2 hover:bg-indigo-50 border-b border-gray-50 last:border-0">
