@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.9";
+const APP_VERSION = "3.19.10";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2763,6 +2763,16 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
                           <p className="font-bold text-red-600 text-base">{fmt(p.total)}</p>
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${PC_STATUS_STYLES[p.status]?.bg||"bg-gray-100"} ${PC_STATUS_STYLES[p.status]?.text||"text-gray-600"}`}>{p.status}</span>
                           {(p.paidDate||p.status==="pago") ? (<div className="flex flex-col items-end gap-1 mt-1"><span className="text-[10px] text-green-600 font-semibold">✅ Pago{p.paidDate?" em "+new Date(p.paidDate+"T12:00:00").toLocaleDateString("pt-BR"):""}</span><button onClick={()=>setPayPag(p)} className="text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100">↩ Editar pgto</button></div>) : <button onClick={()=>setPayPag(p)} className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 mt-1">💸 Pagar</button>}
+                          {p._type === "lancamento" && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <button onClick={()=>setModal(p)} className="p-1 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                                <Icon name="edit" size={13}/>
+                              </button>
+                              <button onClick={()=>setConfirmDelete(p)} className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                                <Icon name="trash" size={13}/>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
