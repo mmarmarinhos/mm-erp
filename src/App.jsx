@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.11";
+const APP_VERSION = "3.19.12";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -968,7 +968,7 @@ const EmitNfeModal = ({ order, onClose, onIssued }) => {
   );
 };
 
-const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance, representantes = [], formasPagamento = [], params }) => {
+const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance, representantes = [], formasPagamento = [], params, openOrderId = null, onConsumeOpenOrder }) => {
   const [search, setSearch] = useState("");
   const [filterChannel, setFilterChannel] = useState("Todos");
   const [filterStatus, setFilterStatus] = useState("Todos");
@@ -978,6 +978,15 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
   const [devolucaoModal, setDevolucaoModal] = useState(null);
   const [emitNfeOrder, setEmitNfeOrder] = useState(null);
   const [filterMode, setFilterMode] = useState("todos"); // mes | personalizado | todos
+
+  // Chegou aqui via "🔗 Ver Pedido" (Contas a Receber) — abre o detalhe direto
+  useEffect(() => {
+    if (openOrderId) {
+      const o = orders.find(x => x.id === openOrderId);
+      if (o) setDetailOrder(o);
+      if (onConsumeOpenOrder) onConsumeOpenOrder();
+    }
+  }, [openOrderId]);
   const [period, setPeriod] = useState(() => {
     const n = new Date();
     return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;
@@ -2067,7 +2076,7 @@ const FinPagModal = ({ item, onClose, onSave }) => {
   );
 };
 
-const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setPurchases, params, initialTab = "overview" }) => {
+const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setPurchases, params, initialTab = "overview", onViewOrder }) => {
   const [tab, setTab]         = useState(initialTab);
   const [filterMode, setFilterMode] = useState("mes");  // mes | trimestre | ano | personalizado | todos
   const [period, setPeriod]   = useState(() => {
@@ -2658,6 +2667,12 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
                             className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700">
                             ✅ Pagar
                           </button>}
+                          {onViewOrder && (
+                            <button onClick={()=>onViewOrder(o.id)}
+                              className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
+                              🔗 Ver Pedido
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -12826,6 +12841,7 @@ function ERPApp({ currentUser, onLogout }) {
   const [phQuery, setPhQuery]       = useState("");
   const [phPrice, setPhPrice]       = useState(null);
   const [appToast, setAppToast]     = useState(null);
+  const [openOrderId, setOpenOrderId] = useState(null);
 
   const showAppToast = (msg) => { setAppToast(msg); setTimeout(()=>setAppToast(null), 4000); };
 
@@ -13074,11 +13090,11 @@ function ERPApp({ currentUser, onLogout }) {
   const renderModule = () => {
     switch (active) {
       case "dashboard": return <DashboardModule orders={orders} />;
-      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
+      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
-      case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber"/>;
+      case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber" onViewOrder={(id)=>{ setOpenOrderId(id); setActive("orders"); }}/>;
       case "pagar":     return <FinanceModule key="fm-pagar" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="pagar"/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases}/>;
