@@ -57,10 +57,12 @@ window.storage = {
   },
 
   async set(key, value, shared = false) {
-    try {
-      await apiStorage('set', { key, value })
-      return { key, value, shared }
-    } catch { return null }
+    // Não engolir o erro aqui: quem chama (persistKV, no App.jsx) precisa
+    // saber quando uma gravação falha de verdade, pra poder tentar de novo
+    // e avisar o usuário. Engolir em silêncio já causou perda de dado real
+    // (histórico de movimentação de estoque sumindo sem nenhum aviso).
+    await apiStorage('set', { key, value })
+    return { key, value, shared }
   },
 
   async delete(key, shared = false) {
