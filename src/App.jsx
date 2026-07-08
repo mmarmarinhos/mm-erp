@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.7";
+const APP_VERSION = "3.19.8";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -107,13 +107,33 @@ const initials = (name) => name.split(" ").slice(0,2).map(p=>p[0]).join("").toUp
 
 const SEED_CUSTOMERS = [];
 
+// ─── Persistência com retry + aviso visível em caso de falha ──────────────
+// Antes, cada save*() engolia erro de rede/gravação em silêncio (try{}catch(_){}),
+// então uma falha transitória (ex: baixa de pedido) simplesmente sumia sem
+// nenhum aviso — dado ficava só na memória da sessão, nunca ia pro banco.
+async function persistKV(key, data, label) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      await window.storage.set(key, JSON.stringify(data));
+      return true;
+    } catch (err) {
+      if (attempt === 2) {
+        console.error(`[MM ERP] Falha ao salvar "${label}" (${key}):`, err);
+        try { window.dispatchEvent(new CustomEvent("erp:save-error", { detail: { label, key } })); } catch(_){}
+        return false;
+      }
+      await new Promise(r => setTimeout(r, 700));
+    }
+  }
+}
+
 const CLI_KEY = "erp-mmarmarinhos-customers";
 async function loadCustomers() {
   try { const r = await window.storage.get(CLI_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){}
   return SEED_CUSTOMERS;
 }
 async function saveCustomers(c) {
-  try { await window.storage.set(CLI_KEY, JSON.stringify(c)); } catch(_){}
+  return persistKV(CLI_KEY, c, "Clientes");
 }
 
 // ─── Supplier Constants ───────────────────────────────────────────────────
@@ -138,7 +158,8 @@ async function loadSuppliers() {
   return SEED_SUPPLIERS;
 }
 async function saveSuppliers(s) {
-  try { await window.storage.set(FOR_KEY, JSON.stringify(s)); } catch(_){} }
+  return persistKV(FOR_KEY, s, "Fornecedores");
+}
 
 // ─── Purchase Orders Seed & Storage ──────────────────────────────────────
 const PC_STATUS = ["Em Aberto","Baixado Parcial","Baixado","Cancelado"];
@@ -157,7 +178,8 @@ async function loadPurchases() {
   return SEED_PURCHASES;
 }
 async function savePurchases(p) {
-  try { await window.storage.set(PC_KEY, JSON.stringify(p)); } catch(_){} }
+  return persistKV(PC_KEY, p, "Pedidos de Compra");
+}
 
 // ─── Inventory Constants ──────────────────────────────────────────────────
 const INV_CATS  = ["Linhas / Fios","Agulhas","Materiais de Bordado","Bastidores / Aros","Embalagens","Kits","Outros"];
@@ -181,13 +203,13 @@ const SEED_MOVEMENTS = [];
 const PRD_KEY = "erp-mmarmarinhos-products";
 const MOV_KEY = "erp-mmarmarinhos-movements";
 async function loadProducts()  { try { const r = await window.storage.get(PRD_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){} return SEED_PRODUCTS; }
-async function saveProducts(p) { try { await window.storage.set(PRD_KEY, JSON.stringify(p)); } catch(_){} }
+async function saveProducts(p) { return persistKV(PRD_KEY, p, "Estoque/Produtos"); }
 async function loadMovements() { try { const r = await window.storage.get(MOV_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){} return SEED_MOVEMENTS; }
-async function saveMovements(m){ try { await window.storage.set(MOV_KEY, JSON.stringify(m)); } catch(_){} }
+async function saveMovements(m){ return persistKV(MOV_KEY, m, "Movimentos de Estoque"); }
 
 const CAIXA_KEY = "erp-mmarmarinhos-caixa";
 async function loadCaixa()  { try { const r = await window.storage.get(CAIXA_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){} return []; }
-async function saveCaixa(c) { try { await window.storage.set(CAIXA_KEY, JSON.stringify(c)); } catch(_){} }
+async function saveCaixa(c) { return persistKV(CAIXA_KEY, c, "Caixa/PDV"); }
 
 // ─── Fiscal Constants ─────────────────────────────────────────────────────
 const NF_TIPOS    = ["NF-e","NFC-e","NFS-e"];
@@ -249,7 +271,7 @@ const SEED_NFES = [];
 
 const NFE_KEY = "erp-mmarmarinhos-nfes";
 async function loadNfes()  { try { const r = await window.storage.get(NFE_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){} return SEED_NFES; }
-async function saveNfes(n) { try { await window.storage.set(NFE_KEY, JSON.stringify(n)); } catch(_){} }
+async function saveNfes(n) { return persistKV(NFE_KEY, n, "Notas Fiscais"); }
 
 const STORAGE_KEY = "erp-mmarmarinhos-orders";
 
@@ -262,7 +284,7 @@ async function loadOrders() {
 }
 
 async function saveOrders(orders) {
-  try { await window.storage.set(STORAGE_KEY, JSON.stringify(orders)); } catch (_) {}
+  return persistKV(STORAGE_KEY, orders, "Pedidos de Venda");
 }
 
 const FIN_KEY = "erp-mmarmarinhos-finance";
@@ -274,7 +296,7 @@ async function loadFinance() {
   return SEED_FINANCE;
 }
 async function saveFinance(fin) {
-  try { await window.storage.set(FIN_KEY, JSON.stringify(fin)); } catch (_) {}
+  return persistKV(FIN_KEY, fin, "Financeiro");
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -10142,7 +10164,7 @@ async function loadRepresentantes() {
   return [...SEED_REPRESENTANTES];
 }
 async function saveRepresentantes(list) {
-  try { await window.storage.set(REPR_KEY, JSON.stringify(list)); } catch(_) {}
+  return persistKV(REPR_KEY, list, "Representantes");
 }
 // Retorna a comissão % aplicável a um representante, dado o desconto concedido no pedido
 function comissaoAplicavel(rep, descontoPercent) {
@@ -10166,7 +10188,7 @@ async function loadVariantCatalogs() {
   return [];
 }
 async function saveVariantCatalogs(list) {
-  try { await window.storage.set(VARCAT_KEY, JSON.stringify(list)); } catch(_) {}
+  return persistKV(VARCAT_KEY, list, "Catálogos de Variante");
 }
 const CONTA_TIPOS = ["Corrente","Poupança"];
 
@@ -10177,7 +10199,7 @@ async function loadFechamentos() {
   return [];
 }
 async function saveFechamentos(list) {
-  try { await window.storage.set(FECHAMENTO_KEY, JSON.stringify(list)); } catch(_) {}
+  return persistKV(FECHAMENTO_KEY, list, "Fechamentos de Comissão");
 }
 const BANCOS_BR = [
   "Banco do Brasil","Itaú","Bradesco","Caixa Econômica Federal","Santander","Nubank",
@@ -10190,7 +10212,7 @@ async function loadContas() {
   return [...SEED_CONTAS];
 }
 async function saveContas(list) {
-  try { await window.storage.set(CONTA_KEY, JSON.stringify(list)); } catch(_) {}
+  return persistKV(CONTA_KEY, list, "Contas Bancárias");
 }
 
 const FORMAPAG_KEY = "erp-mmarmarinhos-formas-pagamento";
@@ -10207,7 +10229,7 @@ async function loadFormasPagamento() {
   return [...SEED_FORMASPAGAMENTO];
 }
 async function saveFormasPagamento(list) {
-  try { await window.storage.set(FORMAPAG_KEY, JSON.stringify(list)); } catch(_) {}
+  return persistKV(FORMAPAG_KEY, list, "Formas de Pagamento");
 }
 
 // ─── Params Storage ───────────────────────────────────────────────────────
@@ -10249,7 +10271,7 @@ async function loadParams() {
   return { ...PARAMS_DEFAULT };
 }
 async function saveParams(p) {
-  try { await window.storage.set(PARAMS_KEY, JSON.stringify(p)); } catch(_) {}
+  return persistKV(PARAMS_KEY, p, "Parâmetros");
 }
 
 const EMPRESA_KEY = "erp_empresa_dados";
@@ -10283,7 +10305,8 @@ async function loadCotacoes() {
   return SEED_COTACOES;
 }
 async function saveCotacoes(c) {
-  try { await window.storage.set(COT_KEY, JSON.stringify(c)); } catch(_){} }
+  return persistKV(COT_KEY, c, "Cotações");
+}
 
 // ─── Cotação Modal ────────────────────────────────────────────────────────
 const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [], representantes = [], formasPagamento = [], params }) => {
@@ -12775,6 +12798,19 @@ function ERPApp({ currentUser, onLogout }) {
   const [appToast, setAppToast]     = useState(null);
 
   const showAppToast = (msg) => { setAppToast(msg); setTimeout(()=>setAppToast(null), 4000); };
+
+  // Aviso visível quando uma gravação falha de vez (após retry) — antes isso
+  // sumia em silêncio (ex: baixa de pedido gerando estoque mas não o
+  // histórico de movimentação, porque o salvamento de "movements" falhou
+  // sem nenhum aviso).
+  useEffect(() => {
+    const onSaveError = (e) => {
+      const label = e?.detail?.label || "dado";
+      showAppToast(`⚠️ Falha ao salvar "${label}" — verifique sua conexão e tente novamente.`);
+    };
+    window.addEventListener("erp:save-error", onSaveError);
+    return () => window.removeEventListener("erp:save-error", onSaveError);
+  }, []);
 
   const handleLogout = () => {
     sessionStorage.removeItem("erp_session_v2");
