@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.8";
+const APP_VERSION = "3.19.9";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9700,6 +9700,13 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
 
   const handleDelete = (pc) => {
     setPurchases(prev => prev.filter(p => p.id !== pc.id));
+    // Remove também o(s) lançamento(s) em Contas a Pagar gerados pela baixa deste pedido —
+    // por id vinculado (purchaseId) ou, em lançamentos antigos sem esse campo, pela descrição.
+    if (setFinance) {
+      setFinance(prev => prev.filter(f =>
+        !(f.purchaseId === pc.id || (f.description && f.description.startsWith(`Pedido ${pc.id} `)))
+      ));
+    }
     setDelConfirm(null); setDetail(null);
   };
 
@@ -9845,7 +9852,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
             id:newId, type:"despesa", category:"Fornecedores",
             description:`Pedido ${purchase.id} · NF ${data.nfNumber||"—"} · ${purchase.supplierName||""}`,
             amount:valorBaixa, date:data.nfEmissionDate||today(), dueDate:data.dueDate||"",
-            status:"pendente", notes:"", supplierId:purchase.supplierId,
+            status:"pendente", notes:"", supplierId:purchase.supplierId, purchaseId: purchase.id,
           }, ...prev];
         });
       }
@@ -9987,19 +9994,32 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
             onConfirm={handleStockEntry}
           />
         )}
-        {delConfirm && (
+        {delConfirm && (() => {
+          const finLinked = (finance||[]).filter(f =>
+            f.purchaseId === delConfirm.id || (f.description && f.description.startsWith(`Pedido ${delConfirm.id} `))
+          );
+          const temPago = finLinked.some(f => f.status === "pago");
+          return (
           <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center">
               <p className="text-2xl mb-2">🗑️</p>
               <h3 className="font-bold text-gray-900 mb-1">Excluir {delConfirm.id}?</h3>
-              <p className="text-sm text-gray-500 mb-4">Esta ação não pode ser desfeita.</p>
+              <p className="text-sm text-gray-500 mb-2">Esta ação não pode ser desfeita.</p>
+              {finLinked.length > 0 && (
+                <p className={`text-xs rounded-lg px-3 py-2 mb-2 ${temPago ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>
+                  {temPago
+                    ? `⚠️ Este pedido tem ${finLinked.length} lançamento(s) em Contas a Pagar já marcado(s) como PAGO — será(ão) excluído(s) junto.`
+                    : `O lançamento vinculado em Contas a Pagar (${finLinked.length}) também será excluído.`}
+                </p>
+              )}
               <div className="flex gap-2">
                 <button onClick={()=>setDelConfirm(null)} className="flex-1 py-2 border border-gray-200 rounded-xl text-sm">Cancelar</button>
                 <button onClick={()=>handleDelete(delConfirm)} className="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm font-medium">Excluir</button>
               </div>
             </div>
           </div>
-        )}
+          );
+        })()}
       </div>
     );
   }
