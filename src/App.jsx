@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.21.0";
+const APP_VERSION = "3.21.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9397,6 +9397,24 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
           });
         });
       }
+      // Saiu do status "Baixado" (ex: virou "Cancelado") — o estoque já
+      // recebido é estornado abaixo; aqui só registramos essa saída no
+      // histórico, pra não sumir sem rastro.
+      if (!isReceived && wasReceived && oldPurchase?.items) {
+        oldPurchase.items.forEach(oldItem => {
+          if (!oldItem._prodId && !(oldItem.sku)) return;
+          const prod = products.find(p => p.id === oldItem._prodId || (oldItem.sku && p.sku === oldItem.sku));
+          if (!prod || (oldItem.qty||0) <= 0) return;
+          movimentos.push({
+            productId: prod.id,
+            type: "saida",
+            qty: oldItem.qty || 0,
+            date: today(),
+            reason: "Estorno de compra",
+            notes: `Pedido ${data.id} saiu de Baixado (${data.status}) · ${data.supplierName||""}`.trim(),
+          });
+        });
+      }
 
       setProducts(prev => prev.map(prod => {
         let estoqueAtual = prod.stock || 0;
@@ -9434,6 +9452,16 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
         });
       }
     }
+
+    // Saiu do status "Baixado" (ex: cancelado) — remove o lançamento em
+    // Contas a Pagar gerado quando foi baixado, senão a "dívida" fica
+    // pendente pra sempre mesmo o pedido não estando mais baixado.
+    if (setFinance && wasReceived && !isReceived) {
+      setFinance(prev => prev.filter(f =>
+        !(f.purchaseId === data.id || (f.description && f.description.startsWith(`Pedido ${data.id} `)))
+      ));
+    }
+
     setModal(null); setDetail(null);
   };
 
