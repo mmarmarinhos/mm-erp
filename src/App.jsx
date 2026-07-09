@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.21.2";
+const APP_VERSION = "3.21.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -9907,6 +9907,11 @@ function useLogo() {
     window.storage.get(LOGO_KEY)
       .then(r => { if (r?.value) setLogo(r.value); })
       .catch(()=>{});
+    // Atualiza na hora se o logo mudar em outro componente (ex: upload feito
+    // em Parâmetros), sem precisar dar refresh na página pra ver a mudança.
+    const onLogoUpdate = (e) => setLogo(e?.detail?.logo ?? null);
+    window.addEventListener("erp:logo-updated", onLogoUpdate);
+    return () => window.removeEventListener("erp:logo-updated", onLogoUpdate);
   }, []);
   return logo;
 }
@@ -11813,16 +11818,28 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
     reader.onload = async (ev) => {
       const base64 = ev.target.result;
       setLogo(base64);
-      await window.storage.set(LOGO_KEY, base64).catch(()=>{});
-      setLogoSaved(true);
-      setTimeout(()=>setLogoSaved(false), 2500);
+      try {
+        await window.storage.set(LOGO_KEY, base64);
+        window.dispatchEvent(new CustomEvent("erp:logo-updated", { detail: { logo: base64 } }));
+        setLogoSaved(true);
+        setTimeout(()=>setLogoSaved(false), 2500);
+      } catch (err) {
+        alert("⚠️ Falha ao salvar o logo — verifique sua conexão e tente novamente.");
+      }
     };
     reader.readAsDataURL(file);
   };
 
   const handleLogoRemove = async () => {
+    const anterior = logo;
     setLogo(null);
-    await window.storage.delete(LOGO_KEY).catch(()=>{});
+    try {
+      await window.storage.delete(LOGO_KEY);
+      window.dispatchEvent(new CustomEvent("erp:logo-updated", { detail: { logo: null } }));
+    } catch (err) {
+      setLogo(anterior);
+      alert("⚠️ Falha ao remover o logo — verifique sua conexão e tente novamente.");
+    }
   };
 
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null), 2500); };
