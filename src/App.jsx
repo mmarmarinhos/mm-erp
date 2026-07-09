@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.21.3";
+const APP_VERSION = "3.21.4";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -7053,7 +7053,7 @@ function calcReverse({ pv, custo, embalagem, frete, imposto, comissao, taxaPgto 
   return { pv, tot, vComis, vPgto, vImp, vLucro, margemEf: (vLucro/pv)*100 };
 }
 
-const TabelaPrecos = ({ products, setProducts }) => {
+const TabelaPrecos = ({ products, setProducts, params }) => {
   const [tSearch,       setTSearch]       = useState("");
   const [tSaved,        setTSaved]        = useState(false);
   const [tFilterStatus, setTFilterStatus] = useState("Todos");
@@ -7068,9 +7068,13 @@ const TabelaPrecos = ({ products, setProducts }) => {
   // channelPrices[ch] = { price, margin, freight, taxaPerc, otherCosts, qtd }
   const getData = (p, ch) => {
     const raw = p.channelPrices?.[ch];
-    if (!raw) return { price:0, margin:0, freight:0, taxaPerc:0, otherCosts:0, qtd:1 };
-    if (typeof raw === "number") return { price:raw, margin:0, freight:0, taxaPerc:0, otherCosts:0, qtd:1 };
-    return { price:raw.price||0, margin:raw.margin||0, freight:raw.freight||0, taxaPerc:raw.taxaPerc||0, otherCosts:raw.otherCosts||0, qtd:raw.qtd||1 };
+    // Taxa parte já preenchida com a comissão configurada em Parâmetros → Canais
+    // (só como ponto de partida — uma vez que o produto tem um valor salvo,
+    // mesmo que seja 0, esse valor prevalece e não é mais sobrescrito).
+    const taxaPadrao = params?.canais?.[ch]?.comissao || 0;
+    if (!raw) return { price:0, margin:0, freight:0, taxaPerc:taxaPadrao, otherCosts:0, qtd:1 };
+    if (typeof raw === "number") return { price:raw, margin:0, freight:0, taxaPerc:taxaPadrao, otherCosts:0, qtd:1 };
+    return { price:raw.price||0, margin:raw.margin||0, freight:raw.freight||0, taxaPerc:raw.taxaPerc??taxaPadrao, otherCosts:raw.otherCosts||0, qtd:raw.qtd||1 };
   };
 
   // custoBase = custo_unitario × qtd
@@ -7319,7 +7323,7 @@ const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHA
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1">🏪 Taxa</label>
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1" title="Vem pré-preenchida com a comissão configurada em Parâmetros → Canais. Pode editar aqui pra uma exceção nesse produto.">🏪 Taxa</label>
                       <div className="flex items-center gap-0.5">
                         <input type="number" min="0" max="99" step="0.01"
                           className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
@@ -7356,7 +7360,7 @@ const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHA
 };
 
 
-const PricingModule = ({ products, setProducts, onPriceHunt }) => {
+const PricingModule = ({ products, setProducts, onPriceHunt, params }) => {
   const [activeTab,   setActiveTab]   = useState("tabela");
   const [selProd,    setSelProd]    = useState("");
   const [custo,      setCusto]      = useState("");
@@ -7407,7 +7411,7 @@ const PricingModule = ({ products, setProducts, onPriceHunt }) => {
   return (
     <div className="space-y-4">
       {toast && <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg">{toast}</div>}
-      <TabelaPrecos products={products} setProducts={setProducts}/>
+      <TabelaPrecos products={products} setProducts={setProducts} params={params}/>
     </div>
   );
 };
@@ -12915,7 +12919,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
-      case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
+      case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} params={params}/>;
       case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber" onViewOrder={(id)=>{ setOpenOrderId(id); setActive("orders"); }}/>;
       case "pagar":     return <FinanceModule key="fm-pagar" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="pagar"/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
