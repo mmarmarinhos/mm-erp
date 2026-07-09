@@ -68,10 +68,10 @@ window.storage = {
   },
 
   async delete(key, shared = false) {
-    try {
-      await apiStorage('delete', { key })
-      return { key, deleted: true, shared }
-    } catch { return null }
+    // Mesma razão do get()/set(): quem chama precisa saber se falhou de
+    // verdade, pra não dar feedback de sucesso quando na verdade não salvou.
+    await apiStorage('delete', { key })
+    return { key, deleted: true, shared }
   },
 
   async list(prefix = '', shared = false) {
