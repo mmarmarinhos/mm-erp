@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.22.0";
+const APP_VERSION = "3.22.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -10175,10 +10175,12 @@ const REGIMES = ["Simples Nacional","Lucro Presumido","Lucro Real","MEI","Imune/
 
 
 // ─── Cotação Module ───────────────────────────────────────────────────────
-const COT_STATUS     = ["Em Aberto","Enviada","Aprovada","Recusada","Expirada","Convertida"];
+// "Enviada" foi removida das opções: era só um rótulo manual sem nenhuma
+// lógica de negócio associada (sem envio automático, sem efeito em
+// estoque/financeiro) — o funil ficou mais simples com Em Aberto → decisão.
+const COT_STATUS     = ["Em Aberto","Aprovada","Recusada","Expirada","Convertida"];
 const COT_STATUS_ST  = {
   "Em Aberto":  { bg:"bg-gray-100",   text:"text-gray-600"   },
-  "Enviada":    { bg:"bg-blue-100",   text:"text-blue-700"   },
   "Aprovada":   { bg:"bg-green-100",  text:"text-green-700"  },
   "Recusada":   { bg:"bg-red-100",    text:"text-red-600"    },
   "Expirada":   { bg:"bg-orange-100", text:"text-orange-700" },
@@ -10804,7 +10806,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
     .sort((a,b)=>b.date.localeCompare(a.date));
 
   const counts = COT_STATUS.reduce((acc,s)=>({...acc,[s]:cotacoes.filter(c=>c.status===s).length}),{});
-  const totalAberto = cotacoes.filter(c=>["Em Aberto","Enviada","Aprovada"].includes(c.status)).reduce((s,c)=>s+c.total,0);
+  const totalAberto = cotacoes.filter(c=>["Em Aberto","Aprovada"].includes(c.status)).reduce((s,c)=>s+c.total,0);
 
   const st = (s) => COT_STATUS_ST[s]||{bg:"bg-gray-100",text:"text-gray-600"};
 
@@ -10873,7 +10875,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
                 {!["Convertida","Recusada","Expirada"].includes(detail.status) && (
                   <div className="flex flex-wrap gap-2">
                     <p className="text-xs font-semibold text-gray-400 uppercase w-full">Alterar Status</p>
-                    {["Em Aberto","Enviada","Aprovada","Recusada"].filter(s=>s!==detail.status).map(s=>(
+                    {["Em Aberto","Aprovada","Recusada"].filter(s=>s!==detail.status).map(s=>(
                       <button key={s} onClick={()=>{setCotacoes(prev=>prev.map(c=>c.id===detail.id?{...c,status:s}:c));setDetail(d=>({...d,status:s}));}}
                         className={`px-3 py-1.5 rounded-xl text-xs font-semibold border ${st2(s).bg} ${st2(s).text}`}>{s}</button>
                     ))}
