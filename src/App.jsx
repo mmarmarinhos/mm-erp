@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.18";
+const APP_VERSION = "3.19.19";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -737,26 +737,42 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
 // ─── Status Update Dropdown ───────────────────────────────────────────────
 const StatusDropdown = ({ order, onChange }) => {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
   const s = STATUS_STYLES[order.status];
+
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left, minWidth: Math.max(r.width, 140) });
+    }
+    setOpen(o => !o);
+  };
+
   return (
     <div className="relative">
-      <button onClick={() => setOpen(o => !o)}
+      <button ref={btnRef} onClick={toggle}
         className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium cursor-pointer ${s.bg} ${s.text}`}>
         <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
         {order.status}
         <Icon name="chevronDown" size={12} />
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 min-w-[140px] py-1">
-          {ORDER_STATUSES.map(st => (
-            <button key={st} onClick={() => { onChange(st); setOpen(false); }}
-              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-2 ${order.status === st ? "font-semibold" : ""}`}>
-              <span className={`w-2 h-2 rounded-full ${STATUS_STYLES[st].dot}`} />
-              {st}
-              {order.status === st && <Icon name="check" size={12} className="ml-auto text-indigo-500" />}
-            </button>
-          ))}
-        </div>
+        <>
+          {/* Overlay pra fechar ao clicar fora, já que o menu agora é fixed (fora do fluxo normal) */}
+          <div className="fixed inset-0 z-[19]" onClick={()=>setOpen(false)} />
+          <div className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1"
+            style={{ top: (pos?.top ?? 0) + "px", left: (pos?.left ?? 0) + "px", minWidth: (pos?.minWidth ?? 140) + "px" }}>
+            {ORDER_STATUSES.map(st => (
+              <button key={st} onClick={() => { onChange(st); setOpen(false); }}
+                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-2 ${order.status === st ? "font-semibold" : ""}`}>
+                <span className={`w-2 h-2 rounded-full ${STATUS_STYLES[st].dot}`} />
+                {st}
+                {order.status === st && <Icon name="check" size={12} className="ml-auto text-indigo-500" />}
+              </button>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
