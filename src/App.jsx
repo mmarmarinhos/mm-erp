@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.21.4";
+const APP_VERSION = "3.21.5";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -7323,7 +7323,20 @@ const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHA
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1" title="Vem pré-preenchida com a comissão configurada em Parâmetros → Canais. Pode editar aqui pra uma exceção nesse produto.">🏪 Taxa</label>
+                      <div className="flex items-center gap-1 mb-1">
+                        <label className="text-[10px] font-semibold text-gray-400 uppercase" title="Vem pré-preenchida com a comissão configurada em Parâmetros → Canais. Pode editar aqui pra uma exceção nesse produto.">🏪 Taxa</label>
+                        {(() => {
+                          const taxaAtual = params?.canais?.[ch]?.comissao;
+                          const desatualizada = taxaAtual != null && Number(d.taxaPerc) !== Number(taxaAtual);
+                          if (!desatualizada) return null;
+                          return (
+                            <button type="button"
+                              onClick={()=>setField(p.id, ch, "taxaPerc", String(taxaAtual))}
+                              title={`Comissão atual em Parâmetros: ${taxaAtual}% (diferente do salvo aqui: ${d.taxaPerc}%). Clique pra usar a atual.`}
+                              className="text-amber-500 hover:text-amber-600 text-xs leading-none">⚠️</button>
+                          );
+                        })()}
+                      </div>
                       <div className="flex items-center gap-0.5">
                         <input type="number" min="0" max="99" step="0.01"
                           className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
