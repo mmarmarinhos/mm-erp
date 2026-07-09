@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.21.1";
+const APP_VERSION = "3.21.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -3913,7 +3913,7 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
                     className="w-24 border border-indigo-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
                     value={form.paymentTerms||""} onChange={e=>set("paymentTerms",e.target.value)} placeholder="0"/>
                   <span className="text-sm text-indigo-600 font-medium">
-                    {Number(form.paymentTerms)>0 ? `${form.paymentTerms} dias após a compra` : "Pagamento imediato (à vista)"}
+                    {Number(form.paymentTerms)>0 ? `${form.paymentTerms} dias após a emissão da NF` : "Pagamento imediato (à vista)"}
                   </span>
                 </div>
               </div>
