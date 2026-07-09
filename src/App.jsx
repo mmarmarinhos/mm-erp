@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.20.0";
+const APP_VERSION = "3.21.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -345,12 +345,15 @@ const nextId = (orders) => {
 };
 
 // ─── Subcomponents ────────────────────────────────────────────────────────
-const Badge = ({ label, style }) => (
-  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
-    {style.dot && <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />}
-    {label}
-  </span>
-);
+const Badge = ({ label, style }) => {
+  const s = style || { bg: "bg-gray-100", text: "text-gray-600" };
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${s.bg} ${s.text}`}>
+      {s.dot && <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />}
+      {label}
+    </span>
+  );
+};
 
 const Stat = ({ label, value, sub, color = "text-gray-900" }) => (
   <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
@@ -361,8 +364,9 @@ const Stat = ({ label, value, sub, color = "text-gray-900" }) => (
 );
 
 // ─── Order Modal ──────────────────────────────────────────────────────────
-const OrderModal = ({ order, onClose, onSave, customers = [], products = [], representantes = [], formasPagamento = [] }) => {
+const OrderModal = ({ order, onClose, onSave, customers = [], products = [], representantes = [], formasPagamento = [], params }) => {
   const isNew = !order;
+  const orderStatusOptions = (params?.vendas?.statusList?.length ? params.vendas.statusList : ORDER_STATUSES);
   const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, discount:0, discountType:"%", total:0 });
 
   // Parse legacy string items into array
@@ -550,7 +554,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
               <select className={inp} value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
-                {ORDER_STATUSES.map(s=><option key={s}>{s}</option>)}
+                {orderStatusOptions.map(s=><option key={s}>{s}</option>)}
               </select>
             </div>
           </div>
@@ -767,11 +771,12 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
 };
 
 // ─── Status Update Dropdown ───────────────────────────────────────────────
-const StatusDropdown = ({ order, onChange }) => {
+const DEFAULT_STATUS_STYLE = { bg: "bg-gray-100", text: "text-gray-600", dot: "bg-gray-400" };
+const StatusDropdown = ({ order, onChange, statusOptions = ORDER_STATUSES }) => {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState(null);
   const btnRef = useRef(null);
-  const s = STATUS_STYLES[order.status];
+  const s = STATUS_STYLES[order.status] || DEFAULT_STATUS_STYLE;
 
   const toggle = () => {
     if (!open && btnRef.current) {
@@ -795,10 +800,10 @@ const StatusDropdown = ({ order, onChange }) => {
           <div className="fixed inset-0 z-[19]" onClick={()=>setOpen(false)} />
           <div className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1"
             style={{ top: (pos?.top ?? 0) + "px", left: (pos?.left ?? 0) + "px", minWidth: (pos?.minWidth ?? 140) + "px" }}>
-            {ORDER_STATUSES.map(st => (
+            {statusOptions.map(st => (
               <button key={st} onClick={() => { onChange(st); setOpen(false); }}
                 className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-2 ${order.status === st ? "font-semibold" : ""}`}>
-                <span className={`w-2 h-2 rounded-full ${STATUS_STYLES[st].dot}`} />
+                <span className={`w-2 h-2 rounded-full ${(STATUS_STYLES[st]||DEFAULT_STATUS_STYLE).dot}`} />
                 {st}
                 {order.status === st && <Icon name="check" size={12} className="ml-auto text-indigo-500" />}
               </button>
@@ -1507,7 +1512,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
                       <Badge label={order.channel} style={CHANNEL_STYLES[order.channel] || { bg: "bg-gray-100", text: "text-gray-600" }} />
                     </td>
                     <td className="px-4 py-3">
-                      <StatusDropdown order={order} onChange={(s) => handleStatusChange(order.id, s)} />
+                      <StatusDropdown order={order} onChange={(s) => handleStatusChange(order.id, s)} statusOptions={params?.vendas?.statusList?.length ? params.vendas.statusList : ORDER_STATUSES} />
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="font-semibold text-gray-900">{fmt(order.total)}</span>
@@ -1699,6 +1704,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
           products={products}
           representantes={representantes}
           formasPagamento={formasPagamento}
+          params={params}
         />
       )}
     </div>
@@ -9988,7 +9994,7 @@ const PARAMS_DEFAULT = {
     shopee: { partnerId: "",  partnerKey: "", shopId: "",     autoImport: false },
     backendUrl: "",
   },
-  vendas: { validadeCotacaoDias: 10, multaAtrasoPercent: 2, jurosAtrasoPercentMes: 1 },
+  vendas: { validadeCotacaoDias: 10, multaAtrasoPercent: 2, jurosAtrasoPercentMes: 1, statusList: ["Novo","Em Separação","Enviado","Entregue","Cancelado","Devolvido"] },
   compras: { statusList: ["Em Aberto","Baixado","Cancelado"] },
   fiscal: { provider: "", token: "", ambiente: "homologacao" },
 };
@@ -12077,6 +12083,51 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
             <p className="text-xs text-gray-400 bg-gray-50 rounded-xl px-3 py-2">
               Multa: cobrada uma única vez sobre o valor em atraso (o limite legal pra consumidor no Brasil é 2%). Juros: cobrados proporcionalmente aos dias de atraso, com base no percentual mensal informado.
             </p>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-4">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">🏷️ Status do Pedido de Venda</p>
+            <p className="text-xs text-gray-400 -mt-2">
+              Personalize os status que aparecem nos Pedidos de Venda.
+            </p>
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+              ⚠️ <strong>Novo, Em Separação, Enviado, Entregue, Cancelado e Devolvido</strong> têm comportamento automático no sistema (estorno de estoque ao cancelar, liberação de devolução, débito de estoque conforme o status). Não remova nem renomeie esses — só <strong>adicione</strong> status extras pra uso interno (ex: "Aguardando Retirada"). Os novos aparecem no dropdown e nos relatórios, mas não disparam nenhuma ação automática de estoque.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {(vendas.statusList||[]).map((s,idx)=>(
+                <span key={idx} className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-full pl-3 pr-2 py-1.5">
+                  {s}
+                  <button onClick={()=>setVendas(prev=>({...prev, statusList: prev.statusList.filter((_,i)=>i!==idx)}))}
+                    className="text-indigo-400 hover:text-red-500 font-bold">✕</button>
+                </span>
+              ))}
+              {(!vendas.statusList || vendas.statusList.length===0) && <p className="text-xs text-gray-400 italic">Nenhum status configurado — usando os padrões do sistema.</p>}
+            </div>
+
+            <div className="flex gap-2">
+              <input id="novo-status-venda" className={inp} placeholder="Ex: Aguardando Retirada"
+                onKeyDown={e=>{
+                  if (e.key==="Enter") {
+                    e.preventDefault();
+                    const val = e.target.value.trim();
+                    if (val && !(vendas.statusList||[]).includes(val)) {
+                      setVendas(prev=>({...prev, statusList:[...(prev.statusList||[]), val]}));
+                    }
+                    e.target.value = "";
+                  }
+                }}/>
+              <button onClick={()=>{
+                const el = document.getElementById("novo-status-venda");
+                const val = el.value.trim();
+                if (val && !(vendas.statusList||[]).includes(val)) {
+                  setVendas(prev=>({...prev, statusList:[...(prev.statusList||[]), val]}));
+                }
+                el.value = "";
+              }} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 whitespace-nowrap">
+                + Adicionar
+              </button>
+            </div>
           </div>
 
           <button onClick={()=>mergeAndSave({vendas}).then(()=>showToast("✅ Configurações de Vendas salvas!"))}
