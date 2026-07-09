@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.21.5";
+const APP_VERSION = "3.21.6";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -7153,6 +7153,54 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
     }));
   };
 
+  // Conta quantos produto×canal têm taxa salva diferente da comissão atual
+  // configurada em Parâmetros → Canais (só considera canais com comissão
+  // configurada e produtos que já têm preço salvo pra aquele canal).
+  const taxasDesatualizadas = useMemo(() => {
+    const lista = [];
+    products.forEach(p => {
+      CHANNELS.forEach(ch => {
+        const taxaAtual = params?.canais?.[ch]?.comissao;
+        if (taxaAtual == null) return;
+        const raw = p.channelPrices?.[ch];
+        if (!raw) return; // canal ainda não configurado pra esse produto — nada a sincronizar
+        const d = getData(p, ch);
+        if (Number(d.taxaPerc) !== Number(taxaAtual)) lista.push({ productId: p.id, ch });
+      });
+    });
+    return lista;
+  }, [products, params]);
+
+  const [syncConfirm, setSyncConfirm] = useState(false);
+  const handleSyncAllTaxas = () => {
+    setProducts(prev => prev.map(p => {
+      const unitCost = Number(p.cost)||0;
+      let changed = false;
+      const newChannelPrices = { ...(p.channelPrices||{}) };
+      CHANNELS.forEach(ch => {
+        const taxaAtual = params?.canais?.[ch]?.comissao;
+        if (taxaAtual == null) return;
+        const raw = p.channelPrices?.[ch];
+        if (!raw) return;
+        const cur = getData(p, ch);
+        if (Number(cur.taxaPerc) === Number(taxaAtual)) return;
+        changed = true;
+        const custoBase = unitCost * (cur.qtd||1);
+        const updated = { ...cur, taxaPerc: taxaAtual };
+        if (Number(cur.margin) > 0) {
+          updated.price = calcPrice(custoBase, Number(cur.margin), Number(cur.freight), taxaAtual, Number(cur.otherCosts));
+        } else if (Number(cur.price) > 0) {
+          updated.margin = calcMargin(Number(cur.price), custoBase, Number(cur.freight), taxaAtual, Number(cur.otherCosts));
+        }
+        newChannelPrices[ch] = updated;
+      });
+      return changed ? { ...p, channelPrices: newChannelPrices } : p;
+    }));
+    setSyncConfirm(false);
+    setTSaved(true);
+    setTimeout(()=>setTSaved(false), 2500);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -7160,11 +7208,35 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
           <h1 className="text-xl font-bold text-gray-900">Tabela de Preços</h1>
           <p className="text-sm text-gray-500">{products.length} produto{products.length!==1?"s":""} cadastrado{products.length!==1?"s":""}</p>
         </div>
-        <button onClick={()=>{ setProducts(p=>p); setTSaved(true); setTimeout(()=>setTSaved(false),2500); }}
-          className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${tSaved?"bg-green-500 text-white":"bg-indigo-600 text-white hover:bg-indigo-700"}`}>
-          {tSaved?"✓ Salvo!":"Salvar Preços"}
-        </button>
+        <div className="flex items-center gap-2">
+          {taxasDesatualizadas.length > 0 && (
+            <button onClick={()=>setSyncConfirm(true)}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 flex items-center gap-1.5">
+              ⚠️ Sincronizar {taxasDesatualizadas.length} taxa{taxasDesatualizadas.length!==1?"s":""}
+            </button>
+          )}
+          <button onClick={()=>{ setProducts(p=>p); setTSaved(true); setTimeout(()=>setTSaved(false),2500); }}
+            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${tSaved?"bg-green-500 text-white":"bg-indigo-600 text-white hover:bg-indigo-700"}`}>
+            {tSaved?"✓ Salvo!":"Salvar Preços"}
+          </button>
+        </div>
       </div>
+
+      {syncConfirm && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center">
+            <p className="text-2xl mb-2">🔄</p>
+            <h3 className="font-bold text-gray-900 mb-1">Sincronizar taxas?</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              {taxasDesatualizadas.length} combinação(ões) de produto × canal serão atualizadas com a comissão atual de Parâmetros. O preço e a margem de cada uma serão recalculados automaticamente.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={()=>setSyncConfirm(false)} className="flex-1 py-2 border border-gray-200 rounded-xl text-sm">Cancelar</button>
+              <button onClick={handleSyncAllTaxas} className="flex-1 py-2 bg-amber-500 text-white rounded-xl text-sm font-medium hover:bg-amber-600">Sincronizar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-2">
         <div className="relative flex-1">
@@ -7192,7 +7264,7 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
             const cost = Number(p.cost)||0;
             const hasVariants = !p.parentId && products.some(x=>x.parentId===p.id);
             return (
-              <PriceTableRow key={p.id} p={p} cost={cost} getData={getData} setField={setField} setFieldBlur={setFieldBlur} CHANNELS={CHANNELS} CHANNEL_STYLES={CHANNEL_STYLES} fmt={fmt}
+              <PriceTableRow key={p.id} p={p} cost={cost} getData={getData} setField={setField} setFieldBlur={setFieldBlur} CHANNELS={CHANNELS} CHANNEL_STYLES={CHANNEL_STYLES} fmt={fmt} params={params}
                 hasVariants={hasVariants} onPropagate={()=>handlePropagateToVariants(p.id)}/>
             );
           })}
@@ -7203,7 +7275,7 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
 };
 
 // ─── PriceTableRow — linha colapsável da tabela de preços ────────────────────
-const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHANNEL_STYLES, fmt, hasVariants, onPropagate }) => {
+const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHANNEL_STYLES, fmt, hasVariants, onPropagate, params }) => {
   const [open, setOpen] = useState(false);
   const [propagated, setPropagated] = useState(false);
   const handlePropagateClick = (e) => {
