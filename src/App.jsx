@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.16";
+const APP_VERSION = "3.19.17";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -886,8 +886,11 @@ const gerarPedidoPDF = async (order) => {
   if (w) { w.document.write(html); w.document.close(); }
 };
 
-const EmitNfeModal = ({ order, onClose, onIssued, params }) => {
-  const [cpfCnpj, setCpfCnpj] = useState(order.cpfCnpj || "");
+const EmitNfeModal = ({ order, onClose, onIssued, params, customers = [] }) => {
+  // Busca o cliente vinculado ao pedido pra puxar o CPF/CNPJ já cadastrado,
+  // em vez de exigir digitação manual toda vez que for faturar.
+  const custCadastrado = customers.find(c => c.name === order.customer);
+  const [cpfCnpj, setCpfCnpj] = useState(order.cpfCnpj || custCadastrado?.cpfCnpj || "");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [result, setResult] = useState(null);
@@ -968,6 +971,11 @@ const EmitNfeModal = ({ order, onClose, onIssued, params }) => {
             <label className="text-xs font-medium text-gray-600 mb-1 block">CPF ou CNPJ do destinatário</label>
             <input type="text" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
               value={cpfCnpj} onChange={e=>setCpfCnpj(e.target.value)} placeholder="Só números"/>
+            {!cpfCnpj && (
+              <p className="text-[11px] text-gray-400 mt-1">
+                {custCadastrado ? "Esse cliente não tem CPF/CNPJ cadastrado — edite o cadastro em Clientes ou informe aqui manualmente." : "Cliente não encontrado no cadastro — informe o CPF/CNPJ manualmente."}
+              </p>
+            )}
           </div>
         )}
         {err && <p className="text-red-500 text-xs">{err}</p>}
@@ -1573,7 +1581,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
       )}
 
       {emitNfeOrder && (
-        <EmitNfeModal order={emitNfeOrder} onClose={()=>setEmitNfeOrder(null)} params={params}
+        <EmitNfeModal order={emitNfeOrder} onClose={()=>setEmitNfeOrder(null)} params={params} customers={customers}
           onIssued={(updated)=>{
             setOrders(prev => prev.map(o => o.id===emitNfeOrder.id ? {...o, ...updated} : o));
             setEmitNfeOrder(null);
