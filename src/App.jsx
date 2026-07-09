@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.15";
+const APP_VERSION = "3.19.16";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -886,11 +886,12 @@ const gerarPedidoPDF = async (order) => {
   if (w) { w.document.write(html); w.document.close(); }
 };
 
-const EmitNfeModal = ({ order, onClose, onIssued }) => {
+const EmitNfeModal = ({ order, onClose, onIssued, params }) => {
   const [cpfCnpj, setCpfCnpj] = useState(order.cpfCnpj || "");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [result, setResult] = useState(null);
+  const temProvedor = !!params?.fiscal?.provider;
 
   const handleEmit = async () => {
     setErr("");
@@ -924,11 +925,31 @@ const EmitNfeModal = ({ order, onClose, onIssued }) => {
     setLoading(false);
   };
 
+  // Simulação: preenche os campos de NF-e com dados fictícios, sem chamar a API
+  // real nem exigir provedor fiscal configurado — só pra visualizar como fica
+  // a informação de faturamento no pedido.
+  const handleSimular = () => {
+    const digits = String(cpfCnpj).replace(/\D/g,"");
+    if (digits.length !== 11 && digits.length !== 14) { setErr("Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido"); return; }
+    setErr("");
+    const numeroSimulado = String(Math.floor(100000 + Math.random()*900000));
+    const simData = { status: "simulado", numero: numeroSimulado };
+    setResult(simData);
+    onIssued({
+      cpfCnpj: digits,
+      nfNumero: numeroSimulado,
+      nfeStatus: "simulado",
+      nfeChave: "",
+      nfeXmlUrl: "",
+      nfePdfUrl: "",
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-bold text-gray-900">🧾 Emitir Nota Fiscal</h3>
+          <h3 className="font-bold text-gray-900">{temProvedor ? "🧾 Emitir Nota Fiscal" : "🧪 Simular Faturamento"}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
         <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-0.5">
@@ -937,6 +958,11 @@ const EmitNfeModal = ({ order, onClose, onIssued }) => {
           <p className="font-bold text-gray-900">{fmt(order.total)}</p>
           <p className="text-xs text-gray-400">{(order.itemsList||[]).length} item(ns)</p>
         </div>
+        {!temProvedor && !result && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+            Nenhum provedor fiscal (Focus NFe / NFe.io) está configurado em Parâmetros, então não é possível emitir uma NF-e real ainda. Isso aqui só simula os campos de faturamento pra visualização — sem validade fiscal.
+          </p>
+        )}
         {!result && (
           <div>
             <label className="text-xs font-medium text-gray-600 mb-1 block">CPF ou CNPJ do destinatário</label>
@@ -946,8 +972,12 @@ const EmitNfeModal = ({ order, onClose, onIssued }) => {
         )}
         {err && <p className="text-red-500 text-xs">{err}</p>}
         {result && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-sm text-emerald-800 space-y-1">
-            <p className="font-semibold">{result.status==="autorizado" ? "✅ Nota autorizada!" : "⏳ Nota em processamento — confirme em alguns minutos no painel do fornecedor"}</p>
+          <div className={`rounded-xl p-3 text-sm space-y-1 border ${result.status==="simulado" ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-emerald-50 border-emerald-200 text-emerald-800"}`}>
+            <p className="font-semibold">
+              {result.status==="simulado" ? "🧪 Faturamento simulado (sem validade fiscal)"
+                : result.status==="autorizado" ? "✅ Nota autorizada!"
+                : "⏳ Nota em processamento — confirme em alguns minutos no painel do fornecedor"}
+            </p>
             {result.numero && <p>Número: {result.numero}</p>}
             {result.pdfUrl && <a href={result.pdfUrl} target="_blank" rel="noreferrer" className="underline block">Ver DANFE (PDF)</a>}
           </div>
@@ -956,10 +986,16 @@ const EmitNfeModal = ({ order, onClose, onIssued }) => {
           <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
             {result ? "Fechar" : "Cancelar"}
           </button>
-          {!result && (
+          {!result && temProvedor && (
             <button onClick={handleEmit} disabled={loading}
               className="flex-1 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50">
               {loading?"Emitindo...":"Emitir"}
+            </button>
+          )}
+          {!result && !temProvedor && (
+            <button onClick={handleSimular}
+              className="flex-1 py-2 bg-amber-500 text-white rounded-xl text-sm font-semibold hover:bg-amber-600">
+              🧪 Simular
             </button>
           )}
         </div>
@@ -1486,12 +1522,10 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
                 className="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-600 text-sm font-medium hover:bg-indigo-100 flex items-center gap-1.5">
                 🖨️ PDF
               </button>
-              {params?.fiscal?.provider && (
-                <button onClick={() => { setEmitNfeOrder(detailOrder); setDetailOrder(null); }}
-                  className="px-4 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 flex items-center gap-1.5">
-                  🧾 {detailOrder.nfNumero ? `NF-e ${detailOrder.nfNumero}` : "Emitir NF-e"}
-                </button>
-              )}
+              <button onClick={() => { setEmitNfeOrder(detailOrder); setDetailOrder(null); }}
+                className={`px-4 py-2 rounded-xl border text-sm font-medium flex items-center gap-1.5 ${params?.fiscal?.provider ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"}`}>
+                🧾 {detailOrder.nfNumero ? `NF-e ${detailOrder.nfNumero}` : (params?.fiscal?.provider ? "Emitir NF-e" : "Faturar (simular)")}
+              </button>
               {["Enviado","Entregue"].includes(detailOrder.status) && (
                 <button onClick={() => { setDevolucaoModal(detailOrder); setDetailOrder(null); }}
                   className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 text-sm font-medium hover:bg-rose-100 flex items-center gap-1.5">
@@ -1539,7 +1573,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
       )}
 
       {emitNfeOrder && (
-        <EmitNfeModal order={emitNfeOrder} onClose={()=>setEmitNfeOrder(null)}
+        <EmitNfeModal order={emitNfeOrder} onClose={()=>setEmitNfeOrder(null)} params={params}
           onIssued={(updated)=>{
             setOrders(prev => prev.map(o => o.id===emitNfeOrder.id ? {...o, ...updated} : o));
             setEmitNfeOrder(null);
