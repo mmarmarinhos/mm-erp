@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.21.6";
+const APP_VERSION = "3.22.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -940,14 +940,20 @@ const gerarPedidoPDF = async (order) => {
 };
 
 const EmitNfeModal = ({ order, onClose, onIssued, params, customers = [] }) => {
-  // Busca o cliente vinculado ao pedido pra puxar o CPF/CNPJ já cadastrado,
-  // em vez de exigir digitação manual toda vez que for faturar.
+  // Busca o cliente vinculado ao pedido pra puxar o CPF/CNPJ e o prazo de
+  // pagamento já cadastrados, em vez de exigir digitação manual toda vez.
   const custCadastrado = customers.find(c => c.name === order.customer);
   const [cpfCnpj, setCpfCnpj] = useState(order.cpfCnpj || custCadastrado?.cpfCnpj || "");
+  const [nfEmissionDate, setNfEmissionDate] = useState(order.nfEmissionDate || today());
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [result, setResult] = useState(null);
   const temProvedor = !!params?.fiscal?.provider;
+
+  // Vencimento = emissão da NF + prazo de pagamento do cliente (mesma lógica
+  // usada na baixa de pedido de compra, com o prazo do fornecedor).
+  const diasPrazo = parseInt(custCadastrado?.paymentTerms) || 0;
+  const dueDateCalculada = nfEmissionDate ? addDaysISO(nfEmissionDate, diasPrazo) : "";
 
   const handleEmit = async () => {
     setErr("");
@@ -959,7 +965,7 @@ const EmitNfeModal = ({ order, onClose, onIssued, params, customers = [] }) => {
       const r = await fetch("/api/nfe-issue", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token?{Authorization:`Bearer ${token}`}:{}) },
-        body: JSON.stringify({ order: { ...order, cpfCnpj: digits }, ref: `${order.id}-${Date.now()}` }),
+        body: JSON.stringify({ order: { ...order, cpfCnpj: digits, nfEmissionDate }, ref: `${order.id}-${Date.now()}` }),
       });
       const data = await r.json().catch(()=>({}));
       if (!r.ok || !data.ok) {
@@ -976,6 +982,8 @@ const EmitNfeModal = ({ order, onClose, onIssued, params, customers = [] }) => {
         nfeChave: data.chave || "",
         nfeXmlUrl: data.xmlUrl || "",
         nfePdfUrl: data.pdfUrl || "",
+        nfEmissionDate,
+        dueDate: dueDateCalculada,
       });
     } catch(e) { setErr("Erro: "+e.message); }
     setLoading(false);
@@ -998,6 +1006,8 @@ const EmitNfeModal = ({ order, onClose, onIssued, params, customers = [] }) => {
       nfeChave: "",
       nfeXmlUrl: "",
       nfePdfUrl: "",
+      nfEmissionDate,
+      dueDate: dueDateCalculada,
     });
   };
 
@@ -1029,6 +1039,18 @@ const EmitNfeModal = ({ order, onClose, onIssued, params, customers = [] }) => {
                 {custCadastrado ? "Esse cliente não tem CPF/CNPJ cadastrado — edite o cadastro em Clientes ou informe aqui manualmente." : "Cliente não encontrado no cadastro — informe o CPF/CNPJ manualmente."}
               </p>
             )}
+          </div>
+        )}
+        {!result && (
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Data de emissão da NF</label>
+            <input type="date" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              value={nfEmissionDate} onChange={e=>setNfEmissionDate(e.target.value)}/>
+            <p className="text-[11px] text-gray-400 mt-1">
+              {diasPrazo > 0
+                ? `Vencimento calculado: ${new Date(dueDateCalculada+"T12:00:00").toLocaleDateString("pt-BR")} (${diasPrazo} dias após a emissão, prazo do cliente)`
+                : "Cliente sem prazo de pagamento cadastrado — vencimento vai ficar igual à emissão. Edite em Clientes se for a prazo."}
+            </p>
           </div>
         )}
         {err && <p className="text-red-500 text-xs">{err}</p>}
@@ -2793,7 +2815,7 @@ const CustomerModal = ({ customer, onClose, onSave, orders = [], customers = [] 
                     className="w-24 border border-indigo-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
                     value={form.paymentTerms||""} onChange={e=>set("paymentTerms",e.target.value)} placeholder="0"/>
                   <span className="text-sm text-indigo-600 font-medium">
-                    {Number(form.paymentTerms)>0 ? `${form.paymentTerms} dias após a compra` : "Pagamento imediato (à vista)"}
+                    {Number(form.paymentTerms)>0 ? `${form.paymentTerms} dias após a emissão da NF` : "Pagamento imediato (à vista)"}
                   </span>
                 </div>
               </div>
