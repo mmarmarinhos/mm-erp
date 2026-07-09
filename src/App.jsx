@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from "recharts";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import mmErpLogoUrl from "./assets/mm-erp-logo.png";
 import {
   dbCountUsers, dbResetPasswordWithRecovery,
@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.19";
+const APP_VERSION = "3.20.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -127,10 +127,31 @@ async function persistKV(key, data, label) {
   }
 }
 
+// Mesma ideia do persistKV, só que pra leitura: antes, uma falha ao carregar
+// (rede/sessão) fazia o módulo simplesmente aparecer vazio, sem nenhum aviso —
+// dando a impressão de que os dados tinham sido apagados, quando na verdade
+// só não carregaram. Agora tenta de novo uma vez e avisa se falhar de vez,
+// deixando claro que o fallback (vazio) é falha de carregamento, não perda de dado.
+async function loadKV(key, seedFallback, label) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const r = await window.storage.get(key);
+      if (r?.value) return JSON.parse(r.value);
+      return seedFallback;
+    } catch (err) {
+      if (attempt === 2) {
+        console.error(`[MM ERP] Falha ao carregar "${label}" (${key}):`, err);
+        try { window.dispatchEvent(new CustomEvent("erp:load-error", { detail: { label, key } })); } catch(_){}
+        return seedFallback;
+      }
+      await new Promise(r2 => setTimeout(r2, 700));
+    }
+  }
+}
+
 const CLI_KEY = "erp-mmarmarinhos-customers";
 async function loadCustomers() {
-  try { const r = await window.storage.get(CLI_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){}
-  return SEED_CUSTOMERS;
+  return loadKV(CLI_KEY, SEED_CUSTOMERS, "Clientes");
 }
 async function saveCustomers(c) {
   return persistKV(CLI_KEY, c, "Clientes");
@@ -154,18 +175,21 @@ const SEED_SUPPLIERS = [];
 
 const FOR_KEY = "erp-mmarmarinhos-suppliers";
 async function loadSuppliers() {
-  try { const r = await window.storage.get(FOR_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){}
-  return SEED_SUPPLIERS;
+  return loadKV(FOR_KEY, SEED_SUPPLIERS, "Fornecedores");
 }
 async function saveSuppliers(s) {
   return persistKV(FOR_KEY, s, "Fornecedores");
 }
 
 // ─── Purchase Orders Seed & Storage ──────────────────────────────────────
-const PC_STATUS = ["Em Aberto","Baixado Parcial","Baixado","Cancelado"];
+// "Baixado Parcial" foi removido das opções: nunca teve nenhuma lógica de
+// negócio associada (não gerava estoque nem financeiro), e o recebimento
+// parcial de verdade já é tratado pelo fluxo "Baixar Pedido" (que baixa a
+// quantidade recebida e cria automaticamente um pedido complementar
+// "Em Aberto" com o saldo) — deixar o status manual só confundia.
+const PC_STATUS = ["Em Aberto","Baixado","Cancelado"];
 const PC_STATUS_STYLES = {
   "Em Aberto":       { bg:"bg-gray-100",   text:"text-gray-600"   },
-  "Baixado Parcial": { bg:"bg-amber-100",  text:"text-amber-700"  },
   "Baixado":         { bg:"bg-green-100",  text:"text-green-700"  },
   "Cancelado":       { bg:"bg-red-100",    text:"text-red-600"    },
 };
@@ -174,8 +198,7 @@ const SEED_PURCHASES = [];
 
 const PC_KEY = "erp-mmarmarinhos-purchases";
 async function loadPurchases() {
-  try { const r = await window.storage.get(PC_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){}
-  return SEED_PURCHASES;
+  return loadKV(PC_KEY, SEED_PURCHASES, "Pedidos de Compra");
 }
 async function savePurchases(p) {
   return persistKV(PC_KEY, p, "Pedidos de Compra");
@@ -202,13 +225,13 @@ const SEED_MOVEMENTS = [];
 
 const PRD_KEY = "erp-mmarmarinhos-products";
 const MOV_KEY = "erp-mmarmarinhos-movements";
-async function loadProducts()  { try { const r = await window.storage.get(PRD_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){} return SEED_PRODUCTS; }
+async function loadProducts()  { return loadKV(PRD_KEY, SEED_PRODUCTS, "Estoque/Produtos"); }
 async function saveProducts(p) { return persistKV(PRD_KEY, p, "Estoque/Produtos"); }
-async function loadMovements() { try { const r = await window.storage.get(MOV_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){} return SEED_MOVEMENTS; }
+async function loadMovements() { return loadKV(MOV_KEY, SEED_MOVEMENTS, "Movimentos de Estoque"); }
 async function saveMovements(m){ return persistKV(MOV_KEY, m, "Movimentos de Estoque"); }
 
 const CAIXA_KEY = "erp-mmarmarinhos-caixa";
-async function loadCaixa()  { try { const r = await window.storage.get(CAIXA_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){} return []; }
+async function loadCaixa()  { return loadKV(CAIXA_KEY, [], "Caixa/PDV"); }
 async function saveCaixa(c) { return persistKV(CAIXA_KEY, c, "Caixa/PDV"); }
 
 // ─── Fiscal Constants ─────────────────────────────────────────────────────
@@ -270,17 +293,13 @@ const AGENDA_ITEMS = [
 const SEED_NFES = [];
 
 const NFE_KEY = "erp-mmarmarinhos-nfes";
-async function loadNfes()  { try { const r = await window.storage.get(NFE_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){} return SEED_NFES; }
+async function loadNfes()  { return loadKV(NFE_KEY, SEED_NFES, "Notas Fiscais"); }
 async function saveNfes(n) { return persistKV(NFE_KEY, n, "Notas Fiscais"); }
 
 const STORAGE_KEY = "erp-mmarmarinhos-orders";
 
 async function loadOrders() {
-  try {
-    const result = await window.storage.get(STORAGE_KEY);
-    if (result?.value) return JSON.parse(result.value);
-  } catch (_) {}
-  return SEED_ORDERS;
+  return loadKV(STORAGE_KEY, SEED_ORDERS, "Pedidos de Venda");
 }
 
 async function saveOrders(orders) {
@@ -289,11 +308,7 @@ async function saveOrders(orders) {
 
 const FIN_KEY = "erp-mmarmarinhos-finance";
 async function loadFinance() {
-  try {
-    const r = await window.storage.get(FIN_KEY);
-    if (r?.value) return JSON.parse(r.value);
-  } catch (_) {}
-  return SEED_FINANCE;
+  return loadKV(FIN_KEY, SEED_FINANCE, "Financeiro");
 }
 async function saveFinance(fin) {
   return persistKV(FIN_KEY, fin, "Financeiro");
@@ -373,6 +388,9 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
   const [showCustList, setShowCustList] = useState(false);
   const [skuSearch, setSkuSearch]   = useState([]);
   const [showSkuList, setShowSkuList] = useState([]);
+  // Posição calculada do dropdown de SKU do item — renderizado com position:fixed
+  // (fora do <div overflow-x-auto> da tabela de itens) pra não ser cortado.
+  const [skuListPos, setSkuListPos] = useState({});
   const [askAddItem, setAskAddItem] = useState(false);
   const naoItemRef = useRef(null);
   const modalRef = useRef(null);
@@ -560,8 +578,16 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
                         <p className="text-[10px] text-gray-400 mb-0.5">SKU</p>
                         <input className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 font-mono"
                           value={sq}
-                          onChange={e=>{const ss=[...skuSearch];ss[i]=e.target.value;setSkuSearch(ss);setItem(i,"sku",e.target.value);const sl=[...showSkuList];sl[i]=true;setShowSkuList(sl);}}
-                          onFocus={()=>{const sl=[...showSkuList];sl[i]=true;setShowSkuList(sl);}}
+                          onChange={e=>{
+                            const ss=[...skuSearch];ss[i]=e.target.value;setSkuSearch(ss);setItem(i,"sku",e.target.value);const sl=[...showSkuList];sl[i]=true;setShowSkuList(sl);
+                            const r = skuInputRefs.current[i]?.getBoundingClientRect();
+                            if (r) setSkuListPos(p=>({...p,[i]:{top:r.bottom+4, left:r.left, width:Math.max(r.width,220)}}));
+                          }}
+                          onFocus={()=>{
+                            const sl=[...showSkuList];sl[i]=true;setShowSkuList(sl);
+                            const r = skuInputRefs.current[i]?.getBoundingClientRect();
+                            if (r) setSkuListPos(p=>({...p,[i]:{top:r.bottom+4, left:r.left, width:Math.max(r.width,220)}}));
+                          }}
                           onBlur={()=>setTimeout(()=>{const sl=[...showSkuList];sl[i]=false;setShowSkuList(sl);},150)}
                           onKeyDown={e=>{
                             if (e.key==="Tab" && showSkuList[i] && filtProd.length>0) {
@@ -572,7 +598,13 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
                           ref={el=>skuInputRefs.current[i]=el}
                           placeholder="SKU"/>
                         {showSkuList[i] && filtProd.length>0 && sq && (
-                          <div className="absolute z-50 left-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 w-64 max-h-48 overflow-y-auto">
+                          <div
+                            className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto"
+                            style={{
+                              top: (skuListPos[i]?.top ?? 0) + "px",
+                              left: (skuListPos[i]?.left ?? 0) + "px",
+                              width: (skuListPos[i]?.width ?? 256) + "px",
+                            }}>
                             {filtProd.map(p=>(
                               <button key={p.id} type="button" onMouseDown={()=>selectProduct(i,p)}
                                 className="w-full text-left px-3 py-2 hover:bg-indigo-50 border-b border-gray-50 last:border-0">
@@ -1673,18 +1705,6 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
   );
 };
 
-// ─── Coming Soon Module ────────────────────────────────────────────────────
-const ComingSoon = ({ title, description, icon }) => (
-  <div className="flex flex-col items-center justify-center py-24 text-center px-4">
-    <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center mb-4">
-      <Icon name={icon} size={28} className="text-indigo-400" />
-    </div>
-    <h2 className="text-xl font-bold text-gray-800 mb-2">{title}</h2>
-    <p className="text-gray-500 text-sm max-w-xs">{description}</p>
-    <span className="mt-4 px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">Em desenvolvimento</span>
-  </div>
-);
-
 // ─── Dashboard Module ─────────────────────────────────────────────────────
 const DashboardModule = ({ orders }) => {
   const total = orders.reduce((s, o) => s + o.total, 0);
@@ -2381,285 +2401,6 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
           </button>
         </div>
       )}
-      {!standalone && (
-      <>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Financeiro</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{finance.length} lançamentos registrados</p>
-        </div>
-        <button onClick={() => setModal("new")}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm">
-          <Icon name="plus" size={16}/> Lançamento
-        </button>
-      </div>
-
-      {/* Date filter bar */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-3 shadow-sm space-y-3">
-        {/* Mode selector */}
-        <div className="flex gap-1 flex-wrap">
-          {[["mes","Mês"],["trimestre","Trimestre"],["ano","Ano"],["personalizado","Personalizado"],["todos","Todos"]].map(([id,label])=>(
-            <button key={id} onClick={()=>setFilterMode(id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterMode===id?"bg-indigo-600 text-white":"bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Navigator */}
-        {filterMode !== "todos" && filterMode !== "personalizado" && (
-          <div className="flex items-center gap-2">
-            <button onClick={prevMonth} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M15 18l-6-6 6-6"/></svg>
-            </button>
-            <span className="text-sm font-semibold text-gray-700 capitalize min-w-[160px] text-center">{periodLabel()}</span>
-            <button onClick={nextMonth} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M9 18l6-6-6-6"/></svg>
-            </button>
-            <span className="text-xs text-gray-400 ml-2">{periodTx.length} lançamento{periodTx.length!==1?"s":""}</span>
-          </div>
-        )}
-
-        {/* Custom date range */}
-        {filterMode === "personalizado" && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500 font-medium">De:</label>
-              <input type="date" className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                value={dateFrom} onChange={e=>setDateFrom(e.target.value)}/>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500 font-medium">Até:</label>
-              <input type="date" className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                value={dateTo} onChange={e=>setDateTo(e.target.value)}/>
-            </div>
-            {(dateFrom||dateTo) && (
-              <button onClick={()=>{setDateFrom("");setDateTo("");}}
-                className="text-xs text-red-400 hover:text-red-600 font-medium">Limpar</button>
-            )}
-            <span className="text-xs text-gray-400">{periodTx.length} lançamento{periodTx.length!==1?"s":""}</span>
-          </div>
-        )}
-
-        {filterMode === "todos" && (
-          <p className="text-xs text-gray-400">{finance.length} lançamento{finance.length!==1?"s":""} no total</p>
-        )}
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Receitas</p>
-          <p className="text-2xl font-bold text-green-600 mt-1">{fmt(periodReceitas)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{periodActive.filter(t=>t.type==="receita").length + paidOrdersInPeriod.length} lançamentos</p>
-          {multaJurosRecebidosPeriodo>0 && <p className="text-[10px] text-red-400 mt-0.5">inclui {fmt(multaJurosRecebidosPeriodo)} de multa/juros</p>}
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Despesas</p>
-          <p className="text-2xl font-bold text-red-500 mt-1">{fmt(periodDespesas)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{periodActive.filter(t=>t.type==="despesa").length + paidPurchasesInPeriod.length} lançamentos</p>
-        </div>
-        <div className={`rounded-xl p-4 border shadow-sm ${periodResult >= 0 ? "bg-indigo-50 border-indigo-100" : "bg-red-50 border-red-100"}`}>
-          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Resultado</p>
-          <p className={`text-2xl font-bold mt-1 ${periodResult >= 0 ? "text-indigo-700" : "text-red-600"}`}>{fmt(periodResult)}</p>
-          <p className={`text-xs mt-0.5 ${periodResult >= 0 ? "text-indigo-400" : "text-red-400"}`}>{periodResult >= 0 ? "▲ Lucro" : "▼ Prejuízo"}</p>
-        </div>
-        <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 shadow-sm">
-          <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">A Pagar</p>
-          <p className="text-2xl font-bold text-amber-600 mt-1">{fmt(pendingDesp)}</p>
-          <p className="text-xs text-amber-400 mt-0.5">{pending.filter(t=>t.type==="despesa").length} pendente{pending.filter(t=>t.type==="despesa").length!==1?"s":""}</p>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
-        {[["overview","📊 Visão Geral"],["pagar","💸 Contas a Pagar"]].map(([id,label]) => (
-          <button key={id} onClick={() => setTab(id)}
-            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${tab===id ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
-            {label}
-          </button>
-        ))}
-      </div>
-      </>
-      )}
-
-      {/* ── TAB: Overview ── */}
-      {tab === "overview" && (
-        <div className="space-y-4">
-          {/* Chart */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <h3 className="font-semibold text-gray-700 text-sm mb-4">Fluxo de Caixa — Últimos 6 meses</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={chartData} barGap={2} barCategoryGap="30%">
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false}/>
-                <XAxis dataKey="label" tick={{ fontSize:11, fill:"#94a3b8" }} axisLine={false} tickLine={false}/>
-                <YAxis tick={{ fontSize:10, fill:"#94a3b8" }} axisLine={false} tickLine={false}
-                  tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}/>
-                <Tooltip content={<FinTooltip/>}/>
-                <Bar dataKey="receitas" name="Receitas" fill="#22c55e" radius={[4,4,0,0]}/>
-                <Bar dataKey="despesas" name="Despesas" fill="#f87171" radius={[4,4,0,0]}/>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* DRE breakdown + Recent */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <h3 className="font-semibold text-gray-700 text-sm mb-3">Breakdown do Período</h3>
-              <div className="space-y-2">
-                {dreData.length === 0 && <p className="text-xs text-gray-400 py-4 text-center">Sem lançamentos no período</p>}
-                {dreData.map(item => (
-                  <div key={item.cat} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CAT_COLORS[item.cat] || "#94a3b8" }}/>
-                      <span className="text-gray-600 text-xs">{item.cat}</span>
-                    </div>
-                    <span className={`font-semibold text-xs ${item.type==="receita" ? "text-green-600" : "text-red-500"}`}>
-                      {item.type==="receita" ? "+" : "-"}{fmt(item.total)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>          </div>
-        </div>
-      )}
-
-      {/* ── TAB: Lançamentos ── */}
-      {tab === "lancamentos" && (
-        <div className="space-y-3">
-          <div className="flex gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-[180px]">
-              <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-              <input className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                placeholder="Buscar descrição ou categoria..." value={search} onChange={e => setSearch(e.target.value)}/>
-            </div>
-            <select className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none bg-white"
-              value={filterType} onChange={e => setFilterType(e.target.value)}>
-              <option value="todos">Todos</option>
-              <option value="receita">Receitas</option>
-              <option value="despesa">Despesas</option>
-            </select>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            {filteredList.length === 0 ? (
-              <div className="py-12 text-center text-gray-400">
-                <Icon name="finance" size={28} className="mx-auto mb-2 opacity-40"/>
-                <p className="text-sm">Nenhum lançamento encontrado</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50/60">
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Data</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Descrição</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Categoria</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Valor</th>
-                      <th className="px-4 py-3"/>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {filteredList.map(t => (
-                      <tr key={t.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{t.date}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${t.type==="receita" ? "bg-green-100 text-green-600" : "bg-red-100 text-red-500"}`}>
-                              {t.type==="receita" ? "↑" : "↓"}
-                            </span>
-                            <span className="text-gray-800 text-xs">{t.description}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 hidden md:table-cell">
-                          <span className="inline-flex items-center gap-1 text-xs">
-                            <span className="w-2 h-2 rounded-full" style={{ background: CAT_COLORS[t.category]||"#94a3b8" }}/>
-                            <span className="text-gray-500">{t.category}</span>
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge label={t.status.charAt(0).toUpperCase()+t.status.slice(1)} style={FSTATUS_STYLES[t.status]}/>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className={`font-bold text-sm ${t.type==="receita" ? "text-green-600" : "text-red-500"}`}>
-                            {t.type==="receita" ? "+" : "-"}{fmt(t.amount)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center gap-1">
-                            <button onClick={() => setModal(t)} className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
-                              <Icon name="edit" size={14}/>
-                            </button>
-                            <button onClick={() => setConfirmDelete(t)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                              <Icon name="trash" size={14}/>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── TAB: Pendentes ── */}
-      {tab === "pendentes" && (
-        <div className="space-y-4">
-          {pending.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-sm">
-              <Icon name="check" size={28} className="mx-auto mb-2 text-green-400"/>
-              <p className="text-sm text-gray-500 font-medium">Tudo em dia! Nenhum lançamento pendente.</p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-green-50 border border-green-100 rounded-xl p-3 text-center">
-                  <p className="text-xs text-gray-500">A Receber</p>
-                  <p className="text-lg font-bold text-green-600 mt-0.5">{fmt(pendingRec)}</p>
-                  <p className="text-xs text-green-400">{pending.filter(t=>t.type==="receita").length} lançamento(s)</p>
-                </div>
-                <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-center">
-                  <p className="text-xs text-gray-500">A Pagar</p>
-                  <p className="text-lg font-bold text-red-500 mt-0.5">{fmt(pendingDesp)}</p>
-                  <p className="text-xs text-red-400">{pending.filter(t=>t.type==="despesa").length} lançamento(s)</p>
-                </div>
-              </div>
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
-                {pending.map(t => (
-                  <div key={t.id} className="flex items-center justify-between p-4 hover:bg-gray-50/50">
-                    <div className="flex items-center gap-3">
-                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${t.type==="receita" ? "bg-green-100 text-green-600" : "bg-red-100 text-red-500"}`}>
-                        {t.type==="receita" ? "↑" : "↓"}
-                      </span>
-                      <div>
-                        <p className="text-sm text-gray-800 font-medium">{t.description}</p>
-                        <p className="text-xs text-gray-400">{t.date} · {t.category}</p>
-                        {t.notes && <p className="text-xs text-amber-500 italic mt-0.5">{t.notes}</p>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`font-bold ${t.type==="receita" ? "text-green-600" : "text-red-500"}`}>
-                        {fmt(t.amount)}
-                      </span>
-                      <button
-                        onClick={() => setFinance(prev => prev.map(x => x.id===t.id ? {...x, status:"pago", paidDate: x.paidDate||today()} : x))}
-                        className="px-3 py-1 text-xs font-medium bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
-                        Pagar
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
       {/* ── TAB: Contas a Receber ── */}
       {tab === "receber" && (() => {
         const today0 = new Date(); today0.setHours(0,0,0,0);
@@ -3985,21 +3726,6 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
     </div>
   );
 };
-
-// ─── Star Rating ──────────────────────────────────────────────────────────
-const StarRating = ({ value, onChange, readOnly = false }) => (
-  <div className="flex gap-0.5">
-    {[1,2,3,4,5].map(n => (
-      <button key={n} type="button" onClick={() => !readOnly && onChange?.(n)}
-        className={readOnly ? "cursor-default" : "cursor-pointer"}>
-        <svg width="13" height="13" viewBox="0 0 24 24"
-          fill={n <= value ? "#f59e0b" : "none"} stroke={n <= value ? "#f59e0b" : "#d1d5db"} strokeWidth={1.5}>
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-        </svg>
-      </button>
-    ))}
-  </div>
-);
 
 // ─── Register Purchase Modal ──────────────────────────────────────────────
 const RegisterPurchaseModal = ({ supplier, onClose, onSave }) => {
@@ -7321,113 +7047,6 @@ function calcReverse({ pv, custo, embalagem, frete, imposto, comissao, taxaPgto 
   return { pv, tot, vComis, vPgto, vImp, vLucro, margemEf: (vLucro/pv)*100 };
 }
 
-// ─── Canais de Venda Tab (shared component) ──────────────────────────────
-const CanaisVendaTab = () => {
-  const [canais, setCanais]         = useState(CANAIS_DEFAULT);
-  const [canaisSaved, setCanaisSaved] = useState(false);
-
-  useEffect(() => {
-    window.storage.get(CANAIS_KEY).then(r => { if (r?.value) setCanais(JSON.parse(r.value)); }).catch(()=>{});
-  }, []);
-
-  const setCanal = (i, k, v) => setCanais(prev => prev.map((c,idx)=> idx===i ? {...c,[k]:v} : c));
-  const addCanal = () => setCanais(prev=>[...prev, { canal:"Novo Canal", taxaPerc:0, taxaFixa:0, prazoRepasse:0, ativo:true }]);
-
-  const handleSaveCanais = async () => {
-    await window.storage.set(CANAIS_KEY, JSON.stringify(canais)).catch(()=>{});
-    setCanaisSaved(true);
-    setTimeout(()=>setCanaisSaved(false), 2500);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Canais de Venda</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Configure as taxas de cada canal</p>
-        </div>
-        <button onClick={handleSaveCanais}
-          className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${canaisSaved?"bg-green-500 text-white":"bg-indigo-600 text-white hover:bg-indigo-700"}`}>
-          {canaisSaved?"✓ Salvo!":"Salvar Taxas"}
-        </button>
-      </div>
-
-      <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm text-blue-700">
-        💡 As taxas configuradas aqui são usadas como referência ao criar pedidos e cotações.
-      </div>
-
-      <div className="space-y-3">
-        {canais.map((c, i) => (
-          <div key={i} className={`bg-white border rounded-2xl p-4 shadow-sm transition-all ${c.ativo?"border-gray-100":"border-gray-100 opacity-50"}`}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full ${c.ativo?"bg-green-500":"bg-gray-300"}`}/>
-                <input className="font-semibold text-gray-800 text-sm bg-transparent border-0 focus:outline-none focus:ring-1 focus:ring-indigo-300 rounded px-1"
-                  value={c.canal} onChange={e=>setCanal(i,"canal",e.target.value)}/>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={()=>setCanal(i,"ativo",!c.ativo)}
-                  className={`text-xs px-2 py-1 rounded-lg font-medium transition-colors ${c.ativo?"bg-green-100 text-green-700":"bg-gray-100 text-gray-500"}`}>
-                  {c.ativo?"Ativo":"Inativo"}
-                </button>
-                <button onClick={()=>setCanais(prev=>prev.filter((_,idx)=>idx!==i))}
-                  className="text-gray-300 hover:text-red-400 transition-colors text-sm">✕</button>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-1">Taxa % (sobre itens)</label>
-                <div className="flex items-center gap-1">
-                  <input type="number" min="0" max="100" step="0.01"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                    value={c.taxaPerc===0?"":c.taxaPerc}
-                    onChange={e=>setCanal(i,"taxaPerc", e.target.value===""?"":(parseFloat(e.target.value)||0))}
-                    onBlur={e=>{ if (e.target.value==="") setCanal(i,"taxaPerc",0); }}/>
-                  <span className="text-gray-400 font-medium text-sm">%</span>
-                </div>
-              </div>
-              <div>
-                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-1">Taxa Fixa (R$)</label>
-                <div className="flex items-center gap-1">
-                  <span className="text-gray-400 text-sm">R$</span>
-                  <input type="number" min="0" step="0.01"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                    value={c.taxaFixa===0?"":c.taxaFixa}
-                    onChange={e=>setCanal(i,"taxaFixa", e.target.value===""?"":(parseFloat(e.target.value)||0))}
-                    onBlur={e=>{ if (e.target.value==="") setCanal(i,"taxaFixa",0); }}/>
-                </div>
-              </div>
-              <div>
-                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block mb-1">Prazo Repasse (dias)</label>
-                <input type="number" min="0"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                  value={c.prazoRepasse===0?"":c.prazoRepasse}
-                  onChange={e=>setCanal(i,"prazoRepasse", e.target.value===""?"":(parseInt(e.target.value)||0))}
-                  onBlur={e=>{ if (e.target.value==="") setCanal(i,"prazoRepasse",0); }}/>
-              </div>
-            </div>
-            {(c.taxaPerc>0 || c.taxaFixa>0) && (
-              <p className="text-[10px] text-gray-400 mt-2">
-                Ex: pedido de R$ 100 → custo de <strong>{fmt(100*(c.taxaPerc/100)+c.taxaFixa)}</strong>
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <button onClick={addCanal}
-        className="w-full py-2.5 border-2 border-dashed border-gray-200 rounded-2xl text-sm text-gray-400 hover:border-indigo-300 hover:text-indigo-500 transition-colors font-medium">
-        + Adicionar Canal
-      </button>
-
-      <button onClick={handleSaveCanais}
-        className={`w-full py-3 rounded-xl text-sm font-semibold transition-all ${canaisSaved?"bg-green-500 text-white":"bg-indigo-600 text-white hover:bg-indigo-700"}`}>
-        {canaisSaved?"✓ Taxas salvas!":"Salvar Taxas dos Canais"}
-      </button>
-    </div>
-  );
-};
-
 const TabelaPrecos = ({ products, setProducts }) => {
   const [tSearch,       setTSearch]       = useState("");
   const [tSaved,        setTSaved]        = useState(false);
@@ -8266,11 +7885,6 @@ async function sha256(text) {
   const buf = await crypto.subtle.digest("SHA-256",
     new TextEncoder().encode(text + "::mmarmarinhos2025"));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
-}
-
-function genRecoveryKey() {
-  const ch = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  return [0,1,2,3].map(()=>[0,1,2,3].map(()=>ch[Math.floor(Math.random()*ch.length)]).join("")).join("-");
 }
 
 // Session helpers
@@ -10289,23 +9903,13 @@ const LogoMark = ({ size = 40, className = "" }) => {
 };
 
 // ─── Empresa Module ───────────────────────────────────────────────────────
-const CANAIS_KEY = "erp_canais_taxas";
-const CANAIS_DEFAULT = [
-  { canal:"Mercado Livre", taxaPerc:14, taxaFixa:0,  prazoRepasse:15, ativo:true },
-  { canal:"Shopee",        taxaPerc:12, taxaFixa:0,  prazoRepasse:15, ativo:true },
-  { canal:"WhatsApp",      taxaPerc:0,  taxaFixa:0,  prazoRepasse:0,  ativo:true },
-  { canal:"Loja Própria",  taxaPerc:0,  taxaFixa:0,  prazoRepasse:0,  ativo:true },
-  { canal:"Telefone",      taxaPerc:0,  taxaFixa:0,  prazoRepasse:0,  ativo:true },
-];
-
 // ─── Cadastros Storage (Representantes, Contas, Forma de Pagamento) ───────
 const REPR_KEY = "erp-mmarmarinhos-representantes";
 const REPR_STATUS = ["Ativo","Inativo"];
 const REPR_COMISSAO_TIPOS = ["fixa","faixas"];
 const SEED_REPRESENTANTES = [];
 async function loadRepresentantes() {
-  try { const r = await window.storage.get(REPR_KEY); if (r?.value) return JSON.parse(r.value); } catch(_) {}
-  return [...SEED_REPRESENTANTES];
+  return loadKV(REPR_KEY, [...SEED_REPRESENTANTES], "Representantes");
 }
 async function saveRepresentantes(list) {
   return persistKV(REPR_KEY, list, "Representantes");
@@ -10328,8 +9932,7 @@ const CONTA_KEY = "erp-mmarmarinhos-contas";
 // ─── Catálogo de Variantes (molde reutilizável de códigos pra gerar variantes em massa) ──
 const VARCAT_KEY = "erp-mmarmarinhos-catalogos-variante";
 async function loadVariantCatalogs() {
-  try { const r = await window.storage.get(VARCAT_KEY); if (r?.value) return JSON.parse(r.value); } catch(_) {}
-  return [];
+  return loadKV(VARCAT_KEY, [], "Catálogos de Variante");
 }
 async function saveVariantCatalogs(list) {
   return persistKV(VARCAT_KEY, list, "Catálogos de Variante");
@@ -10339,8 +9942,7 @@ const CONTA_TIPOS = ["Corrente","Poupança"];
 // ─── Fechamentos de Comissão de Representantes (módulo Movimentos) ───────────
 const FECHAMENTO_KEY = "erp-mmarmarinhos-fechamentos-comissao";
 async function loadFechamentos() {
-  try { const r = await window.storage.get(FECHAMENTO_KEY); if (r?.value) return JSON.parse(r.value); } catch(_) {}
-  return [];
+  return loadKV(FECHAMENTO_KEY, [], "Fechamentos de Comissão");
 }
 async function saveFechamentos(list) {
   return persistKV(FECHAMENTO_KEY, list, "Fechamentos de Comissão");
@@ -10352,8 +9954,7 @@ const BANCOS_BR = [
 ];
 const SEED_CONTAS = [];
 async function loadContas() {
-  try { const r = await window.storage.get(CONTA_KEY); if (r?.value) return JSON.parse(r.value); } catch(_) {}
-  return [...SEED_CONTAS];
+  return loadKV(CONTA_KEY, [...SEED_CONTAS], "Contas Bancárias");
 }
 async function saveContas(list) {
   return persistKV(CONTA_KEY, list, "Contas Bancárias");
@@ -10366,11 +9967,7 @@ const SEED_FORMASPAGAMENTO = PAYMENT_METHODS.map((nome, i) => ({
   id: `FPG-${String(i+1).padStart(3,"0")}`, nome, taxa: 0, prazoRecebimento: 0, contaId: "", status: "Ativo",
 }));
 async function loadFormasPagamento() {
-  try {
-    const r = await window.storage.get(FORMAPAG_KEY);
-    if (r?.value) return JSON.parse(r.value);
-  } catch(_) {}
-  return [...SEED_FORMASPAGAMENTO];
+  return loadKV(FORMAPAG_KEY, [...SEED_FORMASPAGAMENTO], "Formas de Pagamento");
 }
 async function saveFormasPagamento(list) {
   return persistKV(FORMAPAG_KEY, list, "Formas de Pagamento");
@@ -10392,26 +9989,23 @@ const PARAMS_DEFAULT = {
     backendUrl: "",
   },
   vendas: { validadeCotacaoDias: 10, multaAtrasoPercent: 2, jurosAtrasoPercentMes: 1 },
-  compras: { statusList: ["Em Aberto","Baixado Parcial","Baixado","Cancelado"] },
+  compras: { statusList: ["Em Aberto","Baixado","Cancelado"] },
   fiscal: { provider: "", token: "", ambiente: "homologacao" },
 };
 async function loadParams() {
-  try {
-    const r = await window.storage.get(PARAMS_KEY);
-    if (r?.value) {
-      const saved = JSON.parse(r.value);
-      return {
-        ...PARAMS_DEFAULT,
-        ...saved,
-        canais: { ...PARAMS_DEFAULT.canais, ...(saved.canais||{}) },
-        alertas: { ...PARAMS_DEFAULT.alertas, ...(saved.alertas||{}) },
-        sincronizacao: { ...PARAMS_DEFAULT.sincronizacao, ...(saved.sincronizacao||{}) },
-        vendas: { ...PARAMS_DEFAULT.vendas, ...(saved.vendas||{}) },
-        compras: { ...PARAMS_DEFAULT.compras, ...(saved.compras||{}) },
-        fiscal: { ...PARAMS_DEFAULT.fiscal, ...(saved.fiscal||{}) },
-      };
-    }
-  } catch(_) {}
+  const saved = await loadKV(PARAMS_KEY, null, "Parâmetros");
+  if (saved) {
+    return {
+      ...PARAMS_DEFAULT,
+      ...saved,
+      canais: { ...PARAMS_DEFAULT.canais, ...(saved.canais||{}) },
+      alertas: { ...PARAMS_DEFAULT.alertas, ...(saved.alertas||{}) },
+      sincronizacao: { ...PARAMS_DEFAULT.sincronizacao, ...(saved.sincronizacao||{}) },
+      vendas: { ...PARAMS_DEFAULT.vendas, ...(saved.vendas||{}) },
+      compras: { ...PARAMS_DEFAULT.compras, ...(saved.compras||{}) },
+      fiscal: { ...PARAMS_DEFAULT.fiscal, ...(saved.fiscal||{}) },
+    };
+  }
   return { ...PARAMS_DEFAULT };
 }
 async function saveParams(p) {
@@ -10445,8 +10039,7 @@ const SEED_COTACOES = [];
 
 const COT_KEY = "erp_cotacoes";
 async function loadCotacoes() {
-  try { const r = await window.storage.get(COT_KEY); if (r?.value) return JSON.parse(r.value); } catch(_){}
-  return SEED_COTACOES;
+  return loadKV(COT_KEY, SEED_COTACOES, "Cotações");
 }
 async function saveCotacoes(c) {
   return persistKV(COT_KEY, c, "Cotações");
@@ -12959,6 +12552,7 @@ function ERPApp({ currentUser, onLogout }) {
   const [phQuery, setPhQuery]       = useState("");
   const [phPrice, setPhPrice]       = useState(null);
   const [appToast, setAppToast]     = useState(null);
+  const [loadErrors, setLoadErrors] = useState([]);
   const [openOrderId, setOpenOrderId] = useState(null);
 
   const showAppToast = (msg) => { setAppToast(msg); setTimeout(()=>setAppToast(null), 4000); };
@@ -12974,6 +12568,20 @@ function ERPApp({ currentUser, onLogout }) {
     };
     window.addEventListener("erp:save-error", onSaveError);
     return () => window.removeEventListener("erp:save-error", onSaveError);
+  }, []);
+
+  // Aviso persistente (banner, não some sozinho) quando o CARREGAMENTO de um
+  // dado falha de vez — diferente do save-error, isso geralmente acontece
+  // logo ao abrir a página, então um toast de alguns segundos passaria
+  // despercebido. Sem isso, o módulo simplesmente aparece vazio e parece que
+  // os dados foram apagados, quando na verdade só não carregaram.
+  useEffect(() => {
+    const onLoadError = (e) => {
+      const label = e?.detail?.label || "dado";
+      setLoadErrors(prev => prev.includes(label) ? prev : [...prev, label]);
+    };
+    window.addEventListener("erp:load-error", onLoadError);
+    return () => window.removeEventListener("erp:load-error", onLoadError);
   }, []);
 
   const handleLogout = () => {
@@ -13236,6 +12844,17 @@ function ERPApp({ currentUser, onLogout }) {
       {appToast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 max-w-sm text-center">
           {appToast}
+        </div>
+      )}
+      {loadErrors.length > 0 && (
+        <div className="fixed top-0 inset-x-0 z-50 bg-red-600 text-white text-sm px-4 py-2.5 flex items-center justify-between gap-3 shadow-lg">
+          <p className="flex-1">
+            ⚠️ Não foi possível carregar: <strong>{loadErrors.join(", ")}</strong>. Seus dados <strong>não</strong> foram apagados — é uma falha de conexão. Tente atualizar a página.
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={()=>window.location.reload()} className="px-3 py-1 bg-white text-red-700 rounded-lg text-xs font-semibold hover:bg-red-50">Atualizar</button>
+            <button onClick={()=>setLoadErrors([])} className="text-white/80 hover:text-white text-lg leading-none">✕</button>
+          </div>
         </div>
       )}
 
