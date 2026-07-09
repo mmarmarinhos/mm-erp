@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.19.17";
+const APP_VERSION = "3.19.18";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1020,6 +1020,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
   const [detailOrder, setDetailOrder] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [devolucaoModal, setDevolucaoModal] = useState(null);
+  const [cancelNfeConfirm, setCancelNfeConfirm] = useState(null);
   const [emitNfeOrder, setEmitNfeOrder] = useState(null);
   const [filterMode, setFilterMode] = useState("todos"); // mes | personalizado | todos
 
@@ -1534,6 +1535,12 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
                 className={`px-4 py-2 rounded-xl border text-sm font-medium flex items-center gap-1.5 ${params?.fiscal?.provider ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"}`}>
                 🧾 {detailOrder.nfNumero ? `NF-e ${detailOrder.nfNumero}` : (params?.fiscal?.provider ? "Emitir NF-e" : "Faturar (simular)")}
               </button>
+              {detailOrder.nfNumero && (
+                <button onClick={() => { setCancelNfeConfirm(detailOrder); setDetailOrder(null); }}
+                  className="px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 flex items-center gap-1.5">
+                  ❌ Cancelar NF
+                </button>
+              )}
               {["Enviado","Entregue"].includes(detailOrder.status) && (
                 <button onClick={() => { setDevolucaoModal(detailOrder); setDetailOrder(null); }}
                   className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 text-sm font-medium hover:bg-rose-100 flex items-center gap-1.5">
@@ -1586,6 +1593,35 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
             setOrders(prev => prev.map(o => o.id===emitNfeOrder.id ? {...o, ...updated} : o));
             setEmitNfeOrder(null);
           }}/>
+      )}
+
+      {/* Cancelar NF-e/faturamento */}
+      {cancelNfeConfirm && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center">
+            <p className="text-2xl mb-2">❌</p>
+            <h3 className="font-bold text-gray-900 mb-1">Cancelar faturamento?</h3>
+            <p className="text-sm text-gray-500 mb-2">
+              NF-e {cancelNfeConfirm.nfNumero} do pedido {cancelNfeConfirm.id} será desvinculada, e você poderá faturar de novo.
+            </p>
+            {cancelNfeConfirm.nfeStatus === "simulado" ? (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                Essa é uma NF-e simulada — cancelar aqui é seguro, não tem nenhuma nota fiscal real envolvida.
+              </p>
+            ) : (
+              <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
+                ⚠️ Isso só limpa o registro aqui no MM ERP — não cancela a nota de verdade na Receita/SEFAZ. Se essa NF-e foi emitida de fato, cancele-a também no painel do Focus NFe/NFe.io, com uma justificativa (mínimo 15 caracteres).
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button onClick={()=>setCancelNfeConfirm(null)} className="flex-1 py-2 border border-gray-200 rounded-xl text-sm">Voltar</button>
+              <button onClick={()=>{
+                setOrders(prev => prev.map(o => o.id===cancelNfeConfirm.id ? {...o, nfNumero:"", nfeStatus:"", nfeChave:"", nfeXmlUrl:"", nfePdfUrl:""} : o));
+                setCancelNfeConfirm(null);
+              }} className="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm font-medium">Cancelar NF</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Delete confirm */}
