@@ -49,11 +49,13 @@ async function apiStorage(action, payload = {}) {
 
 window.storage = {
   async get(key, shared = false) {
-    try {
-      const data = await apiStorage('get', { key })
-      if (data?.value == null) return null
-      return { key, value: data.value, shared }
-    } catch { return null }
+    // Não engolir erro aqui, mesmo motivo do set(): quem chama (loadKV, no
+    // App.jsx) precisa saber quando uma leitura falha de verdade — antes,
+    // uma falha de rede/sessão fazia os módulos aparecerem vazios, dando a
+    // impressão de que os dados tinham sido apagados.
+    const data = await apiStorage('get', { key })
+    if (data?.value == null) return null
+    return { key, value: data.value, shared }
   },
 
   async set(key, value, shared = false) {
