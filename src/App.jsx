@@ -45,9 +45,16 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.25.1";
+const APP_VERSION = "3.26.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
+// Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
+// pra configurar quais dias cada canal despacha (Parâmetros → Canais) e pro
+// cálculo do prazo de postagem no Dashboard.
+const WEEKDAYS = [
+  { v:1, l:"Seg" }, { v:2, l:"Ter" }, { v:3, l:"Qua" }, { v:4, l:"Qui" },
+  { v:5, l:"Sex" }, { v:6, l:"Sáb" }, { v:0, l:"Dom" },
+];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
 const chId = (ch) => CHANNEL_TO_ID[ch] || ch;
 const ORDER_STATUSES = ["Novo", "Em Separação", "Enviado", "Entregue", "Cancelado", "Devolvido"];
@@ -1828,13 +1835,14 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
 
   // ── Shipping deadline logic ──────────────────────────────────────────────
   const SHIP_SLA = { "Mercado Livre":3, "Shopee":2, "WhatsApp":2, "Loja Própria":3 };
+  const DEFAULT_DIAS_DESPACHO = [1,2,3,4,5]; // seg-sex
 
-  function addBizDays(dateStr, days) {
+  function addBizDays(dateStr, days, diasValidos) {
     const d = new Date(dateStr + "T12:00:00");
     let added = 0;
     while (added < days) {
       d.setDate(d.getDate() + 1);
-      if (d.getDay() !== 0 && d.getDay() !== 6) added++;
+      if (diasValidos.includes(d.getDay())) added++;
     }
     return d;
   }
@@ -1845,8 +1853,9 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
   const pendingOrders = orders
     .filter(o => o.status === "Novo" || o.status === "Em Separação")
     .map(o => {
-      const sla      = params?.canais?.[o.channel]?.sla ?? SHIP_SLA[o.channel] ?? 3;
-      const deadline = addBizDays(o.date, sla);
+      const sla         = params?.canais?.[o.channel]?.sla ?? SHIP_SLA[o.channel] ?? 3;
+      const diasValidos = params?.canais?.[o.channel]?.diasDespacho ?? DEFAULT_DIAS_DESPACHO;
+      const deadline = addBizDays(o.date, sla, diasValidos);
       const diffDays = Math.floor((deadline - todayDate) / 86400000);
       const deadlineStr = deadline.toLocaleDateString("pt-BR", { weekday:"short", day:"2-digit", month:"2-digit" });
       let urgency = "ok";
@@ -10256,10 +10265,10 @@ async function saveFormasPagamento(list) {
 const PARAMS_KEY = "erp-mmarmarinhos-params";
 const PARAMS_DEFAULT = {
   canais: {
-    "Mercado Livre": { comissao: 12,  gateway: 3.5, ativo: true, sla: 3, taxaFixa: 0 },
-    "Shopee":        { comissao: 14,  gateway: 2.0, ativo: true, sla: 2, taxaFixa: 0 },
-    "WhatsApp":      { comissao: 0,   gateway: 0,   ativo: true, sla: 2, taxaFixa: 0 },
-    "Loja Própria":  { comissao: 0,   gateway: 2.5, ativo: true, sla: 3, taxaFixa: 0 },
+    "Mercado Livre": { comissao: 12,  gateway: 3.5, ativo: true, sla: 3, taxaFixa: 0, diasDespacho: [1,2,3,4,5] },
+    "Shopee":        { comissao: 14,  gateway: 2.0, ativo: true, sla: 2, taxaFixa: 0, diasDespacho: [1,2,3,4,5] },
+    "WhatsApp":      { comissao: 0,   gateway: 0,   ativo: true, sla: 2, taxaFixa: 0, diasDespacho: [1,2,3,4,5] },
+    "Loja Própria":  { comissao: 0,   gateway: 2.5, ativo: true, sla: 3, taxaFixa: 0, diasDespacho: [1,2,3,4,5] },
   },
   alertas: { diasInatividade: 30, emailAlertas: "" },
   sincronizacao: {
@@ -12333,6 +12342,22 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                       </p>
                       <p className="text-[10px] text-gray-400 mt-0.5">sobram R$ {(100-taxaTotalReais).toFixed(2).replace(".",",")}</p>
                     </div>
+                  </div>
+                </div>
+                <div className="px-5 pb-4">
+                  <label className="text-xs text-gray-500 block mb-1.5 font-medium" title="Dias em que você despacha pedidos desse canal. Desmarque sábado/domingo (ou qualquer dia que não despache) pra o prazo de postagem no Dashboard pular esses dias.">📅 Dias de despacho</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WEEKDAYS.map(w => {
+                      const dias = cfg.diasDespacho || [1,2,3,4,5];
+                      const marcado = dias.includes(w.v);
+                      return (
+                        <button key={w.v} type="button"
+                          onClick={()=>setC(ch,"diasDespacho", marcado ? dias.filter(d=>d!==w.v) : [...dias, w.v].sort())}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${marcado ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
+                          {marcado ? "✓ " : ""}{w.l}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
