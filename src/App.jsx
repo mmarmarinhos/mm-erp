@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.23.1";
+const APP_VERSION = "3.23.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1087,7 +1087,7 @@ const EmitNfeModal = ({ order, onClose, onIssued, params, customers = [] }) => {
   );
 };
 
-const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance, representantes = [], formasPagamento = [], params, openOrderId = null, onConsumeOpenOrder }) => {
+const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance, representantes = [], formasPagamento = [], params, openOrderId = null, onConsumeOpenOrder, initialStatusFilter = null, onConsumeStatusFilter }) => {
   const [search, setSearch] = useState("");
   const [filterChannel, setFilterChannel] = useState("Todos");
   const [filterStatus, setFilterStatus] = useState("Todos");
@@ -1107,6 +1107,14 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
       if (onConsumeOpenOrder) onConsumeOpenOrder();
     }
   }, [openOrderId]);
+
+  // Chegou aqui via card "A Enviar" (Dashboard) — já abre filtrado
+  useEffect(() => {
+    if (initialStatusFilter) {
+      setFilterStatus(initialStatusFilter);
+      if (onConsumeStatusFilter) onConsumeStatusFilter();
+    }
+  }, [initialStatusFilter]);
   const [period, setPeriod] = useState(() => {
     const n = new Date();
     return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;
@@ -1150,7 +1158,9 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
       o.id.toLowerCase().includes(search.toLowerCase()) ||
       o.items.toLowerCase().includes(search.toLowerCase());
     const matchChannel = filterChannel === "Todos" || o.channel === filterChannel;
-    const matchStatus  = filterStatus  === "Todos" || o.status  === filterStatus;
+    const matchStatus  = filterStatus === "Todos" ? true
+      : filterStatus === "A_ENVIAR" ? (o.status === "Novo" || o.status === "Em Separação")
+      : o.status === filterStatus;
     return matchSearch && matchChannel && matchStatus && filterByDate(o);
   }).sort((a, b) => {
     const da = new Date(a.date + "T12:00:00");
@@ -1434,6 +1444,13 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
           );
         })}
       </div>
+
+      {filterStatus === "A_ENVIAR" && (
+        <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-xl px-4 py-2.5">
+          <p className="text-sm text-purple-700 font-medium">📦 Filtro: pedidos a enviar (Novo + Em Separação)</p>
+          <button onClick={()=>setFilterStatus("Todos")} className="text-purple-500 hover:text-purple-700 text-xs font-semibold">✕ Limpar</button>
+        </div>
+      )}
 
       {/* Date filter */}
       <div className="bg-white border border-gray-100 rounded-2xl p-3 shadow-sm space-y-2">
@@ -1734,7 +1751,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
 };
 
 // ─── Dashboard Module ─────────────────────────────────────────────────────
-const DashboardModule = ({ orders, finance = [], params, setActive }) => {
+const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnviar }) => {
   const total = orders.reduce((s, o) => s + o.total, 0);
   const countByStatus = ORDER_STATUSES.reduce((acc, s) => {
     acc[s] = orders.filter(o => o.status === s).length;
@@ -1829,11 +1846,11 @@ const DashboardModule = ({ orders, finance = [], params, setActive }) => {
           <p className="text-2xl font-bold text-emerald-600 mt-1">{pedidosFaturados}</p>
           <p className="text-[11px] text-gray-400 mt-0.5">com NF emitida</p>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+        <button onClick={onGoToAEnviar} className="text-left bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-purple-200 transition-colors">
           <p className="text-xs text-gray-400 font-medium">📦 A Enviar</p>
           <p className="text-2xl font-bold text-purple-600 mt-1">{pedidosAEnviar}</p>
           <p className="text-[11px] text-gray-400 mt-0.5">Novo + Em Separação</p>
-        </div>
+        </button>
       </div>
 
       {/* ── 2) e 3) Prévia Contas a Receber / Contas a Pagar (vencendo hoje) ── */}
@@ -12839,6 +12856,7 @@ function ERPApp({ currentUser, onLogout }) {
   const [appToast, setAppToast]     = useState(null);
   const [loadErrors, setLoadErrors] = useState([]);
   const [openOrderId, setOpenOrderId] = useState(null);
+  const [initialOrdersFilter, setInitialOrdersFilter] = useState(null);
 
   const showAppToast = (msg) => { setAppToast(msg); setTimeout(()=>setAppToast(null), 4000); };
 
@@ -13100,8 +13118,8 @@ function ERPApp({ currentUser, onLogout }) {
 
   const renderModule = () => {
     switch (active) {
-      case "dashboard": return <DashboardModule orders={orders} finance={finance} params={params} setActive={setActive} />;
-      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)}/>;
+      case "dashboard": return <DashboardModule orders={orders} finance={finance} params={params} setActive={setActive} onGoToAEnviar={()=>{ setInitialOrdersFilter("A_ENVIAR"); setActive("orders"); }} />;
+      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)} initialStatusFilter={initialOrdersFilter} onConsumeStatusFilter={()=>setInitialOrdersFilter(null)}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} params={params}/>;
