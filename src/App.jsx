@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.24.2";
+const APP_VERSION = "3.24.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2002,13 +2002,6 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
             </p>
           </div>
         )}
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="Faturamento Total" value={fmt(total)} sub={`${orders.length} pedidos`} color="text-indigo-700" />
-        <Stat label="Novos" value={countByStatus["Novo"]} sub="aguardando" color="text-blue-600" />
-        <Stat label="Em Trânsito" value={countByStatus["Enviado"]} sub="enviados" color="text-purple-600" />
-        <Stat label="Entregues" value={countByStatus["Entregue"]} sub="finalizados" color="text-green-600" />
       </div>
 
       <div>
