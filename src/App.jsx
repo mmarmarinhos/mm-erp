@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.22.2";
+const APP_VERSION = "3.23.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1734,7 +1734,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
 };
 
 // ─── Dashboard Module ─────────────────────────────────────────────────────
-const DashboardModule = ({ orders }) => {
+const DashboardModule = ({ orders, finance = [], params, setActive }) => {
   const total = orders.reduce((s, o) => s + o.total, 0);
   const countByStatus = ORDER_STATUSES.reduce((acc, s) => {
     acc[s] = orders.filter(o => o.status === s).length;
@@ -1745,6 +1745,25 @@ const DashboardModule = ({ orders }) => {
     return acc;
   }, {});
   const recent = [...orders].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+
+  // ── 1) Pedidos em Aberto / Faturados / A Enviar ──────────────────────────
+  const pedidosEmAberto  = orders.filter(o => !o.nfNumero && o.status !== "Cancelado").length;
+  const pedidosFaturados = orders.filter(o => !!o.nfNumero).length;
+  const pedidosAEnviar   = orders.filter(o => o.status === "Novo" || o.status === "Em Separação").length;
+
+  // ── 2) Prévia Contas a Receber (mesmo critério da aba Contas a Receber:
+  //      só pedidos já faturados e não pagos) ──────────────────────────────
+  const todayISO = today();
+  const recPend = orders.filter(o => o.status !== "Cancelado" && !!o.nfNumero && !o.paidDate);
+  const totalReceber = recPend.reduce((s,o)=>s+o.total,0);
+  const recVencidos = recPend.filter(o => o.dueDate && o.dueDate < todayISO);
+  const totalReceberVencido = recVencidos.reduce((s,o)=>s+o.total,0);
+
+  // ── 3) Prévia Contas a Pagar vencendo hoje ───────────────────────────────
+  const pagVencendoHoje = (finance||[]).filter(f =>
+    f.type === "despesa" && f.status !== "pago" && f.status !== "cancelado" && f.dueDate === todayISO
+  );
+  const totalPagarHoje = pagVencendoHoje.reduce((s,f)=>s+(f.amount||0),0);
 
   // ── Shipping deadline logic ──────────────────────────────────────────────
   const SHIP_SLA = { "Mercado Livre":3, "Shopee":2, "WhatsApp":2, "Loja Própria":3 };
@@ -1796,6 +1815,52 @@ const DashboardModule = ({ orders }) => {
       <div>
         <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-sm text-gray-500 mt-0.5">Visão geral</p>
+      </div>
+
+      {/* ── 1) Pedidos em Aberto / Faturados / A Enviar ─────────────────── */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+          <p className="text-xs text-gray-400 font-medium">📂 Em Aberto</p>
+          <p className="text-2xl font-bold text-gray-800 mt-1">{pedidosEmAberto}</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">ainda não faturados</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+          <p className="text-xs text-gray-400 font-medium">🧾 Faturados</p>
+          <p className="text-2xl font-bold text-emerald-600 mt-1">{pedidosFaturados}</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">com NF emitida</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+          <p className="text-xs text-gray-400 font-medium">📦 A Enviar</p>
+          <p className="text-2xl font-bold text-purple-600 mt-1">{pedidosAEnviar}</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">Novo + Em Separação</p>
+        </div>
+      </div>
+
+      {/* ── 2) e 3) Prévia Contas a Receber / Contas a Pagar (vencendo hoje) ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <button onClick={()=>setActive && setActive("receber")}
+          className="text-left bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-green-200 transition-colors">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">💰 Contas a Receber</p>
+            <span className="text-[10px] text-indigo-500 font-medium">Ver tudo →</span>
+          </div>
+          <p className="text-2xl font-bold text-green-700 mt-2">{fmt(totalReceber)}</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">{recPend.length} pedido{recPend.length!==1?"s":""} pendente{recPend.length!==1?"s":""}</p>
+          {recVencidos.length > 0 && (
+            <p className="text-[11px] text-red-600 font-medium mt-1">🔴 {recVencidos.length} vencido{recVencidos.length!==1?"s":""} · {fmt(totalReceberVencido)}</p>
+          )}
+        </button>
+        <button onClick={()=>setActive && setActive("pagar")}
+          className="text-left bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-red-200 transition-colors">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">💸 Contas a Pagar — vencendo hoje</p>
+            <span className="text-[10px] text-indigo-500 font-medium">Ver tudo →</span>
+          </div>
+          <p className={`text-2xl font-bold mt-2 ${pagVencendoHoje.length>0?"text-red-600":"text-gray-800"}`}>{fmt(totalPagarHoje)}</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">
+            {pagVencendoHoje.length > 0 ? `${pagVencendoHoje.length} lançamento${pagVencendoHoje.length!==1?"s":""} vence${pagVencendoHoje.length===1?"":"m"} hoje` : "Nada vencendo hoje"}
+          </p>
+        </button>
       </div>
 
       {/* ── Shipping Deadlines Panel ─────────────────────────────────── */}
@@ -13028,7 +13093,7 @@ function ERPApp({ currentUser, onLogout }) {
 
   const renderModule = () => {
     switch (active) {
-      case "dashboard": return <DashboardModule orders={orders} />;
+      case "dashboard": return <DashboardModule orders={orders} finance={finance} params={params} setActive={setActive} />;
       case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
