@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from "recharts";
 import mmErpLogoUrl from "./assets/mm-erp-logo.png";
 import {
   dbCountUsers, dbResetPasswordWithRecovery,
@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.23.3";
+const APP_VERSION = "3.24.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1797,6 +1797,24 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
   );
   const totalPagarHoje = pagVencendoHoje.reduce((s,f)=>s+(f.amount||0),0);
 
+  // ── Produtos mais vendidos (por quantidade, exclui Cancelado/Devolvido) ──
+  const PIE_COLORS = ["#6366f1","#8b5cf6","#ec4899","#f59e0b","#10b981","#06b6d4","#94a3b8"];
+  const topProducts = (() => {
+    const qtyByName = {};
+    orders.forEach(o => {
+      if (o.status === "Cancelado" || o.status === "Devolvido") return;
+      (o.itemsList||[]).forEach(it => {
+        const name = it.description || it.sku || "Sem nome";
+        qtyByName[name] = (qtyByName[name]||0) + (Number(it.qty)||0);
+      });
+    });
+    const sorted = Object.entries(qtyByName).sort((a,b)=>b[1]-a[1]).filter(([,q])=>q>0);
+    const top = sorted.slice(0,6).map(([name,qty])=>({name,qty}));
+    const restoQty = sorted.slice(6).reduce((s,[,q])=>s+q,0);
+    if (restoQty > 0) top.push({name:"Outros", qty:restoQty});
+    return top;
+  })();
+
   // ── Shipping deadline logic ──────────────────────────────────────────────
   const SHIP_SLA = { "Mercado Livre":3, "Shopee":2, "WhatsApp":2, "Loja Própria":3 };
 
@@ -2023,6 +2041,37 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
           </div>
         </div>
       </div>
+
+      {/* ── Produtos Mais Vendidos ───────────────────────────────────── */}
+      {topProducts.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+          <h3 className="font-bold text-gray-800 text-sm mb-1">🥧 Produtos Mais Vendidos</h3>
+          <p className="text-xs text-gray-400 mb-3">Por quantidade — exclui pedidos Cancelados/Devolvidos</p>
+          <div className="flex flex-col md:flex-row items-center gap-4">
+            <div style={{ width: "100%", maxWidth: 260, height: 220 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={topProducts} dataKey="qty" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2}>
+                    {topProducts.map((entry, i) => <Cell key={entry.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={(value)=>[`${value} un`, "Quantidade"]}/>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex-1 w-full space-y-1.5">
+              {topProducts.map((p, i) => (
+                <div key={p.name} className="flex items-center justify-between text-xs gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}/>
+                    <span className="text-gray-700 truncate">{p.name}</span>
+                  </div>
+                  <span className="font-semibold text-gray-800 shrink-0">{p.qty} un</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Channel Performance ─────────────────────────────────────── */}
       {(() => {
