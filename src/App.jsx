@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.22.1";
+const APP_VERSION = "3.22.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2435,8 +2435,12 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
         const diffDays = (a,b) => Math.round((a-b)/86400000);
         const multaPct = params?.vendas?.multaAtrasoPercent ?? 2;
         const jurosPctMes = params?.vendas?.jurosAtrasoPercentMes ?? 1;
+        // Só entra em Contas a Receber quem já foi faturado (tem NF emitida
+        // ou simulada) — igual ao critério usado em Contas a Pagar, que só
+        // considera pedidos de compra já baixados. Um pedido "Novo" ainda
+        // não é uma dívida certa do cliente.
         const recItems = (orders||[])
-          .filter(o => o.status !== "Cancelado" && (showPaidRec ? true : !o.paidDate))
+          .filter(o => o.status !== "Cancelado" && !!o.nfNumero && (showPaidRec ? true : !o.paidDate))
           .map(o => {
             const due = o.dueDate ? new Date(o.dueDate+"T12:00:00") : null;
             if (due) due.setHours(0,0,0,0);
