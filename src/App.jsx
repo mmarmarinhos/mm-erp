@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.24.3";
+const APP_VERSION = "3.24.4";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2002,27 +2002,6 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
             </p>
           </div>
         )}
-      </div>
-
-      <div>
-        {/* Recent orders */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-          <h3 className="font-semibold text-gray-700 text-sm mb-3">Pedidos Recentes</h3>
-          <div className="space-y-2">
-            {recent.map(o => (
-              <div key={o.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
-                <div>
-                  <span className="font-mono text-xs text-indigo-600 font-semibold">{o.id}</span>
-                  <span className="text-xs text-gray-600 ml-2">{o.customer}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge label={o.status} style={STATUS_STYLES[o.status]} />
-                  <span className="text-xs font-semibold text-gray-800">{fmt(o.total)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* ── Produtos Mais Vendidos + Canais com Mais Venda ──────────────── */}
