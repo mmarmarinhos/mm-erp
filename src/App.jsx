@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.24.7";
+const APP_VERSION = "3.24.8";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1845,7 +1845,7 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
   const pendingOrders = orders
     .filter(o => o.status === "Novo" || o.status === "Em Separação")
     .map(o => {
-      const sla      = SHIP_SLA[o.channel] || 3;
+      const sla      = params?.canais?.[o.channel]?.sla ?? SHIP_SLA[o.channel] ?? 3;
       const deadline = addBizDays(o.date, sla);
       const diffDays = Math.floor((deadline - todayDate) / 86400000);
       const deadlineStr = deadline.toLocaleDateString("pt-BR", { weekday:"short", day:"2-digit", month:"2-digit" });
@@ -1964,7 +1964,7 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
         {pendingOrders.length > 0 && (
           <div className="px-5 py-2.5 bg-gray-50 border-t border-gray-100">
             <p className="text-[10px] text-gray-400">
-              SLA padrão: ML = 3 dias úteis · Shopee = 2 dias úteis · WhatsApp / Loja = 2-3 dias úteis · Fins de semana não contam
+              SLA (Parâmetros → Canais): {CHANNELS.map(c => `${c} = ${params?.canais?.[c]?.sla ?? SHIP_SLA[c] ?? 3}d`).join(" · ")} · Dias úteis, fins de semana não contam
             </p>
           </div>
         )}
