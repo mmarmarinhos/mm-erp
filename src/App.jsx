@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.24.8";
+const APP_VERSION = "3.25.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -7188,29 +7188,30 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
     (p.sku||"").toLowerCase().includes(tSearch.toLowerCase()))
   );
 
-  // channelPrices[ch] = { price, margin, freight, taxaPerc, otherCosts, qtd }
+  // channelPrices[ch] = { price, margin, freight, taxaPerc, taxaFixa, otherCosts, qtd }
   const getData = (p, ch) => {
     const raw = p.channelPrices?.[ch];
-    // Taxa parte já preenchida com a comissão configurada em Parâmetros → Canais
-    // (só como ponto de partida — uma vez que o produto tem um valor salvo,
-    // mesmo que seja 0, esse valor prevalece e não é mais sobrescrito).
+    // Taxa parte já preenchida com a comissão/taxa fixa configuradas em
+    // Parâmetros → Canais (só como ponto de partida — uma vez que o produto
+    // tem um valor salvo, mesmo que seja 0, esse valor prevalece).
     const taxaPadrao = params?.canais?.[ch]?.comissao || 0;
-    if (!raw) return { price:0, margin:0, freight:0, taxaPerc:taxaPadrao, otherCosts:0, qtd:1 };
-    if (typeof raw === "number") return { price:raw, margin:0, freight:0, taxaPerc:taxaPadrao, otherCosts:0, qtd:1 };
-    return { price:raw.price||0, margin:raw.margin||0, freight:raw.freight||0, taxaPerc:raw.taxaPerc??taxaPadrao, otherCosts:raw.otherCosts||0, qtd:raw.qtd||1 };
+    const taxaFixaPadrao = params?.canais?.[ch]?.taxaFixa || 0;
+    if (!raw) return { price:0, margin:0, freight:0, taxaPerc:taxaPadrao, taxaFixa:taxaFixaPadrao, otherCosts:0, qtd:1 };
+    if (typeof raw === "number") return { price:raw, margin:0, freight:0, taxaPerc:taxaPadrao, taxaFixa:taxaFixaPadrao, otherCosts:0, qtd:1 };
+    return { price:raw.price||0, margin:raw.margin||0, freight:raw.freight||0, taxaPerc:raw.taxaPerc??taxaPadrao, taxaFixa:raw.taxaFixa??taxaFixaPadrao, otherCosts:raw.otherCosts||0, qtd:raw.qtd||1 };
   };
 
   // custoBase = custo_unitario × qtd
-  // price = (custoBase + freight + otherCosts) / (1 - margin/100 - taxaPerc/100)
-  // margin = ((price × (1 - taxaPerc/100)) - custoBase - freight - otherCosts) / price * 100
-  const calcPrice = (custoBase, margin, freight, taxaPerc, otherCosts) => {
+  // price = (custoBase + freight + otherCosts + taxaFixa) / (1 - margin/100 - taxaPerc/100)
+  // margin = ((price × (1 - taxaPerc/100)) - taxaFixa - custoBase - freight - otherCosts) / price * 100
+  const calcPrice = (custoBase, margin, freight, taxaPerc, otherCosts, taxaFixa=0) => {
     const denom = 1 - (margin/100) - (taxaPerc/100);
     if (denom <= 0) return 0;
-    return parseFloat(((custoBase + freight + otherCosts) / denom).toFixed(2));
+    return parseFloat(((custoBase + freight + otherCosts + taxaFixa) / denom).toFixed(2));
   };
-  const calcMargin = (price, custoBase, freight, taxaPerc, otherCosts) => {
+  const calcMargin = (price, custoBase, freight, taxaPerc, otherCosts, taxaFixa=0) => {
     if (price <= 0) return 0;
-    return parseFloat((((price * (1 - taxaPerc/100)) - custoBase - freight - otherCosts) / price * 100).toFixed(1));
+    return parseFloat((((price * (1 - taxaPerc/100)) - taxaFixa - custoBase - freight - otherCosts) / price * 100).toFixed(1));
   };
 
   const setField = (productId, ch, field, value) => {
@@ -7226,19 +7227,19 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
 
       if (field === "price") {
         // Preço digitado → recalcula margem
-        updated.margin = calcMargin(sn(updated.price), custoBase, sn(updated.freight), sn(updated.taxaPerc), sn(updated.otherCosts));
+        updated.margin = calcMargin(sn(updated.price), custoBase, sn(updated.freight), sn(updated.taxaPerc), sn(updated.otherCosts), sn(updated.taxaFixa));
       } else if (field === "margin") {
         // Margem digitada (incluindo 0) → recalcula preço apenas se margem > 0
         if (sn(numVal) > 0) {
-          updated.price = calcPrice(custoBase, sn(numVal), sn(updated.freight), sn(updated.taxaPerc), sn(updated.otherCosts));
+          updated.price = calcPrice(custoBase, sn(numVal), sn(updated.freight), sn(updated.taxaPerc), sn(updated.otherCosts), sn(updated.taxaFixa));
         }
         // Se margem = 0, mantém o preço atual sem recalcular
       } else {
         // Qtd, frete, taxa, outros → recalcula preço se já tem margem definida, senão recalcula margem
         if (sn(updated.margin) > 0) {
-          updated.price = calcPrice(custoBase, sn(updated.margin), sn(updated.freight), sn(updated.taxaPerc), sn(updated.otherCosts));
+          updated.price = calcPrice(custoBase, sn(updated.margin), sn(updated.freight), sn(updated.taxaPerc), sn(updated.otherCosts), sn(updated.taxaFixa));
         } else if (sn(updated.price) > 0) {
-          updated.margin = calcMargin(sn(updated.price), custoBase, sn(updated.freight), sn(updated.taxaPerc), sn(updated.otherCosts));
+          updated.margin = calcMargin(sn(updated.price), custoBase, sn(updated.freight), sn(updated.taxaPerc), sn(updated.otherCosts), sn(updated.taxaFixa));
         }
       }
 
@@ -7269,26 +7270,28 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
         const pd  = getData(parent, ch);
         const cur = getData(x, ch);
         const custoBase = variantCost * (cur.qtd||1);
-        const price = pd.margin>0 ? calcPrice(custoBase, pd.margin, pd.freight, pd.taxaPerc, pd.otherCosts) : cur.price;
-        newChannelPrices[ch] = { ...cur, margin:pd.margin, freight:pd.freight, taxaPerc:pd.taxaPerc, otherCosts:pd.otherCosts, price };
+        const price = pd.margin>0 ? calcPrice(custoBase, pd.margin, pd.freight, pd.taxaPerc, pd.otherCosts, pd.taxaFixa) : cur.price;
+        newChannelPrices[ch] = { ...cur, margin:pd.margin, freight:pd.freight, taxaPerc:pd.taxaPerc, taxaFixa:pd.taxaFixa, otherCosts:pd.otherCosts, price };
       });
       return { ...x, channelPrices: newChannelPrices };
     }));
   };
 
-  // Conta quantos produto×canal têm taxa salva diferente da comissão atual
-  // configurada em Parâmetros → Canais (só considera canais com comissão
-  // configurada e produtos que já têm preço salvo pra aquele canal).
+  // Conta quantos produto×canal têm taxa (percentual ou fixa) salva diferente
+  // da configurada em Parâmetros → Canais (só considera canais configurados e
+  // produtos que já têm preço salvo pra aquele canal).
   const taxasDesatualizadas = useMemo(() => {
     const lista = [];
     products.forEach(p => {
       CHANNELS.forEach(ch => {
-        const taxaAtual = params?.canais?.[ch]?.comissao;
-        if (taxaAtual == null) return;
+        const cfgCanal = params?.canais?.[ch];
+        if (!cfgCanal) return;
         const raw = p.channelPrices?.[ch];
         if (!raw) return; // canal ainda não configurado pra esse produto — nada a sincronizar
         const d = getData(p, ch);
-        if (Number(d.taxaPerc) !== Number(taxaAtual)) lista.push({ productId: p.id, ch });
+        const taxaAtual = cfgCanal.comissao ?? 0;
+        const fixaAtual = cfgCanal.taxaFixa ?? 0;
+        if (Number(d.taxaPerc) !== Number(taxaAtual) || Number(d.taxaFixa||0) !== Number(fixaAtual)) lista.push({ productId: p.id, ch });
       });
     });
     return lista;
@@ -7301,19 +7304,21 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
       let changed = false;
       const newChannelPrices = { ...(p.channelPrices||{}) };
       CHANNELS.forEach(ch => {
-        const taxaAtual = params?.canais?.[ch]?.comissao;
-        if (taxaAtual == null) return;
+        const cfgCanal = params?.canais?.[ch];
+        if (!cfgCanal) return;
         const raw = p.channelPrices?.[ch];
         if (!raw) return;
         const cur = getData(p, ch);
-        if (Number(cur.taxaPerc) === Number(taxaAtual)) return;
+        const taxaAtual = cfgCanal.comissao ?? 0;
+        const fixaAtual = cfgCanal.taxaFixa ?? 0;
+        if (Number(cur.taxaPerc) === Number(taxaAtual) && Number(cur.taxaFixa||0) === Number(fixaAtual)) return;
         changed = true;
         const custoBase = unitCost * (cur.qtd||1);
-        const updated = { ...cur, taxaPerc: taxaAtual };
+        const updated = { ...cur, taxaPerc: taxaAtual, taxaFixa: fixaAtual };
         if (Number(cur.margin) > 0) {
-          updated.price = calcPrice(custoBase, Number(cur.margin), Number(cur.freight), taxaAtual, Number(cur.otherCosts));
+          updated.price = calcPrice(custoBase, Number(cur.margin), Number(cur.freight), taxaAtual, Number(cur.otherCosts), fixaAtual);
         } else if (Number(cur.price) > 0) {
-          updated.margin = calcMargin(Number(cur.price), custoBase, Number(cur.freight), taxaAtual, Number(cur.otherCosts));
+          updated.margin = calcMargin(Number(cur.price), custoBase, Number(cur.freight), taxaAtual, Number(cur.otherCosts), fixaAtual);
         }
         newChannelPrices[ch] = updated;
       });
@@ -7351,7 +7356,7 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
             <p className="text-2xl mb-2">🔄</p>
             <h3 className="font-bold text-gray-900 mb-1">Sincronizar taxas?</h3>
             <p className="text-sm text-gray-500 mb-4">
-              {taxasDesatualizadas.length} combinação(ões) de produto × canal serão atualizadas com a comissão atual de Parâmetros. O preço e a margem de cada uma serão recalculados automaticamente.
+              {taxasDesatualizadas.length} combinação(ões) de produto × canal serão atualizadas com a comissão e a taxa fixa atuais de Parâmetros. O preço e a margem de cada uma serão recalculados automaticamente.
             </p>
             <div className="flex gap-2">
               <button onClick={()=>setSyncConfirm(false)} className="flex-1 py-2 border border-gray-200 rounded-xl text-sm">Cancelar</button>
@@ -7506,7 +7511,7 @@ const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHA
                     </div>
                   </div>
                   {/* Frete + Taxa + Outros */}
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <div>
                       <label className="text-[10px] font-semibold text-gray-400 uppercase block mb-1">🚚 Frete</label>
                       <div className="flex items-center gap-0.5">
@@ -7538,6 +7543,29 @@ const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHA
                           value={d.taxaPerc===0?"":d.taxaPerc} placeholder="0" onChange={e=>setField(p.id, ch, "taxaPerc", e.target.value)}
                           onBlur={()=>setFieldBlur(p.id, ch, "taxaPerc")}/>
                         <span className="text-[10px] text-gray-400">%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1 mb-1">
+                        <label className="text-[10px] font-semibold text-gray-400 uppercase" title="Valor fixo em R$ configurado em Parâmetros → Canais. Pode editar aqui pra uma exceção nesse produto.">💵 Tx.Fixa</label>
+                        {(() => {
+                          const fixaAtual = params?.canais?.[ch]?.taxaFixa;
+                          const desatualizada = fixaAtual != null && Number(d.taxaFixa||0) !== Number(fixaAtual);
+                          if (!desatualizada) return null;
+                          return (
+                            <button type="button"
+                              onClick={()=>setField(p.id, ch, "taxaFixa", String(fixaAtual))}
+                              title={`Taxa fixa atual em Parâmetros: R$ ${fixaAtual} (diferente do salvo aqui: R$ ${d.taxaFixa||0}). Clique pra usar a atual.`}
+                              className="text-amber-500 hover:text-amber-600 text-xs leading-none">⚠️</button>
+                          );
+                        })()}
+                      </div>
+                      <div className="flex items-center gap-0.5">
+                        <span className="text-[10px] text-gray-400">R$</span>
+                        <input type="number" min="0" step="0.01"
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300 text-right"
+                          value={d.taxaFixa===0?"":d.taxaFixa} placeholder="0" onChange={e=>setField(p.id, ch, "taxaFixa", e.target.value)}
+                          onBlur={()=>setFieldBlur(p.id, ch, "taxaFixa")}/>
                       </div>
                     </div>
                     <div>
@@ -10228,10 +10256,10 @@ async function saveFormasPagamento(list) {
 const PARAMS_KEY = "erp-mmarmarinhos-params";
 const PARAMS_DEFAULT = {
   canais: {
-    "Mercado Livre": { comissao: 12,  gateway: 3.5, ativo: true, sla: 3 },
-    "Shopee":        { comissao: 14,  gateway: 2.0, ativo: true, sla: 2 },
-    "WhatsApp":      { comissao: 0,   gateway: 0,   ativo: true, sla: 2 },
-    "Loja Própria":  { comissao: 0,   gateway: 2.5, ativo: true, sla: 3 },
+    "Mercado Livre": { comissao: 12,  gateway: 3.5, ativo: true, sla: 3, taxaFixa: 0 },
+    "Shopee":        { comissao: 14,  gateway: 2.0, ativo: true, sla: 2, taxaFixa: 0 },
+    "WhatsApp":      { comissao: 0,   gateway: 0,   ativo: true, sla: 2, taxaFixa: 0 },
+    "Loja Própria":  { comissao: 0,   gateway: 2.5, ativo: true, sla: 3, taxaFixa: 0 },
   },
   alertas: { diasInatividade: 30, emailAlertas: "" },
   sincronizacao: {
@@ -12235,8 +12263,10 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
             💡 Taxas de referência para precificação. O mini-simulador mostra o custo real para um produto de R$ 100.
           </div>
           {CHANNELS.map(ch => {
-            const cfg = canais[ch] || PARAMS_DEFAULT.canais[ch] || { comissao:0, gateway:0, ativo:true, sla:3 };
+            const cfg = canais[ch] || PARAMS_DEFAULT.canais[ch] || { comissao:0, gateway:0, ativo:true, sla:3, taxaFixa:0 };
             const taxa = (cfg.comissao||0) + (cfg.gateway||0);
+            const taxaFixa = cfg.taxaFixa||0;
+            const taxaTotalReais = (100 * taxa/100) + taxaFixa;
             return (
               <div key={ch} className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-opacity ${!cfg.ativo?"opacity-55":""}`}>
                 <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50">
@@ -12244,7 +12274,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                     <span className={`w-2.5 h-2.5 rounded-full ${CHANNEL_DOT_COLOR[ch]}`}/>
                     <span className="font-semibold text-gray-800 text-sm">{CHANNEL_EMOJI_MAP[ch]} {ch}</span>
                     <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
-                      total: <b>{taxa.toFixed(1)}%</b>
+                      total: <b>{taxa.toFixed(1)}%</b>{taxaFixa>0 && <> + <b>R$ {taxaFixa.toFixed(2).replace(".",",")}</b></>}
                     </span>
                   </div>
                   <button onClick={()=>setC(ch,"ativo",!cfg.ativo)}
@@ -12252,7 +12282,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                     {cfg.ativo?"● Ativo":"○ Inativo"}
                   </button>
                 </div>
-                <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div>
                     <label className="text-xs text-gray-500 block mb-1.5 font-medium">Comissão marketplace</label>
                     <div className="flex items-center gap-1">
@@ -12276,6 +12306,17 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                     </div>
                   </div>
                   <div>
+                    <label className="text-xs text-gray-500 block mb-1.5 font-medium" title="Valor fixo em reais cobrado por venda, além do percentual — ex: taxa fixa do Mercado Livre em itens de baixo valor.">Taxa Fixa (R$)</label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-400">R$</span>
+                      <input type="number" min="0" step="0.01"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        value={cfg.taxaFixa===0?"":cfg.taxaFixa}
+                        onChange={e=>setC(ch,"taxaFixa", e.target.value==="" ? "" : parseFloat(e.target.value))}
+                        onBlur={e=>{ if (e.target.value==="") setC(ch,"taxaFixa",0); }}/>
+                    </div>
+                  </div>
+                  <div>
                     <label className="text-xs text-gray-500 block mb-1.5 font-medium">SLA postagem (dias úteis)</label>
                     <input type="number" min="1" max="10"
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
@@ -12288,9 +12329,9 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                     <div className="bg-indigo-50 rounded-xl p-2.5 text-center">
                       <p className="text-[10px] text-gray-400">taxas totais</p>
                       <p className="font-bold text-indigo-700 text-lg leading-none mt-0.5">
-                        − R$ {taxa.toFixed(2).replace(".",",")}
+                        − R$ {taxaTotalReais.toFixed(2).replace(".",",")}
                       </p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">sobram R$ {(100-taxa).toFixed(2).replace(".",",")}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">sobram R$ {(100-taxaTotalReais).toFixed(2).replace(".",",")}</p>
                     </div>
                   </div>
                 </div>
