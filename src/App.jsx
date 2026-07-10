@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.23.0";
+const APP_VERSION = "3.23.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1840,15 +1840,22 @@ const DashboardModule = ({ orders, finance = [], params, setActive }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <button onClick={()=>setActive && setActive("receber")}
           className="text-left bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-green-200 transition-colors">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-semibold text-gray-700">💰 Contas a Receber</p>
             <span className="text-[10px] text-indigo-500 font-medium">Ver tudo →</span>
           </div>
-          <p className="text-2xl font-bold text-green-700 mt-2">{fmt(totalReceber)}</p>
-          <p className="text-[11px] text-gray-400 mt-0.5">{recPend.length} pedido{recPend.length!==1?"s":""} pendente{recPend.length!==1?"s":""}</p>
-          {recVencidos.length > 0 && (
-            <p className="text-[11px] text-red-600 font-medium mt-1">🔴 {recVencidos.length} vencido{recVencidos.length!==1?"s":""} · {fmt(totalReceberVencido)}</p>
-          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[11px] text-gray-400">Total pendente</p>
+              <p className="text-xl font-bold text-green-700">{fmt(totalReceber)}</p>
+              <p className="text-[10px] text-gray-400">{recPend.length} pedido{recPend.length!==1?"s":""}</p>
+            </div>
+            <div className={`rounded-xl px-2.5 py-1.5 ${recVencidos.length>0?"bg-red-50":"bg-gray-50"}`}>
+              <p className={`text-[11px] ${recVencidos.length>0?"text-red-600":"text-gray-400"}`}>🔴 Vencido</p>
+              <p className={`text-xl font-bold ${recVencidos.length>0?"text-red-600":"text-gray-400"}`}>{fmt(totalReceberVencido)}</p>
+              <p className={`text-[10px] ${recVencidos.length>0?"text-red-500":"text-gray-400"}`}>{recVencidos.length} pedido{recVencidos.length!==1?"s":""}</p>
+            </div>
+          </div>
         </button>
         <button onClick={()=>setActive && setActive("pagar")}
           className="text-left bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-red-200 transition-colors">
