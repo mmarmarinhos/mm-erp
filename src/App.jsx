@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.24.4";
+const APP_VERSION = "3.24.5";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -2060,50 +2060,6 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
           </div>
         </div>
       )}
-
-      {/* ── Channel Performance ─────────────────────────────────────── */}
-      {(() => {
-        const chStats = CHANNELS.map(ch => {
-          const chOrds = orders.filter(o => o.channel === ch && o.status !== "Cancelado" && o.status !== "Devolvido");
-          const rev = chOrds.reduce((s,o)=>s+o.total,0);
-          const devolvidos = orders.filter(o => o.channel === ch && o.status === "Devolvido").length;
-          return { ch, count: chOrds.length, rev, ticket: chOrds.length > 0 ? rev/chOrds.length : 0, devolvidos };
-        }).filter(c => c.count > 0 || c.devolvidos > 0);
-        const maxRev = Math.max(...chStats.map(c=>c.rev), 1);
-        if (chStats.length === 0) return null;
-        return (
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="font-bold text-gray-800 text-sm">📊 Performance por Canal</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Receita, ticket médio e volume por canal de venda</p>
-              </div>
-            </div>
-            <div className="space-y-4">
-              {chStats.sort((a,b)=>b.rev-a.rev).map(({ch, count, rev, ticket, devolvidos}) => {
-                const pct = maxRev > 0 ? rev/maxRev*100 : 0;
-                const s = CHANNEL_STYLES[ch]||{bg:"bg-gray-100",text:"text-gray-600"};
-                return (
-                  <div key={ch}>
-                    <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${s.bg} ${s.text}`}>{ch}</span>
-                      <div className="flex gap-3 items-center text-xs">
-                        <span className="text-gray-400">{count} pedido{count!==1?"s":""}</span>
-                        {devolvidos > 0 && <span className="text-purple-500 font-medium">{devolvidos} devol.</span>}
-                        <span className="text-gray-500">TM {ticket>0?fmt(ticket):"—"}</span>
-                        <span className="font-bold text-gray-800">{fmt(rev)}</span>
-                      </div>
-                    </div>
-                    <div className="bg-gray-100 rounded-full h-2.5">
-                      <div className="bg-indigo-500 h-2.5 rounded-full transition-all" style={{width:`${pct}%`}}/>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 };
