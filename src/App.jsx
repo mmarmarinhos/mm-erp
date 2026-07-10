@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.24.0";
+const APP_VERSION = "3.24.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1815,6 +1815,17 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
     return top;
   })();
 
+  // ── Canais com mais venda (por valor, exclui Cancelado/Devolvido) ────────
+  const topChannels = (() => {
+    const valByChannel = {};
+    orders.forEach(o => {
+      if (o.status === "Cancelado" || o.status === "Devolvido") return;
+      const ch = o.channel || "Sem canal";
+      valByChannel[ch] = (valByChannel[ch]||0) + (Number(o.total)||0);
+    });
+    return Object.entries(valByChannel).sort((a,b)=>b[1]-a[1]).filter(([,v])=>v>0).map(([name,value])=>({name,value}));
+  })();
+
   // ── Shipping deadline logic ──────────────────────────────────────────────
   const SHIP_SLA = { "Mercado Livre":3, "Shopee":2, "WhatsApp":2, "Loja Própria":3 };
 
@@ -2042,33 +2053,68 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
         </div>
       </div>
 
-      {/* ── Produtos Mais Vendidos ───────────────────────────────────── */}
-      {topProducts.length > 0 && (
+      {/* ── Produtos Mais Vendidos + Canais com Mais Venda ──────────────── */}
+      {(topProducts.length > 0 || topChannels.length > 0) && (
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-          <h3 className="font-bold text-gray-800 text-sm mb-1">🥧 Produtos Mais Vendidos</h3>
-          <p className="text-xs text-gray-400 mb-3">Por quantidade — exclui pedidos Cancelados/Devolvidos</p>
-          <div className="flex flex-col md:flex-row items-center gap-4">
-            <div style={{ width: "100%", maxWidth: 260, height: 220 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={topProducts} dataKey="qty" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2}>
-                    {topProducts.map((entry, i) => <Cell key={entry.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={(value)=>[`${value} un`, "Quantidade"]}/>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex-1 w-full space-y-1.5">
-              {topProducts.map((p, i) => (
-                <div key={p.name} className="flex items-center justify-between text-xs gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}/>
-                    <span className="text-gray-700 truncate">{p.name}</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {topProducts.length > 0 && (
+              <div>
+                <h3 className="font-bold text-gray-800 text-sm mb-1">🥧 Produtos Mais Vendidos</h3>
+                <p className="text-xs text-gray-400 mb-3">Por quantidade — exclui Cancelados/Devolvidos</p>
+                <div className="flex flex-col items-center gap-3">
+                  <div style={{ width: "100%", maxWidth: 220, height: 200 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={topProducts} dataKey="qty" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={80} paddingAngle={2}>
+                          {topProducts.map((entry, i) => <Cell key={entry.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip formatter={(value)=>[`${value} un`, "Quantidade"]}/>
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
-                  <span className="font-semibold text-gray-800 shrink-0">{p.qty} un</span>
+                  <div className="w-full space-y-1.5">
+                    {topProducts.map((p, i) => (
+                      <div key={p.name} className="flex items-center justify-between text-xs gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}/>
+                          <span className="text-gray-700 truncate">{p.name}</span>
+                        </div>
+                        <span className="font-semibold text-gray-800 shrink-0">{p.qty} un</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+            {topChannels.length > 0 && (
+              <div>
+                <h3 className="font-bold text-gray-800 text-sm mb-1">🛒 Canais com Mais Venda</h3>
+                <p className="text-xs text-gray-400 mb-3">Por valor vendido — exclui Cancelados/Devolvidos</p>
+                <div className="flex flex-col items-center gap-3">
+                  <div style={{ width: "100%", maxWidth: 220, height: 200 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={topChannels} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={80} paddingAngle={2}>
+                          {topChannels.map((entry, i) => <Cell key={entry.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip formatter={(value)=>[fmt(value), "Vendido"]}/>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="w-full space-y-1.5">
+                    {topChannels.map((c, i) => (
+                      <div key={c.name} className="flex items-center justify-between text-xs gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}/>
+                          <span className="text-gray-700 truncate">{c.name}</span>
+                        </div>
+                        <span className="font-semibold text-gray-800 shrink-0">{fmt(c.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
