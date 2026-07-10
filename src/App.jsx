@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.23.2";
+const APP_VERSION = "3.23.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1160,6 +1160,8 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
     const matchChannel = filterChannel === "Todos" || o.channel === filterChannel;
     const matchStatus  = filterStatus === "Todos" ? true
       : filterStatus === "A_ENVIAR" ? (o.status === "Novo" || o.status === "Em Separação")
+      : filterStatus === "EM_ABERTO_FAT" ? (!o.nfNumero && o.status !== "Cancelado")
+      : filterStatus === "FATURADOS" ? !!o.nfNumero
       : o.status === filterStatus;
     return matchSearch && matchChannel && matchStatus && filterByDate(o);
   }).sort((a, b) => {
@@ -1445,10 +1447,23 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
         })}
       </div>
 
-      {filterStatus === "A_ENVIAR" && (
-        <div className="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-xl px-4 py-2.5">
-          <p className="text-sm text-purple-700 font-medium">📦 Filtro: pedidos a enviar (Novo + Em Separação)</p>
-          <button onClick={()=>setFilterStatus("Todos")} className="text-purple-500 hover:text-purple-700 text-xs font-semibold">✕ Limpar</button>
+      {["A_ENVIAR","EM_ABERTO_FAT","FATURADOS"].includes(filterStatus) && (
+        <div className={`flex items-center justify-between border rounded-xl px-4 py-2.5 ${
+          filterStatus==="A_ENVIAR" ? "bg-purple-50 border-purple-200" :
+          filterStatus==="EM_ABERTO_FAT" ? "bg-gray-50 border-gray-200" :
+          "bg-emerald-50 border-emerald-200"}`}>
+          <p className={`text-sm font-medium ${
+            filterStatus==="A_ENVIAR" ? "text-purple-700" :
+            filterStatus==="EM_ABERTO_FAT" ? "text-gray-700" :
+            "text-emerald-700"}`}>
+            {filterStatus==="A_ENVIAR" && "📦 Filtro: pedidos a enviar (Novo + Em Separação)"}
+            {filterStatus==="EM_ABERTO_FAT" && "📂 Filtro: pedidos ainda não faturados"}
+            {filterStatus==="FATURADOS" && "🧾 Filtro: pedidos já faturados (com NF)"}
+          </p>
+          <button onClick={()=>setFilterStatus("Todos")} className={`text-xs font-semibold ${
+            filterStatus==="A_ENVIAR" ? "text-purple-500 hover:text-purple-700" :
+            filterStatus==="EM_ABERTO_FAT" ? "text-gray-500 hover:text-gray-700" :
+            "text-emerald-500 hover:text-emerald-700"}`}>✕ Limpar</button>
         </div>
       )}
 
@@ -1751,7 +1766,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
 };
 
 // ─── Dashboard Module ─────────────────────────────────────────────────────
-const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnviar }) => {
+const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnviar, onGoToEmAberto, onGoToFaturados }) => {
   const total = orders.reduce((s, o) => s + o.total, 0);
   const countByStatus = ORDER_STATUSES.reduce((acc, s) => {
     acc[s] = orders.filter(o => o.status === s).length;
@@ -1836,16 +1851,16 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
 
       {/* ── 1) Pedidos em Aberto / Faturados / A Enviar ─────────────────── */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+        <button onClick={onGoToEmAberto} className="text-left bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-gray-300 transition-colors">
           <p className="text-xs text-gray-400 font-medium">📂 Em Aberto</p>
           <p className="text-2xl font-bold text-gray-800 mt-1">{pedidosEmAberto}</p>
           <p className="text-[11px] text-gray-400 mt-0.5">ainda não faturados</p>
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+        </button>
+        <button onClick={onGoToFaturados} className="text-left bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-emerald-200 transition-colors">
           <p className="text-xs text-gray-400 font-medium">🧾 Faturados</p>
           <p className="text-2xl font-bold text-emerald-600 mt-1">{pedidosFaturados}</p>
           <p className="text-[11px] text-gray-400 mt-0.5">com NF emitida</p>
-        </div>
+        </button>
         <button onClick={onGoToAEnviar} className="text-left bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-purple-200 transition-colors">
           <p className="text-xs text-gray-400 font-medium">📦 A Enviar</p>
           <p className="text-2xl font-bold text-purple-600 mt-1">{pedidosAEnviar}</p>
@@ -13118,7 +13133,10 @@ function ERPApp({ currentUser, onLogout }) {
 
   const renderModule = () => {
     switch (active) {
-      case "dashboard": return <DashboardModule orders={orders} finance={finance} params={params} setActive={setActive} onGoToAEnviar={()=>{ setInitialOrdersFilter("A_ENVIAR"); setActive("orders"); }} />;
+      case "dashboard": return <DashboardModule orders={orders} finance={finance} params={params} setActive={setActive}
+        onGoToAEnviar={()=>{ setInitialOrdersFilter("A_ENVIAR"); setActive("orders"); }}
+        onGoToEmAberto={()=>{ setInitialOrdersFilter("EM_ABERTO_FAT"); setActive("orders"); }}
+        onGoToFaturados={()=>{ setInitialOrdersFilter("FATURADOS"); setActive("orders"); }} />;
       case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)} initialStatusFilter={initialOrdersFilter} onConsumeStatusFilter={()=>setInitialOrdersFilter(null)}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
