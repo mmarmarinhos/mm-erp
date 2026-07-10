@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.24.5";
+const APP_VERSION = "3.24.6";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
@@ -1881,17 +1881,17 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
       {/* ── 1) Pedidos em Aberto / Faturados / A Enviar ─────────────────── */}
       <div className="grid grid-cols-3 gap-3">
         <button onClick={onGoToEmAberto} className="text-left bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-gray-300 transition-colors">
-          <p className="text-xs text-gray-400 font-medium">📂 Em Aberto</p>
+          <p className="text-xs text-gray-400 font-medium">📂 Pedidos em Aberto</p>
           <p className="text-2xl font-bold text-gray-800 mt-1">{pedidosEmAberto}</p>
           <p className="text-[11px] text-gray-400 mt-0.5">ainda não faturados</p>
         </button>
         <button onClick={onGoToFaturados} className="text-left bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-emerald-200 transition-colors">
-          <p className="text-xs text-gray-400 font-medium">🧾 Faturados</p>
+          <p className="text-xs text-gray-400 font-medium">🧾 Pedidos Faturados</p>
           <p className="text-2xl font-bold text-emerald-600 mt-1">{pedidosFaturados}</p>
           <p className="text-[11px] text-gray-400 mt-0.5">com NF emitida</p>
         </button>
         <button onClick={onGoToAEnviar} className="text-left bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-purple-200 transition-colors">
-          <p className="text-xs text-gray-400 font-medium">📦 A Enviar</p>
+          <p className="text-xs text-gray-400 font-medium">📦 Pedidos a Enviar</p>
           <p className="text-2xl font-bold text-purple-600 mt-1">{pedidosAEnviar}</p>
           <p className="text-[11px] text-gray-400 mt-0.5">Novo + Em Separação</p>
         </button>
