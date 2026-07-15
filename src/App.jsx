@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.29.1";
+const APP_VERSION = "3.29.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -11723,7 +11723,9 @@ const VariantCatalogModal = ({ catalog, onClose, onSave }) => {
 };
 
 // ─── MovimentosModule — Fechamento/Faturamento de Comissão dos Representantes ──
-const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFechamentos, finance=[], setFinance }) => {
+const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFechamentos, finance=[], setFinance, currentUser }) => {
+  const canIncluir = getUserPerm(currentUser, "movimentos", "incluir");
+  const canAlterar = getUserPerm(currentUser, "movimentos", "alterar");
   const [period, setPeriod] = useState(() => {
     const n = new Date();
     return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;
@@ -11763,6 +11765,7 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
   }, [orders, representantes, fechamentos, period]);
 
   const handleFaturar = (block) => {
+    if (!canIncluir) return; // segurança extra, além do botão já escondido
     if (faturando[block.rep.id] || block.fech) return;
     setFaturando(f=>({...f,[block.rep.id]:true}));
     const finNums = finance.map(f=>parseInt((f.id||"").replace("FIN-",""))||0);
@@ -11796,6 +11799,7 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
   };
 
   const handleReabrir = (block) => {
+    if (!canAlterar) return; // segurança extra, além do botão já escondido
     const fin = finance.find(f=>f.id===block.fech.finLancamentoId);
     if (fin && fin.status === "pago") {
       alert("O lançamento financeiro dessa comissão já foi marcado como pago no Financeiro. Reabrindo o fechamento aqui, mas o lançamento não será removido — ajuste manualmente se necessário.");
@@ -11907,14 +11911,14 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
                       {fechado ? (
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-gray-400">Faturado em {new Date(block.fech.dataFechamento+"T00:00:00").toLocaleDateString("pt-BR")} · lançamento {block.fech.finLancamentoId} em Contas a Pagar</span>
-                          <button onClick={()=>handleReabrir(block)} className="text-xs text-amber-600 hover:underline font-medium">Reabrir</button>
+                          {canAlterar && <button onClick={()=>handleReabrir(block)} className="text-xs text-amber-600 hover:underline font-medium">Reabrir</button>}
                         </div>
-                      ) : (
+                      ) : canIncluir ? (
                         <button onClick={()=>handleFaturar(block)} disabled={!!faturando[block.rep.id]}
                           className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
                           {faturando[block.rep.id] ? "Faturando..." : "🧾 Faturar"}
                         </button>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 )}
@@ -13457,7 +13461,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes} currentUser={currentUser}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
       case "reports":   return <ReportsModule orders={orders} finance={finance} customers={customers} suppliers={suppliers} purchases={purchases} products={products}/>;
-      case "movimentos": return <MovimentosModule orders={orders} representantes={representantes} fechamentos={fechamentos} setFechamentos={updateFechamentos} finance={finance} setFinance={updateFinance}/>;
+      case "movimentos": return <MovimentosModule orders={orders} representantes={representantes} fechamentos={fechamentos} setFechamentos={updateFechamentos} finance={finance} setFinance={updateFinance} currentUser={currentUser}/>;
       default: return null;
     }
   };
