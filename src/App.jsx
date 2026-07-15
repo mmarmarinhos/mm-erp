@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.26.3";
+const APP_VERSION = "3.27.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -4722,11 +4722,17 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
   , [finance, filterMode, period, dateFrom, dateTo]);
 
   const periodOrders = useMemo(() =>
-    orders.filter(o => o.status !== "Cancelado" && filterByDate(o.date))
+    // Só pedidos já FATURADOS entram como receita real — um pedido "Novo"
+    // sem NF emitida ainda não é uma venda concretizada (mesmo critério já
+    // usado em Contas a Receber e no Dashboard).
+    orders.filter(o => o.status !== "Cancelado" && !!o.nfNumero && filterByDate(o.date))
   , [orders, filterMode, period, dateFrom, dateTo]);
 
   const periodPurchases = useMemo(() =>
-    (purchases||[]).filter(p => p.status !== "Cancelado" && filterByDate(p.date))
+    // Só compras já BAIXADAS entram como despesa real — um pedido de compra
+    // "Em Aberto" ainda não chegou nem foi pago (mesmo critério já usado em
+    // Contas a Pagar).
+    (purchases||[]).filter(p => p.status === "Baixado" && filterByDate(p.date))
   , [purchases, filterMode, period, dateFrom, dateTo]);
 
   // KPIs
@@ -4750,15 +4756,18 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
       const d = new Date(base.getFullYear(), base.getMonth()-(5-i), 1);
       const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
       const txs = finance.filter(f=>f.status!=="cancelado"&&f.date.startsWith(key));
-      const ordMes = orders.filter(o=>o.status!=="Cancelado"&&(o.date||"").startsWith(key));
+      // Mesmo critério do resumo: só pedidos faturados e compras baixadas
+      const ordMes = orders.filter(o=>o.status!=="Cancelado"&&(o.nfNumero)&&(o.date||"").startsWith(key));
+      const pcMes  = (purchases||[]).filter(p=>p.status==="Baixado"&&(p.date||"").startsWith(key));
       return {
         label: d.toLocaleDateString("pt-BR",{month:"short"}).replace(".",""),
         receitas: txs.filter(f=>f.type==="receita").reduce((s,f)=>s+f.amount,0)
                 + ordMes.reduce((s,o)=>s+o.total,0),
-        despesas: txs.filter(f=>f.type==="despesa").reduce((s,f)=>s+f.amount,0),
+        despesas: txs.filter(f=>f.type==="despesa").reduce((s,f)=>s+f.amount,0)
+                + pcMes.reduce((s,p)=>s+(p.total||0),0),
       };
     });
-  }, [finance]);
+  }, [finance, orders, purchases]);
 
   // Revenue by channel (from finance categories)
   const channelRevData = useMemo(() => {
@@ -4786,12 +4795,16 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
   // Orders by status (all time)
   const statusData = ORDER_STATUSES.map(s => ({ label:s, count:orders.filter(o=>o.status===s).length }));
 
-  // DRE grouped by category
+  // DRE grouped by category — inclui pedidos faturados e compras baixadas
+  // como categorias próprias, pra bater com o total do Resumo (que soma os
+  // dois junto com os lançamentos financeiros manuais).
   const dreGroups = useMemo(() => {
     const g = {};
     activeFin.forEach(f => { if (!g[f.category]) g[f.category]={category:f.category,type:f.type,total:0}; g[f.category].total+=f.amount; });
+    if (receitasOrders > 0) g["Vendas (Pedidos)"] = { category:"Vendas (Pedidos)", type:"receita", total:receitasOrders };
+    if (despesasCompras > 0) g["Compras (Fornecedores)"] = { category:"Compras (Fornecedores)", type:"despesa", total:despesasCompras };
     return Object.values(g).sort((a,b)=>b.total-a.total);
-  }, [activeFin]);
+  }, [activeFin, receitasOrders, despesasCompras]);
   const dreReceitas = dreGroups.filter(g=>g.type==="receita");
   const dreDespesas = dreGroups.filter(g=>g.type==="despesa");
   const expenseChartData = dreDespesas.map(g=>({ label:g.category.length>20?g.category.slice(0,18)+"…":g.category, fullLabel:g.category, value:g.total }));
