@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.28.7";
+const APP_VERSION = "3.28.8";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -2356,7 +2356,13 @@ const FinPagModal = ({ item, onClose, onSave }) => {
   );
 };
 
-const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setPurchases, params, initialTab = "overview", onViewOrder }) => {
+const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setPurchases, params, initialTab = "overview", onViewOrder, currentUser }) => {
+  // receber e pagar são módulos de permissão separados, mas usam o mesmo
+  // componente — a permissão certa depende de qual aba a pessoa está.
+  const permModule = initialTab === "pagar" ? "pagar" : "receber";
+  const canIncluir = getUserPerm(currentUser, permModule, "incluir");
+  const canAlterar = getUserPerm(currentUser, permModule, "alterar");
+  const canExcluir = getUserPerm(currentUser, permModule, "excluir");
   const [tab, setTab]         = useState(initialTab);
   const [filterMode, setFilterMode] = useState("mes");  // mes | trimestre | ano | personalizado | todos
   const [period, setPeriod]   = useState(() => {
@@ -2538,6 +2544,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
   };
 
   const handleSave = (data) => {
+    if (data.id ? !canAlterar : !canIncluir) return; // segurança extra, além dos botões já escondidos
     if (data.id) {
       setFinance(prev => prev.map(t => t.id === data.id ? data : t));
     } else {
@@ -2547,6 +2554,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
   };
 
   const handleDelete = (id) => {
+    if (!canExcluir) return; // segurança extra, além do botão já escondido
     setFinance(prev => prev.filter(t => t.id !== id));
     setConfirmDelete(null);
   };
@@ -2561,10 +2569,12 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
             <h1 className="text-xl font-bold text-gray-900">{initialTab === "receber" ? "Contas a Receber" : "Contas a Pagar"}</h1>
             <p className="text-sm text-gray-500 mt-0.5">{initialTab === "receber" ? "Pedidos pendentes de recebimento" : "Despesas e compras pendentes de pagamento"}</p>
           </div>
-          <button onClick={() => setModal("new")}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm">
-            <Icon name="plus" size={16}/> Lançamento
-          </button>
+          {canIncluir && (
+            <button onClick={() => setModal("new")}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm">
+              <Icon name="plus" size={16}/> Lançamento
+            </button>
+          )}
         </div>
       )}
       {/* ── TAB: Contas a Receber ── */}
@@ -2665,10 +2675,10 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
                             <div className="flex flex-col items-end gap-1">
                               {o.pagoComAtraso && <span className="text-[10px] text-red-500 font-semibold">⚠️ Pago com atraso (+multa/juros)</span>}
                               <span className="text-[10px] text-green-600 font-semibold">✅ Pago em {new Date(o.paidDate+"T12:00:00").toLocaleDateString("pt-BR")}</span>
-                              <button onClick={()=>setPayRec(o)} className="text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100">↩ Editar pgto</button>
+                              {canAlterar && <button onClick={()=>setPayRec(o)} className="text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100">↩ Editar pgto</button>}
                             </div>
                           )}
-                          {!o.paidDate && <button onClick={()=>setPayRec(o)}
+                          {!o.paidDate && canAlterar && <button onClick={()=>setPayRec(o)}
                             className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700">
                             ✅ Pagar
                           </button>}
@@ -2687,7 +2697,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
             )}
             {payRec && (
               <FinPayModal order={payRec} onClose={()=>setPayRec(null)}
-                onSave={(updated)=>{ if(setOrders) setOrders(prev=>prev.map(o=>o.id===updated.id?updated:o)); setPayRec(null); }}/>
+                onSave={(updated)=>{ if(!canAlterar) return; if(setOrders) setOrders(prev=>prev.map(o=>o.id===updated.id?updated:o)); setPayRec(null); }}/>
             )}
           </div>
         );
@@ -2782,15 +2792,22 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
                         <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                           <p className="font-bold text-red-600 text-base">{fmt(p.total)}</p>
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${PC_STATUS_STYLES[p.status]?.bg||"bg-gray-100"} ${PC_STATUS_STYLES[p.status]?.text||"text-gray-600"}`}>{p.status}</span>
-                          {(p.paidDate||p.status==="pago") ? (<div className="flex flex-col items-end gap-1 mt-1"><span className="text-[10px] text-green-600 font-semibold">✅ Pago{p.paidDate?" em "+new Date(p.paidDate+"T12:00:00").toLocaleDateString("pt-BR"):""}</span><button onClick={()=>setPayPag(p)} className="text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100">↩ Editar pgto</button></div>) : <button onClick={()=>setPayPag(p)} className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 mt-1">💸 Pagar</button>}
-                          {p._type === "lancamento" && (
+                          {(p.paidDate||p.status==="pago") ? (
+                            canAlterar ? (<div className="flex flex-col items-end gap-1 mt-1"><span className="text-[10px] text-green-600 font-semibold">✅ Pago{p.paidDate?" em "+new Date(p.paidDate+"T12:00:00").toLocaleDateString("pt-BR"):""}</span><button onClick={()=>setPayPag(p)} className="text-[10px] font-semibold px-2 py-0.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100">↩ Editar pgto</button></div>)
+                            : (<span className="text-[10px] text-green-600 font-semibold mt-1">✅ Pago{p.paidDate?" em "+new Date(p.paidDate+"T12:00:00").toLocaleDateString("pt-BR"):""}</span>)
+                          ) : (canAlterar && <button onClick={()=>setPayPag(p)} className="text-[10px] font-semibold px-2.5 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 mt-1">💸 Pagar</button>)}
+                          {p._type === "lancamento" && (canAlterar || canExcluir) && (
                             <div className="flex items-center gap-1 mt-1">
-                              <button onClick={()=>setModal(p)} className="p-1 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
-                                <Icon name="edit" size={13}/>
-                              </button>
-                              <button onClick={()=>setConfirmDelete(p)} className="p-1 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
-                                <Icon name="trash" size={13}/>
-                              </button>
+                              {canAlterar && (
+                                <button onClick={()=>setModal(p)} className="p-1 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
+                                  <Icon name="edit" size={13}/>
+                                </button>
+                              )}
+                              {canExcluir && (
+                                <button onClick={()=>setConfirmDelete(p)} className="p-1 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                                  <Icon name="trash" size={13}/>
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -2803,6 +2820,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
             {payPag && (
               <FinPagModal item={payPag} onClose={()=>setPayPag(null)}
                 onSave={(updated)=>{
+                  if (!canAlterar) return;
                   if (updated._type === "lancamento") {
                     setFinance(prev => prev.map(t => t.id === updated.id ? {...t, status:updated.status, paidDate:updated.paidDate, payment:updated.payment} : t));
                   } else if (updated._type === "compra") {
@@ -13401,8 +13419,8 @@ function ERPApp({ currentUser, onLogout }) {
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params} currentUser={currentUser}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} currentUser={currentUser}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} params={params}/>;
-      case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber" onViewOrder={(id)=>{ setOpenOrderId(id); setActive("orders"); }}/>;
-      case "pagar":     return <FinanceModule key="fm-pagar" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="pagar"/>;
+      case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber" onViewOrder={(id)=>{ setOpenOrderId(id); setActive("orders"); }} currentUser={currentUser}/>;
+      case "pagar":     return <FinanceModule key="fm-pagar" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="pagar" currentUser={currentUser}/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders} currentUser={currentUser}/>;
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases} currentUser={currentUser}/>;
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} params={params} currentUser={currentUser}/>;
