@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.27.0";
+const APP_VERSION = "3.27.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -4736,8 +4736,11 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
   , [purchases, filterMode, period, dateFrom, dateTo]);
 
   // KPIs
+  // "despesasFin" exclui lançamentos com purchaseId — esses já são gerados
+  // automaticamente na baixa do pedido de compra e contados em
+  // "despesasCompras" via periodPurchases; somar os dois duplicava o valor.
   const receitasFin    = activeFin.filter(f=>f.type==="receita").reduce((s,f)=>s+f.amount,0);
-  const despesasFin    = activeFin.filter(f=>f.type==="despesa").reduce((s,f)=>s+f.amount,0);
+  const despesasFin    = activeFin.filter(f=>f.type==="despesa" && !f.purchaseId).reduce((s,f)=>s+f.amount,0);
   const totalPedidos   = periodOrders.length;
   const receitasOrders = periodOrders.filter(o=>o.status!=="Cancelado").reduce((s,o)=>s+o.total,0);
   const despesasCompras = periodPurchases.reduce((s,p)=>s+(p.total||0),0);
@@ -4763,7 +4766,7 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
         label: d.toLocaleDateString("pt-BR",{month:"short"}).replace(".",""),
         receitas: txs.filter(f=>f.type==="receita").reduce((s,f)=>s+f.amount,0)
                 + ordMes.reduce((s,o)=>s+o.total,0),
-        despesas: txs.filter(f=>f.type==="despesa").reduce((s,f)=>s+f.amount,0)
+        despesas: txs.filter(f=>f.type==="despesa" && !f.purchaseId).reduce((s,f)=>s+f.amount,0)
                 + pcMes.reduce((s,p)=>s+(p.total||0),0),
       };
     });
@@ -4800,7 +4803,10 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
   // dois junto com os lançamentos financeiros manuais).
   const dreGroups = useMemo(() => {
     const g = {};
-    activeFin.forEach(f => { if (!g[f.category]) g[f.category]={category:f.category,type:f.type,total:0}; g[f.category].total+=f.amount; });
+    // Ignora lançamentos com purchaseId (gerados automaticamente na baixa)
+    // pra não contar a mesma compra duas vezes — ela já entra como
+    // "Compras (Fornecedores)" logo abaixo, com o valor de periodPurchases.
+    activeFin.filter(f => !f.purchaseId).forEach(f => { if (!g[f.category]) g[f.category]={category:f.category,type:f.type,total:0}; g[f.category].total+=f.amount; });
     if (receitasOrders > 0) g["Vendas (Pedidos)"] = { category:"Vendas (Pedidos)", type:"receita", total:receitasOrders };
     if (despesasCompras > 0) g["Compras (Fornecedores)"] = { category:"Compras (Fornecedores)", type:"despesa", total:despesasCompras };
     return Object.values(g).sort((a,b)=>b.total-a.total);
