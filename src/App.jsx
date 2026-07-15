@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.28.3";
+const APP_VERSION = "3.28.4";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -5586,7 +5586,7 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], variantC
 };
 
 // ─── Product Detail Panel ─────────────────────────────────────────────────
-const ProductDetailPanel = ({ product, movements, onClose, onEdit, onDelete, onMove }) => {
+const ProductDetailPanel = ({ product, movements, onClose, onEdit, onDelete, onMove, canAlterar=true, canExcluir=true }) => {
   if (!product) return null;
   const ss  = stockStatus(product.stock, product.minStock);
   const cc  = avatarColor(product.name);
@@ -5702,13 +5702,17 @@ const ProductDetailPanel = ({ product, movements, onClose, onEdit, onDelete, onM
         </div>
 
         <div className="p-4 border-t border-gray-100 flex gap-2 shrink-0">
-          <button onClick={()=>onDelete(product)} className="p-2.5 rounded-xl border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors"><Icon name="trash" size={16}/></button>
-          <button onClick={()=>onMove(product)} className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 font-medium">
-            <Icon name="arrowUp" size={14}/> Movimentar
-          </button>
-          <button onClick={()=>onEdit(product)} className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 flex items-center justify-center gap-2">
-            <Icon name="edit" size={14}/> Editar
-          </button>
+          {canExcluir && <button onClick={()=>onDelete(product)} className="p-2.5 rounded-xl border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors"><Icon name="trash" size={16}/></button>}
+          {canAlterar && (
+            <button onClick={()=>onMove(product)} className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 font-medium">
+              <Icon name="arrowUp" size={14}/> Movimentar
+            </button>
+          )}
+          {canAlterar && (
+            <button onClick={()=>onEdit(product)} className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 flex items-center justify-center gap-2">
+              <Icon name="edit" size={14}/> Editar
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -5801,7 +5805,10 @@ const ApplyCatalogModal = ({ product, catalogs, onClose, onConfirm }) => {
   );
 };
 
-const InventoryModule = ({ products, setProducts, movements, setMovements, suppliers, variantCatalogs=[], onPriceHunt }) => {
+const InventoryModule = ({ products, setProducts, movements, setMovements, suppliers, variantCatalogs=[], onPriceHunt, currentUser }) => {
+  const canIncluir = getUserPerm(currentUser, "inventory", "incluir");
+  const canAlterar = getUserPerm(currentUser, "inventory", "alterar");
+  const canExcluir = getUserPerm(currentUser, "inventory", "excluir");
   const [search, setSearch]           = useState("");
   const [filterCat,    setFilterCat]    = useState("Todas");
   const [filterStock,  setFilterStock]  = useState("Todos");
@@ -5881,6 +5888,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
   const nextMovId = (ms) => { const n=ms.map(m=>parseInt(m.id.replace("MOV-",""))||0); return `MOV-${String(Math.max(0,...n)+1).padStart(3,"0")}`; };
 
   const handleSaveProd = (data) => {
+    if (data.id ? !canAlterar : !canIncluir) return; // segurança extra, além dos botões já escondidos
     if (data.id) {
       setProducts(prev=>prev.map(p=>p.id===data.id?data:p));
     } else {
@@ -5935,6 +5943,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
   };
 
   const handleDelete = (prd) => {
+    if (!canExcluir) return; // segurança extra, além do botão já escondido
     setProducts(prev=>prev.filter(p=>p.id!==prd.id));
     setConfirmDelete(null);
     if (selected===prd.id) setSelected(null);
@@ -5942,6 +5951,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
   };
 
   const handleMove = (data) => {
+    if (!canAlterar) return; // segurança extra, além do botão já escondido
     const newStock = data.type==="entrada"
       ? moveModal.stock + data.qty
       : data.type==="saida"
@@ -5965,9 +5975,11 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
           <h1 className="text-xl font-bold text-gray-900">Gestão de Estoque</h1>
           <p className="text-sm text-gray-500 mt-0.5">{products.length} SKUs cadastrados</p>
         </div>
-        <button onClick={()=>setModal("new")} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm flex items-center gap-1.5">
-          <Icon name="plus" size={15}/> Produto
-        </button>
+        {canIncluir && (
+          <button onClick={()=>setModal("new")} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm flex items-center gap-1.5">
+            <Icon name="plus" size={15}/> Produto
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -6153,28 +6165,36 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
                             <button onClick={()=>onPriceHunt(p.name,p.price)} title="Pesquisar preços (PriceHunt)"
                               className="p-1.5 rounded-lg text-purple-500 hover:text-purple-700 hover:bg-purple-50 transition-colors text-xs">🔍</button>
                           )}
-                          <button onClick={()=>{setMoveModal(p);}} title="Entrada"
-                            className="p-1.5 rounded-lg text-green-500 hover:text-green-700 hover:bg-green-50 transition-colors font-bold text-xs">↑</button>
-                          <button onClick={()=>{setMoveModal(p);}} title="Saída"
-                            className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors font-bold text-xs">↓</button>
-                          <button onClick={()=>setModal(p)} className="p-1.5 rounded-lg text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors" title="Editar produto">
-                            <Icon name="edit" size={13}/>
-                          </button>
-                          {!p.parentId && (
+                          {canAlterar && (
+                            <button onClick={()=>{setMoveModal(p);}} title="Entrada"
+                              className="p-1.5 rounded-lg text-green-500 hover:text-green-700 hover:bg-green-50 transition-colors font-bold text-xs">↑</button>
+                          )}
+                          {canAlterar && (
+                            <button onClick={()=>{setMoveModal(p);}} title="Saída"
+                              className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors font-bold text-xs">↓</button>
+                          )}
+                          {canAlterar && (
+                            <button onClick={()=>setModal(p)} className="p-1.5 rounded-lg text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors" title="Editar produto">
+                              <Icon name="edit" size={13}/>
+                            </button>
+                          )}
+                          {canIncluir && !p.parentId && (
                             <button onClick={()=>setModal({name:"",sku:"",category:p.category,channels:[...p.channels],price:"",cost:p.cost||"",stock:"",minStock:p.minStock||"",unit:p.unit||"un",status:"Ativo",description:"",parentId:p.id,variantLabel:""})}
                               className="p-1.5 rounded-lg text-violet-400 hover:text-violet-600 hover:bg-violet-50 transition-colors text-xs font-bold" title="Criar variante deste produto">
                               +V
                             </button>
                           )}
-                          {!p.parentId && variantCatalogs.length>0 && (
+                          {canIncluir && !p.parentId && variantCatalogs.length>0 && (
                             <button onClick={()=>setApplyCatalogProduct(p)}
                               className="p-1.5 rounded-lg text-violet-400 hover:text-violet-600 hover:bg-violet-50 transition-colors" title="Aplicar catálogo de variante (gerar várias de uma vez)">
                               🎨
                             </button>
                           )}
-                          <button onClick={()=>setConfirmDelete(p)} className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                            <Icon name="trash" size={13}/>
-                          </button>
+                          {canExcluir && (
+                            <button onClick={()=>setConfirmDelete(p)} className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                              <Icon name="trash" size={13}/>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -6192,7 +6212,8 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
           onClose={()=>setSelected(null)}
           onEdit={(p)=>{setModal(p);setSelected(null);}}
           onDelete={(p)=>setConfirmDelete(p)}
-          onMove={(p)=>{setMoveModal(p);setSelected(null);}}/>
+          onMove={(p)=>{setMoveModal(p);setSelected(null);}}
+          canAlterar={canAlterar} canExcluir={canExcluir}/>
       )}
 
       {moveModal && <StockMovementModal product={moveModal} onClose={()=>setMoveModal(null)} onSave={handleMove}/>}
@@ -13345,7 +13366,7 @@ function ERPApp({ currentUser, onLogout }) {
         onGoToFaturados={()=>{ setInitialOrdersFilter("FATURADOS"); setActive("orders"); }} />;
       case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)} initialStatusFilter={initialOrdersFilter} onConsumeStatusFilter={()=>setInitialOrdersFilter(null)} currentUser={currentUser}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
-      case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
+      case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} currentUser={currentUser}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} params={params}/>;
       case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber" onViewOrder={(id)=>{ setOpenOrderId(id); setActive("orders"); }}/>;
       case "pagar":     return <FinanceModule key="fm-pagar" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="pagar"/>;
