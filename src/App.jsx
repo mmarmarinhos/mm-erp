@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.28.5";
+const APP_VERSION = "3.28.6";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -3306,7 +3306,7 @@ const PaymentModal = ({ order, onClose, onSave }) => {
   );
 };
 
-const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOrder }) => {
+const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOrder, canAlterar=true, canExcluir=true }) => {
   if (!customer) return null;
   const [panelTab, setPanelTab] = useState("dados");
   const [payModal, setPayModal] = useState(null); // order being paid
@@ -3595,14 +3595,18 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
             className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
             Fechar
           </button>
-          <button onClick={() => onEdit(customer)}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 flex items-center justify-center gap-2">
-            <Icon name="edit" size={14}/> Editar
-          </button>
-          <button onClick={() => onDelete(customer)}
-            className="p-2.5 rounded-xl border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors">
-            <Icon name="trash" size={16}/>
-          </button>
+          {canAlterar && (
+            <button onClick={() => onEdit(customer)}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 flex items-center justify-center gap-2">
+              <Icon name="edit" size={14}/> Editar
+            </button>
+          )}
+          {canExcluir && (
+            <button onClick={() => onDelete(customer)}
+              className="p-2.5 rounded-xl border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors">
+              <Icon name="trash" size={16}/>
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -3610,7 +3614,10 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
 };
 
 // ─── CRM Module ───────────────────────────────────────────────────────────
-const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) => {
+const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {}, currentUser }) => {
+  const canIncluir = getUserPerm(currentUser, "crm", "incluir");
+  const canAlterar = getUserPerm(currentUser, "crm", "alterar");
+  const canExcluir = getUserPerm(currentUser, "crm", "excluir");
   // ── Calcular stats de pedidos dinamicamente ─────────────────────────
   const customerStats = useMemo(() => {
     const map = {};
@@ -3666,6 +3673,7 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
   };
 
   const handleSave = (data) => {
+    if (data.id ? !canAlterar : !canIncluir) return; // segurança extra, além dos botões já escondidos
     if (data.id) {
       setCustomers(prev => prev.map(c => c.id === data.id ? data : c));
       if (selected === data.id) setSelected(data.id);
@@ -3676,6 +3684,7 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
   };
 
   const handleDelete = (cust) => {
+    if (!canExcluir) return; // segurança extra, além do botão já escondido
     setConfirmDelete(null);
     setCustomers(prev => prev.filter(c => c.id !== cust.id));
     if (selected === cust.id) setSelected(null);
@@ -3745,10 +3754,12 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
             className="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-1.5">
             <Icon name="tag" size={14}/> Recalcular Status
           </button>
-          <button onClick={() => setModal("new")}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm flex items-center gap-1.5">
-            <Icon name="plus" size={15}/> Cliente
-          </button>
+          {canIncluir && (
+            <button onClick={() => setModal("new")}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm flex items-center gap-1.5">
+              <Icon name="plus" size={15}/> Cliente
+            </button>
+          )}
         </div>
       </div>
 
@@ -3869,6 +3880,7 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {} }) =>
           onClose={() => setSelected(null)}
           onEdit={(c) => { setModal(c); setSelected(null); }}
           onDelete={(c) => setConfirmDelete(c)}
+          canAlterar={canAlterar} canExcluir={canExcluir}
           onUpdateOrder={(updatedOrder) => {
             setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
           }}
@@ -13383,7 +13395,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} params={params}/>;
       case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber" onViewOrder={(id)=>{ setOpenOrderId(id); setActive("orders"); }}/>;
       case "pagar":     return <FinanceModule key="fm-pagar" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="pagar"/>;
-      case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
+      case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders} currentUser={currentUser}/>;
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases} currentUser={currentUser}/>;
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} params={params} currentUser={currentUser}/>;
       case "pdv": return <PdvModule products={products} setProducts={updateProducts} orders={orders} setOrders={updateOrders} movements={movements} setMovements={updateMovements} customers={customers} caixa={caixa} setCaixa={updateCaixa} params={params} currentUser={currentUser}/>;
