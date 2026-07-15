@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.28.8";
+const APP_VERSION = "3.28.9";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -7305,7 +7305,8 @@ function calcReverse({ pv, custo, embalagem, frete, imposto, comissao, taxaPgto 
   return { pv, tot, vComis, vPgto, vImp, vLucro, margemEf: (vLucro/pv)*100 };
 }
 
-const TabelaPrecos = ({ products, setProducts, params }) => {
+const TabelaPrecos = ({ products, setProducts, params, currentUser }) => {
+  const canAlterar = getUserPerm(currentUser, "pricing", "alterar");
   const [tSearch,       setTSearch]       = useState("");
   const [tSaved,        setTSaved]        = useState(false);
   const [tFilterStatus, setTFilterStatus] = useState("Todos");
@@ -7344,6 +7345,7 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
   };
 
   const setField = (productId, ch, field, value) => {
+    if (!canAlterar) return; // segurança extra, além dos campos já desabilitados
     setProducts(prev => prev.map(p => {
       if (p.id !== productId) return p;
       const unitCost  = Number(p.cost)||0;
@@ -7386,6 +7388,7 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
   };
 
   const handlePropagateToVariants = (parentId) => {
+    if (!canAlterar) return; // segurança extra
     const parent = products.find(x=>x.id===parentId);
     if (!parent) return;
     const variantIds = products.filter(x=>x.parentId===parentId).map(x=>x.id);
@@ -7428,6 +7431,7 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
 
   const [syncConfirm, setSyncConfirm] = useState(false);
   const handleSyncAllTaxas = () => {
+    if (!canAlterar) return; // segurança extra
     setProducts(prev => prev.map(p => {
       const unitCost = Number(p.cost)||0;
       let changed = false;
@@ -7466,16 +7470,18 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
           <p className="text-sm text-gray-500">{products.length} produto{products.length!==1?"s":""} cadastrado{products.length!==1?"s":""}</p>
         </div>
         <div className="flex items-center gap-2">
-          {taxasDesatualizadas.length > 0 && (
+          {canAlterar && taxasDesatualizadas.length > 0 && (
             <button onClick={()=>setSyncConfirm(true)}
               className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 flex items-center gap-1.5">
               ⚠️ Sincronizar {taxasDesatualizadas.length} taxa{taxasDesatualizadas.length!==1?"s":""}
             </button>
           )}
-          <button onClick={()=>{ setProducts(p=>p); setTSaved(true); setTimeout(()=>setTSaved(false),2500); }}
-            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${tSaved?"bg-green-500 text-white":"bg-indigo-600 text-white hover:bg-indigo-700"}`}>
-            {tSaved?"✓ Salvo!":"Salvar Preços"}
-          </button>
+          {canAlterar && (
+            <button onClick={()=>{ setProducts(p=>p); setTSaved(true); setTimeout(()=>setTSaved(false),2500); }}
+              className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${tSaved?"bg-green-500 text-white":"bg-indigo-600 text-white hover:bg-indigo-700"}`}>
+              {tSaved?"✓ Salvo!":"Salvar Preços"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -7522,7 +7528,7 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
             const hasVariants = !p.parentId && products.some(x=>x.parentId===p.id);
             return (
               <PriceTableRow key={p.id} p={p} cost={cost} getData={getData} setField={setField} setFieldBlur={setFieldBlur} CHANNELS={CHANNELS} CHANNEL_STYLES={CHANNEL_STYLES} fmt={fmt} params={params}
-                hasVariants={hasVariants} onPropagate={()=>handlePropagateToVariants(p.id)}/>
+                hasVariants={hasVariants} onPropagate={()=>handlePropagateToVariants(p.id)} canAlterar={canAlterar}/>
             );
           })}
         </div>
@@ -7532,7 +7538,7 @@ const TabelaPrecos = ({ products, setProducts, params }) => {
 };
 
 // ─── PriceTableRow — linha colapsável da tabela de preços ────────────────────
-const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHANNEL_STYLES, fmt, hasVariants, onPropagate, params }) => {
+const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHANNEL_STYLES, fmt, hasVariants, onPropagate, params, canAlterar=true }) => {
   const [open, setOpen] = useState(false);
   const [propagated, setPropagated] = useState(false);
   const handlePropagateClick = (e) => {
@@ -7578,13 +7584,16 @@ const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHA
       {/* Detalhe expansível */}
       {open && (
         <div className="border-t border-gray-100 p-3 bg-gray-50/50">
-          {hasVariants && (
+          {!canAlterar && (
+            <p className="text-[11px] text-gray-400 bg-gray-100 rounded-lg px-2.5 py-1.5 mb-3">🔒 Somente visualização — sem permissão pra alterar preços</p>
+          )}
+          {canAlterar && hasVariants && (
             <button onClick={handlePropagateClick}
               className={`w-full mb-3 text-xs font-medium rounded-lg py-2 transition-colors ${propagated?"bg-green-50 text-green-600":"bg-violet-50 text-violet-600 hover:bg-violet-100"}`}>
               {propagated ? "✓ Repassado pras variantes!" : "📤 Repassar Margem/Frete/Taxa/Outros pras variantes"}
             </button>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 ${!canAlterar?"opacity-70 pointer-events-none":""}`}>
             {CHANNELS.map(ch => {
               const d = getData(p, ch);
               const custoBase = cost * (d.qtd||1);
@@ -7725,7 +7734,7 @@ const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHA
 };
 
 
-const PricingModule = ({ products, setProducts, onPriceHunt, params }) => {
+const PricingModule = ({ products, setProducts, onPriceHunt, params, currentUser }) => {
   const [activeTab,   setActiveTab]   = useState("tabela");
   const [selProd,    setSelProd]    = useState("");
   const [custo,      setCusto]      = useState("");
@@ -7776,7 +7785,7 @@ const PricingModule = ({ products, setProducts, onPriceHunt, params }) => {
   return (
     <div className="space-y-4">
       {toast && <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg">{toast}</div>}
-      <TabelaPrecos products={products} setProducts={setProducts} params={params}/>
+      <TabelaPrecos products={products} setProducts={setProducts} params={params} currentUser={currentUser}/>
     </div>
   );
 };
@@ -13418,7 +13427,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)} initialStatusFilter={initialOrdersFilter} onConsumeStatusFilter={()=>setInitialOrdersFilter(null)} currentUser={currentUser}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params} currentUser={currentUser}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} currentUser={currentUser}/>;
-      case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} params={params}/>;
+      case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} params={params} currentUser={currentUser}/>;
       case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber" onViewOrder={(id)=>{ setOpenOrderId(id); setActive("orders"); }} currentUser={currentUser}/>;
       case "pagar":     return <FinanceModule key="fm-pagar" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="pagar" currentUser={currentUser}/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders} currentUser={currentUser}/>;
