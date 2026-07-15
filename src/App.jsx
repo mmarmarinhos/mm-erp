@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.28.9";
+const APP_VERSION = "3.29.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -9399,6 +9399,8 @@ const FecharCaixaModal = ({ caixaAtual, vendas, onClose, onConfirm }) => {
 };
 
 const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movements = [], setMovements, customers = [], caixa = [], setCaixa, params, currentUser }) => {
+  const canIncluir = getUserPerm(currentUser, "pdv", "incluir");
+  const canAlterar = getUserPerm(currentUser, "pdv", "alterar");
   const caixaAtual = caixa.find(c => c.status === "aberto");
   const [skuSearch, setSkuSearch] = useState("");
   const [cart, setCart] = useState([]);
@@ -9446,6 +9448,7 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
   const cartTotal = cart.reduce((s,i)=>s+i.total, 0);
 
   const handleAbrirCaixa = (valorInicial) => {
+    if (!canIncluir) return; // segurança extra, além do botão já escondido
     setCaixa(prev => [...prev, {
       id: `CX-${Date.now()}`, dataAbertura: new Date().toISOString(), valorInicial: Number(valorInicial)||0,
       usuarioAbertura: currentUser?.displayName||currentUser?.username||"", status: "aberto",
@@ -9456,6 +9459,7 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
   const vendasDoCaixa = caixaAtual ? orders.filter(o => o.channel==="PDV" && o.caixaId===caixaAtual.id) : [];
 
   const handleFecharCaixa = (valorContado) => {
+    if (!canAlterar) return; // segurança extra, além do botão já escondido
     setCaixa(prev => prev.map(c => c.id===caixaAtual.id ? {
       ...c, status:"fechado", dataFechamento: new Date().toISOString(), valorContado: Number(valorContado)||0,
       usuarioFechamento: currentUser?.displayName||currentUser?.username||"",
@@ -9465,6 +9469,7 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
   };
 
   const handleFinalizar = async () => {
+    if (!canIncluir) return; // segurança extra, além do botão já escondido
     if (!cart.length || finalizing) return;
     setErr(""); setFinalizing(true);
     try {
@@ -9518,7 +9523,11 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
         <div className="text-center">
           <p className="text-5xl mb-3">🔒</p>
           <p className="text-gray-500 mb-4">Nenhum caixa aberto. Abra o caixa pra começar a vender.</p>
-          <button onClick={()=>setShowAbrirCaixa(true)} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700">🔓 Abrir Caixa</button>
+          {canIncluir ? (
+            <button onClick={()=>setShowAbrirCaixa(true)} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700">🔓 Abrir Caixa</button>
+          ) : (
+            <p className="text-sm text-gray-400">Você não tem permissão pra abrir o caixa.</p>
+          )}
         </div>
         {showAbrirCaixa && <AbrirCaixaModal onClose={()=>setShowAbrirCaixa(false)} onConfirm={handleAbrirCaixa}/>}
       </div>
@@ -9532,7 +9541,7 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
           <p className="text-sm font-semibold text-gray-800">🟢 Caixa aberto</p>
           <p className="text-xs text-gray-400">Desde {new Date(caixaAtual.dataAbertura).toLocaleString("pt-BR")} · {vendasDoCaixa.length} venda(s) · {fmt(vendasDoCaixa.reduce((s,o)=>s+(o.total||0),0))}</p>
         </div>
-        <button onClick={()=>setShowFecharCaixa(true)} className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-sm font-medium hover:bg-rose-100">🔒 Fechar Caixa</button>
+        {canAlterar && <button onClick={()=>setShowFecharCaixa(true)} className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-sm font-medium hover:bg-rose-100">🔒 Fechar Caixa</button>}
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
@@ -9600,10 +9609,14 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
               ))}
             </div>
             {err && <p className="text-red-500 text-xs">{err}</p>}
-            <button onClick={handleFinalizar} disabled={finalizing}
-              className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50">
-              {finalizing ? "Finalizando..." : "✅ Finalizar Venda"}
-            </button>
+            {canIncluir ? (
+              <button onClick={handleFinalizar} disabled={finalizing}
+                className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50">
+                {finalizing ? "Finalizando..." : "✅ Finalizar Venda"}
+              </button>
+            ) : (
+              <p className="text-center text-xs text-gray-400">Você não tem permissão pra finalizar vendas.</p>
+            )}
           </>
         )}
       </div>
