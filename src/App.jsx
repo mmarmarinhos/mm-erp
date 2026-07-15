@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.28.0";
+const APP_VERSION = "3.28.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -1094,7 +1094,10 @@ const EmitNfeModal = ({ order, onClose, onIssued, params, customers = [] }) => {
   );
 };
 
-const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance, representantes = [], formasPagamento = [], params, openOrderId = null, onConsumeOpenOrder, initialStatusFilter = null, onConsumeStatusFilter }) => {
+const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance, representantes = [], formasPagamento = [], params, openOrderId = null, onConsumeOpenOrder, initialStatusFilter = null, onConsumeStatusFilter, currentUser }) => {
+  const canIncluir = getUserPerm(currentUser, "orders", "incluir");
+  const canAlterar = getUserPerm(currentUser, "orders", "alterar");
+  const canExcluir = getUserPerm(currentUser, "orders", "excluir");
   const [search, setSearch] = useState("");
   const [filterChannel, setFilterChannel] = useState("Todos");
   const [filterStatus, setFilterStatus] = useState("Todos");
@@ -1227,6 +1230,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
   };
 
   const handleSave = (data) => {
+    if (data.id ? !canAlterar : !canIncluir) return; // segurança extra, além dos botões já escondidos
     const orderId = data.id || nextId(orders);
     const savedOrder = data.id ? data : { ...data, id: orderId };
     const oldOrder = data.id ? orders.find(o => o.id === data.id) : null;
@@ -1320,6 +1324,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
   };
 
   const handleStatusChange = (id, newStatus) => {
+    if (!canAlterar) return; // segurança extra, além do StatusDropdown já escondido
     const order = orders.find(o => o.id === id);
     if (!order || order.status === newStatus) return;
 
@@ -1350,6 +1355,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
   };
 
   const handleDelete = (id) => {
+    if (!canExcluir) return; // segurança extra, além do botão já escondido
     setOrders(prev => prev.filter(o => o.id !== id));
     setConfirmDelete(null);
     if (detailOrder?.id === id) setDetailOrder(null);
@@ -1433,11 +1439,13 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
           <h1 className="text-xl font-bold text-gray-900">Pedidos e Vendas</h1>
           <p className="text-sm text-gray-500 mt-0.5">{orders.length} pedidos no total</p>
         </div>
-        <button onClick={() => setModal("new")}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm">
-          <Icon name="plus" size={16} />
-          Novo Pedido
-        </button>
+        {canIncluir && (
+          <button onClick={() => setModal("new")}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm">
+            <Icon name="plus" size={16} />
+            Novo Pedido
+          </button>
+        )}
       </div>
 
       {/* Status pills */}
@@ -1573,22 +1581,30 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
                       <Badge label={order.channel} style={CHANNEL_STYLES[order.channel] || { bg: "bg-gray-100", text: "text-gray-600" }} />
                     </td>
                     <td className="px-4 py-3">
-                      <StatusDropdown order={order} onChange={(s) => handleStatusChange(order.id, s)} statusOptions={params?.vendas?.statusList?.length ? params.vendas.statusList : ORDER_STATUSES} />
+                      {canAlterar ? (
+                        <StatusDropdown order={order} onChange={(s) => handleStatusChange(order.id, s)} statusOptions={params?.vendas?.statusList?.length ? params.vendas.statusList : ORDER_STATUSES} />
+                      ) : (
+                        <Badge label={order.status} style={STATUS_STYLES[order.status]} />
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="font-semibold text-gray-900">{fmt(order.total)}</span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => setModal(order)} className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
-                          <Icon name="edit" size={14} />
-                        </button>
-                        <button onClick={() => setConfirmDelete(order)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                          <Icon name="trash" size={14} />
-                        </button>
+                        {canAlterar && (
+                          <button onClick={() => setModal(order)} className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                            <Icon name="edit" size={14} />
+                          </button>
+                        )}
+                        {canExcluir && (
+                          <button onClick={() => setConfirmDelete(order)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                            <Icon name="trash" size={14} />
+                          </button>
+                        )}
                       </div>
                     </td>
-                  </tr>
+                    </tr>
                 ))}
               </tbody>
             </table>
@@ -1637,25 +1653,29 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
               )}
             </div>
             <div className="flex gap-2 p-5 border-t border-gray-100 flex-wrap">
-              <button onClick={() => { setModal(detailOrder); setDetailOrder(null); }}
-                className="flex-1 min-w-[90px] px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2">
-                <Icon name="edit" size={14} /> Editar
-              </button>
+              {canAlterar && (
+                <button onClick={() => { setModal(detailOrder); setDetailOrder(null); }}
+                  className="flex-1 min-w-[90px] px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2">
+                  <Icon name="edit" size={14} /> Editar
+                </button>
+              )}
               <button onClick={() => gerarPedidoPDF(detailOrder)}
                 className="px-4 py-2 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-600 text-sm font-medium hover:bg-indigo-100 flex items-center gap-1.5">
                 🖨️ PDF
               </button>
-              <button onClick={() => { setEmitNfeOrder(detailOrder); setDetailOrder(null); }}
-                className={`px-4 py-2 rounded-xl border text-sm font-medium flex items-center gap-1.5 ${params?.fiscal?.provider ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"}`}>
-                🧾 {detailOrder.nfNumero ? `NF-e ${detailOrder.nfNumero}` : (params?.fiscal?.provider ? "Emitir NF-e" : "Faturar (simular)")}
-              </button>
-              {detailOrder.nfNumero && (
+              {canAlterar && (
+                <button onClick={() => { setEmitNfeOrder(detailOrder); setDetailOrder(null); }}
+                  className={`px-4 py-2 rounded-xl border text-sm font-medium flex items-center gap-1.5 ${params?.fiscal?.provider ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"}`}>
+                  🧾 {detailOrder.nfNumero ? `NF-e ${detailOrder.nfNumero}` : (params?.fiscal?.provider ? "Emitir NF-e" : "Faturar (simular)")}
+                </button>
+              )}
+              {canAlterar && detailOrder.nfNumero && (
                 <button onClick={() => { setCancelNfeConfirm(detailOrder); setDetailOrder(null); }}
                   className="px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 flex items-center gap-1.5">
                   ❌ Cancelar NF
                 </button>
               )}
-              {["Enviado","Entregue"].includes(detailOrder.status) && (
+              {canAlterar && ["Enviado","Entregue"].includes(detailOrder.status) && (
                 <button onClick={() => { setDevolucaoModal(detailOrder); setDetailOrder(null); }}
                   className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 text-sm font-medium hover:bg-rose-100 flex items-center gap-1.5">
                   ↩ Devolver
@@ -13300,7 +13320,7 @@ function ERPApp({ currentUser, onLogout }) {
         onGoToAEnviar={()=>{ setInitialOrdersFilter("A_ENVIAR"); setActive("orders"); }}
         onGoToEmAberto={()=>{ setInitialOrdersFilter("EM_ABERTO_FAT"); setActive("orders"); }}
         onGoToFaturados={()=>{ setInitialOrdersFilter("FATURADOS"); setActive("orders"); }} />;
-      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)} initialStatusFilter={initialOrdersFilter} onConsumeStatusFilter={()=>setInitialOrdersFilter(null)}/>;
+      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)} initialStatusFilter={initialOrdersFilter} onConsumeStatusFilter={()=>setInitialOrdersFilter(null)} currentUser={currentUser}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} params={params}/>;
