@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.28.6";
+const APP_VERSION = "3.28.7";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -11002,7 +11002,10 @@ const gerarCotacaoPDF = (cotacao, empresaRaw) => {
   if (w) { w.document.write(html); w.document.close(); }
 };
 
-const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [], products = [], setProducts, movements = [], setMovements, empresa = {}, representantes = [], formasPagamento = [], params }) => {
+const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [], products = [], setProducts, movements = [], setMovements, empresa = {}, representantes = [], formasPagamento = [], params, currentUser }) => {
+  const canIncluir = getUserPerm(currentUser, "cotacao", "incluir");
+  const canAlterar = getUserPerm(currentUser, "cotacao", "alterar");
+  const canExcluir = getUserPerm(currentUser, "cotacao", "excluir");
   const [modal,    setModal]    = useState(null);
   const [detail,   setDetail]   = useState(null);
   const [filter,   setFilter]   = useState("Todos");
@@ -11056,6 +11059,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
   };
 
   const handleSave = (data) => {
+    if (data.id ? !canAlterar : !canIncluir) return; // segurança extra, além dos botões já escondidos
     if (data.id) setCotacoes(prev=>prev.map(c=>c.id===data.id?data:c));
     else         setCotacoes(prev=>[{...data,id:nextId(prev),createdAt:today()},...prev]);
     setModal(null);
@@ -11064,6 +11068,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
 
   // Convert quote to order
   const handleConvert = (cot) => {
+    if (!canAlterar) return; // segurança extra, além do botão já escondido
     const newOrderId = `PED-${String(Math.max(0,...orders.map(o=>parseInt(o.id.replace("PED-",""))||0))+1).padStart(3,"0")}`;
     const newOrder = {
       id:       newOrderId,
@@ -11119,6 +11124,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
   };
 
   const handleDelete = (cot) => {
+    if (!canExcluir) return; // segurança extra, além do botão já escondido
     setCotacoes(prev=>prev.filter(c=>c.id!==cot.id));
     setDelConf(null); setDetail(null);
   };
@@ -11203,7 +11209,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
                   </table>
                 </div>
                 {detail.notes && <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500">{detail.notes}</div>}
-                {!["Convertida","Recusada","Expirada"].includes(detail.status) && (
+                {!["Convertida","Recusada","Expirada"].includes(detail.status) && canAlterar && (
                   <div className="flex flex-wrap gap-2">
                     <p className="text-xs font-semibold text-gray-400 uppercase w-full">Alterar Status</p>
                     {["Em Aberto","Aprovada","Recusada"].filter(s=>s!==detail.status).map(s=>(
@@ -11214,15 +11220,15 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
                 )}
               </div>
               <div className="flex gap-2 p-5 border-t border-gray-100 shrink-0 flex-wrap">
-                {!["Convertida","Recusada","Expirada"].includes(detail.status) && (
+                {canAlterar && !["Convertida","Recusada","Expirada"].includes(detail.status) && (
                   <button onClick={()=>{setModal(detail);setDetail(null);}} className="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Editar</button>
                 )}
-                {detail.status==="Aprovada" && (
+                {canAlterar && detail.status==="Aprovada" && (
                   <button onClick={()=>{handleConvert(detail);setDetail(null);}} className="flex-1 px-4 py-2 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700">🛒 Converter em Pedido</button>
                 )}
                 <button onClick={async()=>{const e2=await window.storage.get(EMPRESA_KEY).catch(()=>null);gerarCotacaoPDF(detail,e2&&e2.value?JSON.parse(e2.value):{});}}
                   className="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 text-sm font-medium hover:bg-indigo-100">🖨️ PDF</button>
-                {detail.status!=="Convertida" && (
+                {canExcluir && detail.status!=="Convertida" && (
                   <button onClick={()=>setDelConf(detail)} className="px-3 py-2 rounded-xl border border-red-200 text-red-500 text-sm hover:bg-red-50">Excluir</button>
                 )}
                 <button onClick={()=>setDetail(null)} className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">Fechar</button>
@@ -11237,9 +11243,11 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
           <h1 className="text-xl font-bold text-gray-900">Cotações</h1>
           <p className="text-sm text-gray-500 mt-0.5">{cotacoes.length} cotação{cotacoes.length!==1?"ões":""} · {fmt(totalAberto)} em aberto</p>
         </div>
-        <button onClick={()=>setModal("new")} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700">
-          + Nova Cotação
-        </button>
+        {canIncluir && (
+          <button onClick={()=>setModal("new")} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700">
+            + Nova Cotação
+          </button>
+        )}
       </div>
 
       {/* Status filter */}
@@ -13390,7 +13398,7 @@ function ERPApp({ currentUser, onLogout }) {
         onGoToEmAberto={()=>{ setInitialOrdersFilter("EM_ABERTO_FAT"); setActive("orders"); }}
         onGoToFaturados={()=>{ setInitialOrdersFilter("FATURADOS"); setActive("orders"); }} />;
       case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)} initialStatusFilter={initialOrdersFilter} onConsumeStatusFilter={()=>setInitialOrdersFilter(null)} currentUser={currentUser}/>;
-      case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params}/>;
+      case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params} currentUser={currentUser}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} currentUser={currentUser}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} params={params}/>;
       case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber" onViewOrder={(id)=>{ setOpenOrderId(id); setActive("orders"); }}/>;
