@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.26.0";
+const APP_VERSION = "3.26.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -1798,11 +1798,15 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
   const recVencidos = recPend.filter(o => o.dueDate && o.dueDate < todayISO);
   const totalReceberVencido = recVencidos.reduce((s,o)=>s+o.total,0);
 
-  // ── 3) Prévia Contas a Pagar vencendo hoje ───────────────────────────────
+  // ── 3) Prévia Contas a Pagar — vencendo hoje + vencidos ──────────────────
   const pagVencendoHoje = (finance||[]).filter(f =>
     f.type === "despesa" && f.status !== "pago" && f.status !== "cancelado" && f.dueDate === todayISO
   );
   const totalPagarHoje = pagVencendoHoje.reduce((s,f)=>s+(f.amount||0),0);
+  const pagVencidos = (finance||[]).filter(f =>
+    f.type === "despesa" && f.status !== "pago" && f.status !== "cancelado" && f.dueDate && f.dueDate < todayISO
+  );
+  const totalPagarVencido = pagVencidos.reduce((s,f)=>s+(f.amount||0),0);
 
   // ── Produtos mais vendidos (por quantidade, exclui Cancelado/Devolvido) ──
   const PIE_COLORS = ["#6366f1","#8b5cf6","#ec4899","#f59e0b","#10b981","#06b6d4","#94a3b8"];
@@ -2002,14 +2006,22 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
         </button>
         <button onClick={()=>setActive && setActive("pagar")}
           className="text-left bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-red-200 transition-colors">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-700">💸 Contas a Pagar — vencendo hoje</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-semibold text-gray-700">💸 Contas a Pagar</p>
             <span className="text-[10px] text-indigo-500 font-medium">Ver tudo →</span>
           </div>
-          <p className={`text-2xl font-bold mt-2 ${pagVencendoHoje.length>0?"text-red-600":"text-gray-800"}`}>{fmt(totalPagarHoje)}</p>
-          <p className="text-[11px] text-gray-400 mt-0.5">
-            {pagVencendoHoje.length > 0 ? `${pagVencendoHoje.length} lançamento${pagVencendoHoje.length!==1?"s":""} vence${pagVencendoHoje.length===1?"":"m"} hoje` : "Nada vencendo hoje"}
-          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className={`rounded-xl px-2.5 py-1.5 ${pagVencendoHoje.length>0?"bg-amber-50":"bg-gray-50"}`}>
+              <p className={`text-[11px] ${pagVencendoHoje.length>0?"text-amber-700":"text-gray-400"}`}>🟡 Vencendo hoje</p>
+              <p className={`text-xl font-bold ${pagVencendoHoje.length>0?"text-amber-700":"text-gray-400"}`}>{fmt(totalPagarHoje)}</p>
+              <p className={`text-[10px] ${pagVencendoHoje.length>0?"text-amber-600":"text-gray-400"}`}>{pagVencendoHoje.length} lançamento{pagVencendoHoje.length!==1?"s":""}</p>
+            </div>
+            <div className={`rounded-xl px-2.5 py-1.5 ${pagVencidos.length>0?"bg-red-50":"bg-gray-50"}`}>
+              <p className={`text-[11px] ${pagVencidos.length>0?"text-red-600":"text-gray-400"}`}>🔴 Vencido</p>
+              <p className={`text-xl font-bold ${pagVencidos.length>0?"text-red-600":"text-gray-400"}`}>{fmt(totalPagarVencido)}</p>
+              <p className={`text-[10px] ${pagVencidos.length>0?"text-red-500":"text-gray-400"}`}>{pagVencidos.length} lançamento{pagVencidos.length!==1?"s":""}</p>
+            </div>
+          </div>
         </button>
       </div>
 
