@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.29.0";
+const APP_VERSION = "3.29.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -6433,7 +6433,10 @@ const NfeModal = ({ nfe, onClose, onSave }) => {
 };
 
 // ─── Fiscal Module ────────────────────────────────────────────────────────
-const FiscalModule = ({ nfes, setNfes }) => {
+const FiscalModule = ({ nfes, setNfes, currentUser }) => {
+  const canIncluir = getUserPerm(currentUser, "fiscal", "incluir");
+  const canAlterar = getUserPerm(currentUser, "fiscal", "alterar");
+  const canExcluir = getUserPerm(currentUser, "fiscal", "excluir");
   const [tab, setTab]             = useState("nfes");
   const [search, setSearch]       = useState("");
   const [filterStatus, setFSt]    = useState("Todos");
@@ -6508,6 +6511,7 @@ const FiscalModule = ({ nfes, setNfes }) => {
   ,[nfes,filterStatus,search,filterMode,period,dateFrom,dateTo]);
 
   const handleSaveNfe = (data) => {
+    if (data.id ? !canAlterar : !canIncluir) return; // segurança extra, além dos botões já escondidos
     if (data.id) setNfes(prev=>prev.map(n=>n.id===data.id?data:n));
     else setNfes(prev=>[{...data,id:nextNfeId(prev)},...prev]);
     setModal(null);
@@ -6558,7 +6562,7 @@ const FiscalModule = ({ nfes, setNfes }) => {
           <h1 className="text-xl font-bold text-gray-900">Fiscal</h1>
           <p className="text-sm text-gray-500 mt-0.5">MM ERP — Simples Nacional</p>
         </div>
-        {tab==="nfes" && (
+        {tab==="nfes" && canIncluir && (
           <button onClick={()=>setModal("new")} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm flex items-center gap-1.5">
             <Icon name="plus" size={15}/> Registrar NF-e
           </button>
@@ -6691,8 +6695,8 @@ const FiscalModule = ({ nfes, setNfes }) => {
                           <td className="px-4 py-3 text-right font-bold text-gray-900">{fmt(n.valorTotal)}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-center gap-1">
-                              <button onClick={()=>setModal(n)} className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"><Icon name="edit" size={13}/></button>
-                              <button onClick={()=>setConfirmDelete(n)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50"><Icon name="trash" size={13}/></button>
+                              {canAlterar && <button onClick={()=>setModal(n)} className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50"><Icon name="edit" size={13}/></button>}
+                              {canExcluir && <button onClick={()=>setConfirmDelete(n)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50"><Icon name="trash" size={13}/></button>}
                             </div>
                           </td>
                         </tr>
@@ -6968,7 +6972,7 @@ const FiscalModule = ({ nfes, setNfes }) => {
             <p className="text-sm text-gray-500 mb-4">{confirmDelete.destinatario}</p>
             <div className="flex gap-2">
               <button onClick={()=>setConfirmDelete(null)} className="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
-              <button onClick={()=>{ setNfes(prev=>prev.filter(n=>n.id!==confirmDelete.id)); setConfirmDelete(null); showToast("🗑 NF-e excluída"); }}
+              <button onClick={()=>{ if(!canExcluir) return; setNfes(prev=>prev.filter(n=>n.id!==confirmDelete.id)); setConfirmDelete(null); showToast("🗑 NF-e excluída"); }}
                 className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600">Excluir</button>
             </div>
           </div>
@@ -13450,7 +13454,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
       case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento} variantCatalogs={variantCatalogs} setVariantCatalogs={updateVariantCatalogs}/>;
       case "parametros": return <ParamsModule params={params} setParams={updateParams} onSaveEmpresa={(data)=>setEmpresaForm(data)} orders={orders} setOrders={updateOrders}/>;
-      case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes}/>;
+      case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes} currentUser={currentUser}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
       case "reports":   return <ReportsModule orders={orders} finance={finance} customers={customers} suppliers={suppliers} purchases={purchases} products={products}/>;
       case "movimentos": return <MovimentosModule orders={orders} representantes={representantes} fechamentos={fechamentos} setFechamentos={updateFechamentos} finance={finance} setFinance={updateFinance}/>;
