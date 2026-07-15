@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.29.4";
+const APP_VERSION = "3.29.5";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -361,14 +361,6 @@ const Badge = ({ label, style }) => {
     </span>
   );
 };
-
-const Stat = ({ label, value, sub, color = "text-gray-900" }) => (
-  <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</p>
-    <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
-    {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-  </div>
-);
 
 // ─── Order Modal ──────────────────────────────────────────────────────────
 const OrderModal = ({ order, onClose, onSave, customers = [], products = [], representantes = [], formasPagamento = [], params }) => {
@@ -5500,7 +5492,6 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], variantC
     description:"", parentId:"", variantLabel:""
   });
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
-  const toggleCh = (c) => setForm(f=>({...f, channels: f.channels.includes(c)?f.channels.filter(x=>x!==c):[...f.channels,c]}));
   const margin = form.price && form.cost ? ((Number(form.price)-Number(form.cost))/Number(form.price)*100).toFixed(1) : null;
   const [nameErr, setNameErr] = useState(false);
 
@@ -7280,35 +7271,6 @@ const PriceHuntModule = ({ products, initialQuery = "", initialPrice = null }) =
 };
 
 // ─── Pricing Calculator Module ────────────────────────────────────────────
-const DEFAULT_CH_CFG = [
-  { id:"ml",     nome:"Mercado Livre", emoji:"🟡", comissao:15.0, taxaPgto:0.0,  freteFixo:0, ativo:true,  cor:"#f59e0b" },
-  { id:"shopee", nome:"Shopee",        emoji:"🟠", comissao:14.0, taxaPgto:0.0,  freteFixo:0, ativo:true,  cor:"#f97316" },
-  { id:"wpp",    nome:"WhatsApp",      emoji:"🟢", comissao:0.0,  taxaPgto:1.99, freteFixo:0, ativo:true,  cor:"#22c55e" },
-  { id:"loja",   nome:"Loja Própria",  emoji:"🔵", comissao:0.0,  taxaPgto:2.99, freteFixo:0, ativo:true,  cor:"#6366f1" },
-];
-
-function calcForward({ custo, embalagem, frete, imposto, margem, comissao, taxaPgto }) {
-  const tot = custo + embalagem + frete;
-  const ded = (comissao + taxaPgto + imposto + margem) / 100;
-  if (ded >= 0.99 || tot <= 0) return null;
-  const pv       = tot / (1 - ded);
-  const vComis   = pv * comissao  / 100;
-  const vPgto    = pv * taxaPgto  / 100;
-  const vImp     = pv * imposto   / 100;
-  const vLucro   = pv - tot - vComis - vPgto - vImp;
-  return { pv, tot, vComis, vPgto, vImp, vLucro, margemEf: (vLucro/pv)*100 };
-}
-
-function calcReverse({ pv, custo, embalagem, frete, imposto, comissao, taxaPgto }) {
-  if (pv <= 0) return null;
-  const tot    = custo + embalagem + frete;
-  const vComis = pv * comissao  / 100;
-  const vPgto  = pv * taxaPgto  / 100;
-  const vImp   = pv * imposto   / 100;
-  const vLucro = pv - tot - vComis - vPgto - vImp;
-  return { pv, tot, vComis, vPgto, vImp, vLucro, margemEf: (vLucro/pv)*100 };
-}
-
 const TabelaPrecos = ({ products, setProducts, params, currentUser }) => {
   const canAlterar = getUserPerm(currentUser, "pricing", "alterar");
   const [tSearch,       setTSearch]       = useState("");
@@ -7738,61 +7700,11 @@ const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHA
 };
 
 
-const PricingModule = ({ products, setProducts, onPriceHunt, params, currentUser }) => {
-  const [activeTab,   setActiveTab]   = useState("tabela");
-  const [selProd,    setSelProd]    = useState("");
-  const [custo,      setCusto]      = useState("");
-  const [embalagem,  setEmbalagem]  = useState("0");
-  const [frete,      setFrete]      = useState("0");
-  const [imposto,    setImposto]    = useState("4");
-  const [margem,     setMargem]     = useState("30");
-  const [modo,       setModo]       = useState("forward");
-  const [pvFixo,     setPvFixo]     = useState("");
-  const [channels,   setChannels]   = useState(DEFAULT_CH_CFG);
-  const [showCfg,    setShowCfg]    = useState(false);
-  const [toast,      setToast]      = useState(null);
-
-  const showToast = (m) => { setToast(m); setTimeout(()=>setToast(null), 3000); };
-  const setChF = (id, k, v) => setChannels(prev => prev.map(c => c.id===id ? {...c,[k]:v} : c));
-
-  const handleSelectProd = (id) => {
-    setSelProd(id);
-    const p = products.find(x=>x.id===id);
-    if (p) { setCusto(p.cost>0?String(p.cost):""); setPvFixo(String(p.price)); }
-  };
-
-  const handleApplyPrice = (chId, pv) => {
-    if (!selProd) return;
-    const rounded = Math.ceil(pv * 100) / 100;
-    setProducts(prev => prev.map(p => p.id===selProd ? {...p, price:rounded} : p));
-    const ch = channels.find(c=>c.id===chId);
-    showToast(`✅ Preço ${ch?.nome} atualizado: ${fmt(rounded)}`);
-  };
-
-  const results = useMemo(() => {
-    const c = Number(custo)||0, e = Number(embalagem)||0, f = Number(frete)||0;
-    const imp = Number(imposto)||0, mrg = Number(margem)||0;
-    const pv = Number(pvFixo)||0;
-    return channels.filter(ch => ch.ativo).map(ch => {
-      const fr = ch.freteFixo > 0 ? ch.freteFixo : f;
-      const r = modo==="forward"
-        ? calcForward({ custo:c, embalagem:e, frete:fr, imposto:imp, margem:mrg, comissao:ch.comissao, taxaPgto:ch.taxaPgto })
-        : calcReverse({ pv,      custo:c, embalagem:e, frete:fr, imposto:imp, comissao:ch.comissao, taxaPgto:ch.taxaPgto });
-      return { ...ch, r };
-    });
-  }, [custo, embalagem, frete, imposto, margem, pvFixo, channels, modo]);
-
-  const produto = products.find(p=>p.id===selProd);
-  const hasResults = results.some(r=>r.r);
-  const c = Number(custo)||0;
-
-  return (
-    <div className="space-y-4">
-      {toast && <div className="fixed top-4 right-4 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg">{toast}</div>}
-      <TabelaPrecos products={products} setProducts={setProducts} params={params} currentUser={currentUser}/>
-    </div>
-  );
-};
+const PricingModule = ({ products, setProducts, params, currentUser }) => (
+  <div className="space-y-4">
+    <TabelaPrecos products={products} setProducts={setProducts} params={params} currentUser={currentUser}/>
+  </div>
+);
 
 // ─── Sync Module ─────────────────────────────────────────────────────────
 const PLATFORM_INFO = {
@@ -8263,9 +8175,6 @@ const MOD_LABELS = {
 
 // ─── Authentication ───────────────────────────────────────────────────────
 const AUTH = {
-  user: "erp_auth_user",
-  hash: "erp_auth_hash",
-  rkey: "erp_auth_rkey",
   sess: "erp_session_v2",
 };
 
@@ -13243,11 +13152,6 @@ function ERPApp({ currentUser, onLogout }) {
     return () => window.removeEventListener("erp:load-error", onLoadError);
   }, []);
 
-  const handleLogout = () => {
-    sessionStorage.removeItem("erp_session_v2");
-    window.location.reload();
-  };
-
   useEffect(() => {
     Promise.all([loadOrders(),loadFinance(),loadCustomers(),loadSuppliers(),loadProducts(),loadMovements(),loadNfes(),loadPurchases(),loadCotacoes(),loadParams(),
       loadRepresentantes(),loadContas(),loadFormasPagamento(),loadVariantCatalogs(),loadFechamentos(),loadCaixa(),
@@ -13257,7 +13161,7 @@ function ERPApp({ currentUser, onLogout }) {
         if (prm) setParamsState(prm);
         setRepresentantes_(reps); setContas_(ctas); setFormasPagamento_(fps); setVariantCatalogs_(vcats); setFechamentos_(fechs);
         setCaixaState(cx);
-        if (emp?.value) setEmpresaForm(JSON.parse(emp.value));
+        if (emp?.value) { try { setEmpresaForm(JSON.parse(emp.value)); } catch(e) { console.error("[MM ERP] Dados da empresa corrompidos, ignorando:", e); } }
 
         // ── Automação: inativar clientes sem compras há 30+ dias ──
         const now    = new Date();
@@ -13299,6 +13203,13 @@ function ERPApp({ currentUser, onLogout }) {
         if (changed > 0) {
           setTimeout(() => showAppToast(`⚠️ ${changed} cliente${changed>1?"s":""} marcado${changed>1?"s":""} como Inativo (sem compras há ${DAYS}+ dias)`), 800);
         }
+      })
+      .catch(err => {
+        // Nunca deixar o app preso na tela de loading: se algo inesperado
+        // falhar no carregamento inicial, libera a UI e avisa.
+        console.error("[MM ERP] Erro no carregamento inicial:", err);
+        setLoading(false);
+        setTimeout(() => showAppToast("⚠️ Erro ao carregar parte dos dados — recarregue a página."), 500);
       });
   }, []);
 
@@ -13481,7 +13392,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)} initialStatusFilter={initialOrdersFilter} onConsumeStatusFilter={()=>setInitialOrdersFilter(null)} currentUser={currentUser}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params} currentUser={currentUser}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} currentUser={currentUser}/>;
-      case "pricing":   return <PricingModule products={products} setProducts={updateProducts} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} params={params} currentUser={currentUser}/>;
+      case "pricing":   return <PricingModule products={products} setProducts={updateProducts} params={params} currentUser={currentUser}/>;
       case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber" onViewOrder={(id)=>{ setOpenOrderId(id); setActive("orders"); }} currentUser={currentUser}/>;
       case "pagar":     return <FinanceModule key="fm-pagar" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="pagar" currentUser={currentUser}/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders} currentUser={currentUser}/>;
