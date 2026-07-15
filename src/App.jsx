@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.29.2";
+const APP_VERSION = "3.29.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -11931,7 +11931,10 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
   );
 };
 
-const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setContas, formasPagamento=[], setFormasPagamento, variantCatalogs=[], setVariantCatalogs }) => {
+const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setContas, formasPagamento=[], setFormasPagamento, variantCatalogs=[], setVariantCatalogs, currentUser }) => {
+  const canIncluir = getUserPerm(currentUser, "cadastros", "incluir");
+  const canAlterar = getUserPerm(currentUser, "cadastros", "alterar");
+  const canExcluir = getUserPerm(currentUser, "cadastros", "excluir");
   const [tab, setTab]         = useState("representantes");
   const [search, setSearch]   = useState("");
   const [modal, setModal]     = useState(null);
@@ -11946,12 +11949,13 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
   ), [representantes, search]);
 
   const saveRep = (data) => {
+    if (data.id ? !canAlterar : !canIncluir) return; // segurança extra, além dos botões já escondidos
     if (data.id) setRepresentantes(prev=>prev.map(r=>r.id===data.id?data:r));
     else setRepresentantes(prev=>[...prev, {...data, id:nextCadId(prev,"REP")}]);
     setModal(null);
     showToast(data.id ? "✅ Representante atualizado!" : "✅ Representante cadastrado!");
   };
-  const deleteRep = (r) => { setRepresentantes(prev=>prev.filter(x=>x.id!==r.id)); setConfirmDelete(null); showToast("🗑️ Representante removido"); };
+  const deleteRep = (r) => { if(!canExcluir) return; setRepresentantes(prev=>prev.filter(x=>x.id!==r.id)); setConfirmDelete(null); showToast("🗑️ Representante removido"); };
 
   // ── Contas ──
   const filteredContas = useMemo(() => contas.filter(c =>
@@ -11959,12 +11963,13 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
   ), [contas, search]);
 
   const saveConta = (data) => {
+    if (data.id ? !canAlterar : !canIncluir) return; // segurança extra, além dos botões já escondidos
     if (data.id) setContas(prev=>prev.map(c=>c.id===data.id?data:c));
     else setContas(prev=>[...prev, {...data, id:nextCadId(prev,"CTA")}]);
     setModal(null);
     showToast(data.id ? "✅ Conta atualizada!" : "✅ Conta cadastrada!");
   };
-  const deleteConta = (c) => { setContas(prev=>prev.filter(x=>x.id!==c.id)); setConfirmDelete(null); showToast("🗑️ Conta removida"); };
+  const deleteConta = (c) => { if(!canExcluir) return; setContas(prev=>prev.filter(x=>x.id!==c.id)); setConfirmDelete(null); showToast("🗑️ Conta removida"); };
 
   // ── Formas de Pagamento ──
   const filteredFP = useMemo(() => formasPagamento.filter(f =>
@@ -11972,12 +11977,13 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
   ), [formasPagamento, search]);
 
   const saveFP = (data) => {
+    if (data.id ? !canAlterar : !canIncluir) return; // segurança extra, além dos botões já escondidos
     if (data.id) setFormasPagamento(prev=>prev.map(f=>f.id===data.id?data:f));
     else setFormasPagamento(prev=>[...prev, {...data, id:nextCadId(prev,"FPG")}]);
     setModal(null);
     showToast(data.id ? "✅ Forma de pagamento atualizada!" : "✅ Forma de pagamento cadastrada!");
   };
-  const deleteFP = (f) => { setFormasPagamento(prev=>prev.filter(x=>x.id!==f.id)); setConfirmDelete(null); showToast("🗑️ Forma de pagamento removida"); };
+  const deleteFP = (f) => { if(!canExcluir) return; setFormasPagamento(prev=>prev.filter(x=>x.id!==f.id)); setConfirmDelete(null); showToast("🗑️ Forma de pagamento removida"); };
 
   // ── Catálogo de Variante ──
   const filteredCatalogos = useMemo(() => variantCatalogs.filter(c =>
@@ -11985,12 +11991,13 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
   ), [variantCatalogs, search]);
 
   const saveCatalogo = (data) => {
+    if (data.id ? !canAlterar : !canIncluir) return; // segurança extra, além dos botões já escondidos
     if (data.id) setVariantCatalogs(prev=>prev.map(c=>c.id===data.id?data:c));
     else setVariantCatalogs(prev=>[...prev, {...data, id:nextCadId(prev,"VCT")}]);
     setModal(null);
     showToast(data.id ? "✅ Catálogo atualizado!" : "✅ Catálogo cadastrado!");
   };
-  const deleteCatalogo = (c) => { setVariantCatalogs(prev=>prev.filter(x=>x.id!==c.id)); setConfirmDelete(null); showToast("🗑️ Catálogo removido"); };
+  const deleteCatalogo = (c) => { if(!canExcluir) return; setVariantCatalogs(prev=>prev.filter(x=>x.id!==c.id)); setConfirmDelete(null); showToast("🗑️ Catálogo removido"); };
 
   const newLabel = { representantes:"Representante", contas:"Conta", formaspagamento:"Forma de Pagamento", catalogovariante:"Catálogo" }[tab];
 
@@ -12003,9 +12010,11 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
           <h1 className="text-xl font-bold text-gray-900">Cadastros</h1>
           <p className="text-sm text-gray-500 mt-0.5">Representantes, contas bancárias e formas de pagamento</p>
         </div>
-        <button onClick={()=>setModal("new")} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm flex items-center gap-1.5">
-          <Icon name="plus" size={15}/> {newLabel}
-        </button>
+        {canIncluir && (
+          <button onClick={()=>setModal("new")} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm flex items-center gap-1.5">
+            <Icon name="plus" size={15}/> {newLabel}
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -12062,8 +12071,8 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
                     <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${r.status==="Ativo"?"bg-green-50 text-green-600":"bg-gray-100 text-gray-400"}`}>{r.status}</span>
                   </div>
                   <div className="col-span-1 flex justify-end gap-2">
-                    <button onClick={()=>setModal(r)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>
-                    <button onClick={()=>setConfirmDelete({type:"rep",item:r})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>
+                    {canAlterar && <button onClick={()=>setModal(r)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>}
+                    {canExcluir && <button onClick={()=>setConfirmDelete({type:"rep",item:r})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>}
                   </div>
                 </div>
                 {/* Card — mobile */}
@@ -12081,8 +12090,8 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
                     </div>
                   </div>
                   <div className="flex flex-col items-center gap-2.5 shrink-0 pt-0.5">
-                    <button onClick={()=>setModal(r)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={16}/></button>
-                    <button onClick={()=>setConfirmDelete({type:"rep",item:r})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={16}/></button>
+                    {canAlterar && <button onClick={()=>setModal(r)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={16}/></button>}
+                    {canExcluir && <button onClick={()=>setConfirmDelete({type:"rep",item:r})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={16}/></button>}
                   </div>
                 </div>
               </Fragment>
@@ -12127,8 +12136,8 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
                     <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${c.status==="Ativo"?"bg-green-50 text-green-600":"bg-gray-100 text-gray-400"}`}>{c.status}</span>
                   </div>
                   <div className="col-span-2 flex justify-end gap-2">
-                    <button onClick={()=>setModal(c)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>
-                    <button onClick={()=>setConfirmDelete({type:"conta",item:c})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>
+                    {canAlterar && <button onClick={()=>setModal(c)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>}
+                    {canExcluir && <button onClick={()=>setConfirmDelete({type:"conta",item:c})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>}
                   </div>
                 </div>
                 {/* Card — mobile */}
@@ -12143,8 +12152,8 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
                     </div>
                   </div>
                   <div className="flex flex-col items-center gap-2.5 shrink-0 pt-0.5">
-                    <button onClick={()=>setModal(c)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={16}/></button>
-                    <button onClick={()=>setConfirmDelete({type:"conta",item:c})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={16}/></button>
+                    {canAlterar && <button onClick={()=>setModal(c)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={16}/></button>}
+                    {canExcluir && <button onClick={()=>setConfirmDelete({type:"conta",item:c})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={16}/></button>}
                   </div>
                 </div>
               </Fragment>
@@ -12183,8 +12192,8 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
                     <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${f.status==="Ativo"?"bg-green-50 text-green-600":"bg-gray-100 text-gray-400"}`}>{f.status}</span>
                   </div>
                   <div className="col-span-2 flex justify-end gap-2">
-                    <button onClick={()=>setModal(f)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>
-                    <button onClick={()=>setConfirmDelete({type:"fp",item:f})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>
+                    {canAlterar && <button onClick={()=>setModal(f)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>}
+                    {canExcluir && <button onClick={()=>setConfirmDelete({type:"fp",item:f})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>}
                   </div>
                 </div>
               );
@@ -12215,8 +12224,8 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0 pt-0.5">
-                  <button onClick={()=>setModal(c)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>
-                  <button onClick={()=>setConfirmDelete({type:"catalogo",item:c})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>
+                  {canAlterar && <button onClick={()=>setModal(c)} className="text-gray-400 hover:text-indigo-600"><Icon name="edit" size={15}/></button>}
+                  {canExcluir && <button onClick={()=>setConfirmDelete({type:"catalogo",item:c})} className="text-gray-400 hover:text-red-500"><Icon name="trash" size={15}/></button>}
                 </div>
               </div>
             ))}
@@ -13456,7 +13465,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} params={params} currentUser={currentUser}/>;
       case "pdv": return <PdvModule products={products} setProducts={updateProducts} orders={orders} setOrders={updateOrders} movements={movements} setMovements={updateMovements} customers={customers} caixa={caixa} setCaixa={updateCaixa} params={params} currentUser={currentUser}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
-      case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento} variantCatalogs={variantCatalogs} setVariantCatalogs={updateVariantCatalogs}/>;
+      case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento} variantCatalogs={variantCatalogs} setVariantCatalogs={updateVariantCatalogs} currentUser={currentUser}/>;
       case "parametros": return <ParamsModule params={params} setParams={updateParams} onSaveEmpresa={(data)=>setEmpresaForm(data)} orders={orders} setOrders={updateOrders}/>;
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes} currentUser={currentUser}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
