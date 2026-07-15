@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.28.4";
+const APP_VERSION = "3.28.5";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -4240,7 +4240,7 @@ const SupplierPayModal = ({ purchase, onClose, onSave }) => {
   );
 };
 
-const SupplierDetailPanel = ({ supplier, finance, purchases, onUpdatePurchase, onClose, onEdit, onDelete, onRegisterPurchase }) => {
+const SupplierDetailPanel = ({ supplier, finance, purchases, onUpdatePurchase, onClose, onEdit, onDelete, onRegisterPurchase, canIncluir=true, canAlterar=true, canExcluir=true }) => {
   if (!supplier) return null;
   const [panelTab,     setPanelTab]     = useState("dados");
   const [supPayModal,  setSupPayModal]  = useState(null);
@@ -4489,13 +4489,17 @@ const SupplierDetailPanel = ({ supplier, finance, purchases, onUpdatePurchase, o
 
         <div className="p-4 border-t border-gray-100 flex gap-2 shrink-0">
           <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Fechar</button>
-          <button onClick={()=>onRegisterPurchase(supplier)} className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 font-medium">
-            <Icon name="plus" size={14}/> Compra
-          </button>
-          <button onClick={()=>onEdit(supplier)} className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 flex items-center justify-center gap-2">
-            <Icon name="edit" size={14}/> Editar
-          </button>
-          <button onClick={()=>onDelete(supplier)} className="p-2.5 rounded-xl border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors"><Icon name="trash" size={16}/></button>
+          {canIncluir && (
+            <button onClick={()=>onRegisterPurchase(supplier)} className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 font-medium">
+              <Icon name="plus" size={14}/> Compra
+            </button>
+          )}
+          {canAlterar && (
+            <button onClick={()=>onEdit(supplier)} className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 flex items-center justify-center gap-2">
+              <Icon name="edit" size={14}/> Editar
+            </button>
+          )}
+          {canExcluir && <button onClick={()=>onDelete(supplier)} className="p-2.5 rounded-xl border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors"><Icon name="trash" size={16}/></button>}
         </div>
       </div>
     </div>
@@ -4503,7 +4507,10 @@ const SupplierDetailPanel = ({ supplier, finance, purchases, onUpdatePurchase, o
 };
 
 // ─── Supplier Module ──────────────────────────────────────────────────────
-const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchases, setPurchases }) => {
+const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchases, setPurchases, currentUser }) => {
+  const canIncluir = getUserPerm(currentUser, "suppliers", "incluir");
+  const canAlterar = getUserPerm(currentUser, "suppliers", "alterar");
+  const canExcluir = getUserPerm(currentUser, "suppliers", "excluir");
   const [search, setSearch]             = useState("");
   const [filterCat, setFilterCat]       = useState("Todas");
   const [filterStatus, setFilterStatus] = useState("Todos");
@@ -4532,16 +4539,19 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
     return `FOR-${String(Math.max(0,...nums)+1).padStart(3,"0")}`;
   };
   const handleSave = (data) => {
+    if (data.id ? !canAlterar : !canIncluir) return; // segurança extra, além dos botões já escondidos
     if (data.id) setSuppliers(prev=>prev.map(s=>s.id===data.id?data:s));
     else setSuppliers(prev=>[...prev, {...data, id:nextForId(prev), createdAt:today()}]);
     setModal(null);
   };
   const handleDelete = (sup) => {
+    if (!canExcluir) return; // segurança extra, além do botão já escondido
     setSuppliers(prev=>prev.filter(s=>s.id!==sup.id));
     setConfirmDelete(null);
     if (selected===sup.id) setSelected(null);
   };
   const handleRegisterPurchase = (data) => {
+    if (!canIncluir) return; // segurança extra, além do botão já escondido
     const finNums = finance.map(f=>parseInt(f.id.replace("FIN-",""))||0);
     const newFinId = `FIN-${String(Math.max(0,...finNums)+1).padStart(3,"0")}`;
     setFinance(prev=>[{ id:newFinId, type:"despesa", category:"Fornecedores",
@@ -4562,9 +4572,11 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
           <h1 className="text-xl font-bold text-gray-900">Fornecedores</h1>
           <p className="text-sm text-gray-500 mt-0.5">{suppliers.length} fornecedores cadastrados</p>
         </div>
-        <button onClick={()=>setModal("new")} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm flex items-center gap-1.5">
-          <Icon name="plus" size={15}/> Fornecedor
-        </button>
+        {canIncluir && (
+          <button onClick={()=>setModal("new")} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm flex items-center gap-1.5">
+            <Icon name="plus" size={15}/> Fornecedor
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -4671,7 +4683,8 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
         onClose={()=>setSelected(null)}
         onEdit={(s)=>{ setModal(s); setSelected(null); }}
         onDelete={(s)=>{ setConfirmDelete(s); setSelected(null); }}
-        onRegisterPurchase={(s)=>{ setPurchaseModal(s); setSelected(null); }}/>}
+        onRegisterPurchase={(s)=>{ setPurchaseModal(s); setSelected(null); }}
+        canIncluir={canIncluir} canAlterar={canAlterar} canExcluir={canExcluir}/>}
 
       {purchaseModal && <RegisterPurchaseModal supplier={purchaseModal} onClose={()=>setPurchaseModal(null)} onSave={handleRegisterPurchase}/>}
 
@@ -13371,7 +13384,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber" onViewOrder={(id)=>{ setOpenOrderId(id); setActive("orders"); }}/>;
       case "pagar":     return <FinanceModule key="fm-pagar" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="pagar"/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
-      case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases}/>;
+      case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases} currentUser={currentUser}/>;
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} params={params} currentUser={currentUser}/>;
       case "pdv": return <PdvModule products={products} setProducts={updateProducts} orders={orders} setOrders={updateOrders} movements={movements} setMovements={updateMovements} customers={customers} caixa={caixa} setCaixa={updateCaixa} params={params} currentUser={currentUser}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
