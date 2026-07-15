@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.27.2";
+const APP_VERSION = "3.28.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -8185,7 +8185,20 @@ const clearSession= () => sessionStorage.removeItem(AUTH.sess);
 
 function buildUserSession(u) {
   const modules = u.customModules || ROLES_DEF[u.role]?.modules || ROLES_DEF.viewer.modules;
-  return { id:u.id, username:u.username, displayName:u.displayName||u.username, role:u.role, modules };
+  return { id:u.id, username:u.username, displayName:u.displayName||u.username, role:u.role, modules, customPermissions: u.customPermissions || null };
+}
+
+// Permissão detalhada (Ver/Incluir/Alterar/Excluir) por módulo. Se o usuário
+// não tiver personalização pra esse módulo/ação, cai no padrão: quem enxerga
+// o módulo (customModules/perfil) pode fazer tudo nele — exatamente como o
+// sistema já se comportava antes dessa funcionalidade existir, então nada
+// muda pra quem nunca foi personalizado.
+function getUserPerm(session, moduleId, action) {
+  if (!session) return false;
+  const custom = session.customPermissions?.[moduleId];
+  if (custom && typeof custom[action] === "boolean") return custom[action];
+  const modules = session.modules || ROLES_DEF[session.role]?.modules || ROLES_DEF.viewer.modules;
+  return modules.includes(moduleId);
 }
 
 // ─── Setup Screen (first access) ─────────────────────────────────────────
@@ -8321,7 +8334,8 @@ const AuthLogin = ({ onDone }) => {
       const u = {
         id: data.user.id, username: data.user.username,
         displayName: data.user.displayName||data.user.username,
-        role: data.user.role, customModules: null,
+        role: data.user.role, customModules: data.user.customModules ?? null,
+        customPermissions: data.user.customPermissions ?? null,
       };
       const session = { ...buildUserSession(u), token: data.token };
       setSession(session); onDone(session);
@@ -8459,6 +8473,7 @@ const UsersModule = ({ currentUser }) => {
     displayName: u.display_name ?? u.displayName ?? u.username,
     role: u.role,
     customModules: u.custom_modules ?? u.customModules ?? null,
+    customPermissions: u.custom_permissions ?? u.customPermissions ?? null,
     active: u.active !== undefined ? u.active : true,
     createdAt: u.created_at ?? u.createdAt,
   });
@@ -8486,7 +8501,7 @@ const UsersModule = ({ currentUser }) => {
   useEffect(() => { load(); }, []);
 
   // User form state
-  const emptyForm = { username:"", displayName:"", pwd:"", role:"vendedor", customModules:null, useCustom:false };
+  const emptyForm = { username:"", displayName:"", pwd:"", role:"vendedor", customModules:null, useCustom:false, customPermissions:null, useCustomPerms:false };
   const [form, setForm]   = useState(emptyForm);
   const [err,  setErr]    = useState("");
   const [ok,   setOk]     = useState("");
@@ -8501,10 +8516,27 @@ const UsersModule = ({ currentUser }) => {
     setF("customModules", next);
   };
 
+  // Permissão detalhada por módulo: incluir/alterar/excluir. "Ver" é sempre
+  // o mesmo da lista de módulos acima — não duplica esse controle aqui.
+  const PERM_ACTIONS = ["incluir","alterar","excluir"];
+  const getPermChecked = (mod, action) => {
+    if (form.useCustomPerms && form.customPermissions?.[mod]?.[action] !== undefined) {
+      return form.customPermissions[mod][action];
+    }
+    return effectiveModules.includes(mod); // padrão: quem vê, pode tudo
+  };
+  const togglePerm = (mod, action) => {
+    const cur = form.customPermissions || {};
+    const modPerm = { ...(cur[mod] || {}) };
+    modPerm[action] = !getPermChecked(mod, action);
+    setF("customPermissions", { ...cur, [mod]: modPerm });
+  };
+
   const openNew = () => { setForm(emptyForm); setErr(""); setOk(""); setModal("new"); };
   const openEdit = (u) => {
     setForm({ username:u.username, displayName:u.displayName||"", pwd:"", role:u.role,
-      customModules:u.customModules||null, useCustom:!!u.customModules });
+      customModules:u.customModules||null, useCustom:!!u.customModules,
+      customPermissions:u.customPermissions||null, useCustomPerms:!!u.customPermissions });
     setErr(""); setOk(""); setModal(u);
   };
 
@@ -8528,6 +8560,7 @@ const UsersModule = ({ currentUser }) => {
         await callUsersApi({
           action:"updateProfile", id:modal.id, displayName:form.displayName||modal.displayName,
           role:form.role, customModules: form.useCustom?form.customModules:null,
+          customPermissions: form.useCustomPerms?form.customPermissions:null,
         });
         if (form.pwd.length>=6) {
           const newHash = await sha256(form.pwd);
@@ -8588,6 +8621,7 @@ const UsersModule = ({ currentUser }) => {
                         {!u.active && <span className="text-[10px] bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full">Inativo</span>}
                         {u.username===currentUser.username && <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full">Você</span>}
                         {u.customModules && <span className="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">Permissões personalizadas</span>}
+                        {u.customPermissions && <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">Ver/Incluir/Alterar/Excluir personalizado</span>}
                       </div>
                     </div>
                   </div>
@@ -8674,6 +8708,40 @@ const UsersModule = ({ currentUser }) => {
                   })}
                 </div>
                 {!form.useCustom && <p className="text-[10px] text-gray-400 mt-1">Usando permissões padrão do perfil "{ROLES_DEF[form.role]?.label}". Marque "Personalizar" para ajustar.</p>}
+              </div>
+
+              {/* Detailed CRUD permissions */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Permissões detalhadas</label>
+                  <label className="flex items-center gap-1.5 text-xs text-indigo-600 cursor-pointer">
+                    <input type="checkbox" checked={form.useCustomPerms}
+                      onChange={e=>{ setF("useCustomPerms",e.target.checked); if(!e.target.checked) setF("customPermissions",null); }}/>
+                    Personalizar
+                  </label>
+                </div>
+                <div className="border border-gray-100 rounded-xl overflow-hidden">
+                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-1.5 bg-gray-50 text-[10px] font-semibold text-gray-400 uppercase">
+                    <span>Módulo</span><span className="w-14 text-center">Incluir</span><span className="w-14 text-center">Alterar</span><span className="w-14 text-center">Excluir</span>
+                  </div>
+                  {allModsWithUsuarios.map(mod => {
+                    const ve = effectiveModules.includes(mod);
+                    return (
+                      <div key={mod} className={`grid grid-cols-[1fr_auto_auto_auto] gap-2 px-3 py-1.5 items-center border-t border-gray-50 text-xs ${ve?"":"opacity-40"}`}>
+                        <span className="text-gray-700 truncate">{MOD_LABELS[mod]||mod}</span>
+                        {PERM_ACTIONS.map(action => (
+                          <div key={action} className="w-14 flex justify-center">
+                            <input type="checkbox" className="accent-indigo-600"
+                              checked={ve && getPermChecked(mod, action)}
+                              disabled={!form.useCustomPerms || !ve}
+                              onChange={()=>togglePerm(mod, action)}/>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+                {!form.useCustomPerms && <p className="text-[10px] text-gray-400 mt-1">Sem personalização: quem vê o módulo (acima) pode incluir/alterar/excluir livremente nele. Marque "Personalizar" pra restringir.</p>}
               </div>
 
               {err && <p className="text-red-500 text-sm">{err}</p>}
