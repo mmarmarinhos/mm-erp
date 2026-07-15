@@ -83,10 +83,11 @@ export default async function handler(req, res) {
     }
 
     if (action === 'updateProfile') {
-      const { id, displayName, role, customModules } = req.body;
+      const { id, displayName, role, customModules, customPermissions } = req.body;
       if (!id) return res.status(400).json({ error: 'Informe o id do usuário' });
       await sbRpc('update_user_profile', {
         p_id: String(id), p_display_name: displayName, p_role: role, p_custom_modules: customModules ?? null,
+        p_custom_permissions: customPermissions ?? null,
       });
       return res.status(200).json({ ok: true });
     }
