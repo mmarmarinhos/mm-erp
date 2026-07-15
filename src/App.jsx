@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.26.1";
+const APP_VERSION = "3.26.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -2086,10 +2086,10 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
 };
 
 // ─── Finance Transaction Modal ────────────────────────────────────────────
-const FinanceModal = ({ tx, onClose, onSave }) => {
+const FinanceModal = ({ tx, onClose, onSave, defaultType = "receita" }) => {
   const isNew = !tx;
   const [form, setForm] = useState(tx || {
-    type:"receita", category:"Vendas ML", description:"", amount:"",
+    type:defaultType, category:defaultType==="despesa" ? EXPENSE_CATS[0] : "Vendas ML", description:"", amount:"",
     date:today(), status:"pago", notes:""
   });
   const set = (k,v) => setForm(f => ({ ...f, [k]:v }));
@@ -2818,6 +2818,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
           tx={modal === "new" ? null : modal}
           onClose={() => setModal(null)}
           onSave={handleSave}
+          defaultType={initialTab === "pagar" ? "despesa" : "receita"}
         />
       )}
     </div>
