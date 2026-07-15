@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.29.3";
+const APP_VERSION = "3.29.4";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -12278,7 +12278,8 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
 const CHANNEL_EMOJI_MAP = { "Mercado Livre":"🛒","Shopee":"🛍️","WhatsApp":"💬","Loja Própria":"🏪" };
 const CHANNEL_DOT_COLOR = { "Mercado Livre":"bg-yellow-500","Shopee":"bg-orange-500","WhatsApp":"bg-green-500","Loja Própria":"bg-blue-500" };
 
-const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) => {
+const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders, currentUser }) => {
+  const canAlterar = getUserPerm(currentUser, "parametros", "alterar");
   const [tab, setTab]       = useState("empresa");
   const [toast, setToast]   = useState(null);
   const [revealed, setRevealed] = useState({});
@@ -12320,6 +12321,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
   }, []);
 
   const handleLogoUpload = (e) => {
+    if (!canAlterar) return; // segurança extra, além do botão já escondido
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 500 * 1024) { alert("Imagem muito grande. Use uma imagem menor que 500KB."); return; }
@@ -12340,6 +12342,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
   };
 
   const handleLogoRemove = async () => {
+    if (!canAlterar) return; // segurança extra, além do botão já escondido
     const anterior = logo;
     setLogo(null);
     try {
@@ -12383,12 +12386,14 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
   );
 
   const handleSaveEmpresa = async () => {
+    if (!canAlterar) return; // segurança extra, além do botão já escondido
     await window.storage.set(EMPRESA_KEY, JSON.stringify(empresa)).catch(()=>{});
     if (onSaveEmpresa) onSaveEmpresa(empresa);
     showToast("✅ Dados da empresa salvos!");
   };
 
   const mergeAndSave = async (patch) => {
+    if (!canAlterar) return; // segurança extra, além dos botões já escondidos
     const next = { ...(params||PARAMS_DEFAULT), ...patch };
     await saveParams(next);
     setParams(next);
@@ -12441,13 +12446,17 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                     </p>
                     <p className="text-xs text-gray-400">PNG ou JPG · máximo 500KB · recomendado 200×200px</p>
                     <div className="flex gap-2 flex-wrap items-center">
-                      <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                        className="hidden" onChange={handleLogoUpload}/>
-                      <button onClick={()=>fileRef.current?.click()}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors">
-                        {logo ? "Trocar Logo" : "Carregar Logo"}
-                      </button>
-                      {logo && (
+                      {canAlterar && (
+                        <>
+                          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                            className="hidden" onChange={handleLogoUpload}/>
+                          <button onClick={()=>fileRef.current?.click()}
+                            className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors">
+                            {logo ? "Trocar Logo" : "Carregar Logo"}
+                          </button>
+                        </>
+                      )}
+                      {logo && canAlterar && (
                         <button onClick={handleLogoRemove}
                           className="px-4 py-2 border border-red-200 text-red-500 rounded-xl text-sm font-medium hover:bg-red-50 transition-colors">
                           Remover
@@ -12516,10 +12525,12 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
                 </div>
               </div>
 
-              <button onClick={handleSaveEmpresa}
-                className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
-                💾 Salvar Dados da Empresa
-              </button>
+              {canAlterar && (
+                <button onClick={handleSaveEmpresa}
+                  className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+                  💾 Salvar Dados da Empresa
+                </button>
+              )}
             </div>
       )}
 
@@ -12621,10 +12632,12 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
               </div>
             );
           })}
-          <button onClick={()=>mergeAndSave({canais}).then(()=>showToast("✅ Canais & Comissões salvos!"))}
-            className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
-            💾 Salvar Canais & Comissões
-          </button>
+          {canAlterar && (
+            <button onClick={()=>mergeAndSave({canais}).then(()=>showToast("✅ Canais & Comissões salvos!"))}
+              className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+              💾 Salvar Canais & Comissões
+            </button>
+          )}
         </div>
       )}
 
@@ -12713,10 +12726,12 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
             </div>
           </div>
 
-          <button onClick={()=>mergeAndSave({vendas}).then(()=>showToast("✅ Configurações de Vendas salvas!"))}
-            className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
-            💾 Salvar Vendas
-          </button>
+          {canAlterar && (
+            <button onClick={()=>mergeAndSave({vendas}).then(()=>showToast("✅ Configurações de Vendas salvas!"))}
+              className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+              💾 Salvar Vendas
+            </button>
+          )}
         </div>
       )}
 
@@ -12763,10 +12778,12 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
               </button>
             </div>
 
-            <button onClick={()=>mergeAndSave({compras}).then(()=>showToast("✅ Status de Compras salvos!"))}
-              className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
-              💾 Salvar Status de Compras
-            </button>
+            {canAlterar && (
+              <button onClick={()=>mergeAndSave({compras}).then(()=>showToast("✅ Status de Compras salvos!"))}
+                className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+                💾 Salvar Status de Compras
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -12819,10 +12836,12 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
               </>
             )}
 
-            <button onClick={()=>mergeAndSave({fiscal}).then(()=>showToast("✅ Configuração fiscal salva!"))}
-              className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
-              💾 Salvar Fiscal
-            </button>
+            {canAlterar && (
+              <button onClick={()=>mergeAndSave({fiscal}).then(()=>showToast("✅ Configuração fiscal salva!"))}
+                className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+                💾 Salvar Fiscal
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -12889,10 +12908,12 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
             </div>
           </div>
 
-          <button onClick={()=>mergeAndSave({canais, alertas}).then(()=>showToast("✅ Alertas configurados!"))}
-            className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
-            💾 Salvar Alertas
-          </button>
+          {canAlterar && (
+            <button onClick={()=>mergeAndSave({canais, alertas}).then(()=>showToast("✅ Alertas configurados!"))}
+              className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+              💾 Salvar Alertas
+            </button>
+          )}
         </div>
       )}
 
@@ -13034,13 +13055,16 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders }) =
             </div>
           </div>
 
-          <button onClick={()=>{
-            const next={...(params||PARAMS_DEFAULT),sincronizacao:sync};
-            saveParams(next).then(()=>{setParams(next);if(sync.backendUrl)localStorage.setItem("erp_backend_url",sync.backendUrl);showToast("✅ Configurações de sincronização salvas!");});
-          }}
-            className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
-            💾 Salvar Sincronização
-          </button>
+          {canAlterar && (
+            <button onClick={()=>{
+              if (!canAlterar) return; // segurança extra
+              const next={...(params||PARAMS_DEFAULT),sincronizacao:sync};
+              saveParams(next).then(()=>{setParams(next);if(sync.backendUrl)localStorage.setItem("erp_backend_url",sync.backendUrl);showToast("✅ Configurações de sincronização salvas!");});
+            }}
+              className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+              💾 Salvar Sincronização
+            </button>
+          )}
 
           {/* Operação de sincronização (importar pedidos agora) */}
           <div className="border-t border-gray-100 pt-4 mt-2">
@@ -13466,7 +13490,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "pdv": return <PdvModule products={products} setProducts={updateProducts} orders={orders} setOrders={updateOrders} movements={movements} setMovements={updateMovements} customers={customers} caixa={caixa} setCaixa={updateCaixa} params={params} currentUser={currentUser}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
       case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento} variantCatalogs={variantCatalogs} setVariantCatalogs={updateVariantCatalogs} currentUser={currentUser}/>;
-      case "parametros": return <ParamsModule params={params} setParams={updateParams} onSaveEmpresa={(data)=>setEmpresaForm(data)} orders={orders} setOrders={updateOrders}/>;
+      case "parametros": return <ParamsModule params={params} setParams={updateParams} onSaveEmpresa={(data)=>setEmpresaForm(data)} orders={orders} setOrders={updateOrders} currentUser={currentUser}/>;
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes} currentUser={currentUser}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
       case "reports":   return <ReportsModule orders={orders} finance={finance} customers={customers} suppliers={suppliers} purchases={purchases} products={products}/>;
