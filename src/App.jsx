@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.28.2";
+const APP_VERSION = "3.28.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -9707,7 +9707,10 @@ const BaixarPedidoModal = ({ purchase, onClose, onConfirm, products = [] }) => {
   );
 };
 
-const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance, params }) => {
+const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance, params, currentUser }) => {
+  const canIncluir = getUserPerm(currentUser, "purchases", "incluir");
+  const canAlterar = getUserPerm(currentUser, "purchases", "alterar");
+  const canExcluir = getUserPerm(currentUser, "purchases", "excluir");
   const [modal,      setModal]      = useState(null);
   const [detail,     setDetail]     = useState(null);
   const [stockEntry, setStockEntry] = useState(false);
@@ -9760,6 +9763,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
   };
 
   const handleSave = (data) => {
+    if (data.id ? !canAlterar : !canIncluir) return; // segurança extra, além dos botões já escondidos
     const oldPurchase = data.id ? purchases.find(p => p.id === data.id) : null;
     const wasReceived = oldPurchase?.status === "Baixado";
     const isReceived  = data.status === "Baixado";
@@ -9854,6 +9858,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
   };
 
   const handleDelete = (pc) => {
+    if (!canExcluir) return; // segurança extra, além do botão já escondido
     setPurchases(prev => prev.filter(p => p.id !== pc.id));
     // Remove também o(s) lançamento(s) em Contas a Pagar gerados pela baixa deste pedido —
     // por id vinculado (purchaseId) ou, em lançamentos antigos sem esse campo, pela descrição.
@@ -9917,6 +9922,7 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
   };
 
   const handleBaixarPedido = (data) => {
+    if (!canAlterar) return; // segurança extra, além do botão já escondido
     const purchase = baixaPedido;
     if (!purchase) return;
 
@@ -10062,13 +10068,13 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
           </div>
           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${st(detail.status).bg} ${st(detail.status).text}`}>{detail.status}</span>
           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${fs.bg} ${fs.text}`}>{fs.icon} {fs.label}</span>
-          {detail.status !== "Baixado" && detail.status !== "Cancelado" && (
+          {canAlterar && detail.status !== "Baixado" && detail.status !== "Cancelado" && (
             <button onClick={() => setBaixaPedido(detail)}
               className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 flex items-center gap-1.5">
               ✅ Baixar Pedido
             </button>
           )}
-          {detail.status === "Baixado" && detail.items.some(it => !it._prodId) && (
+          {canAlterar && detail.status === "Baixado" && detail.items.some(it => !it._prodId) && (
             <button onClick={() => setStockEntry(true)}
               className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 flex items-center gap-1.5">
               📦 Dar Entrada no Estoque
@@ -10077,8 +10083,8 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
           {detail.status === "Baixado" && detail.items.every(it => !!it._prodId) && (
             <span className="px-3 py-2 bg-green-50 text-green-700 rounded-xl text-xs font-semibold border border-green-200">✓ Estoque atualizado</span>
           )}
-          <button onClick={()=>setModal(detail)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700">Editar</button>
-          <button onClick={()=>setDelConfirm(detail)} className="px-3 py-2 border border-red-200 text-red-500 rounded-xl text-sm hover:bg-red-50">Excluir</button>
+          {canAlterar && <button onClick={()=>setModal(detail)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700">Editar</button>}
+          {canExcluir && <button onClick={()=>setDelConfirm(detail)} className="px-3 py-2 border border-red-200 text-red-500 rounded-xl text-sm hover:bg-red-50">Excluir</button>}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -10191,9 +10197,11 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
           <h1 className="text-xl font-bold text-gray-900">Pedidos de Compra</h1>
           <p className="text-sm text-gray-500 mt-0.5">{purchases.length} pedidos · {fmt(totalPending)} em aberto</p>
         </div>
-        <button onClick={()=>setModal("new")} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700">
-          + Novo Pedido
-        </button>
+        {canIncluir && (
+          <button onClick={()=>setModal("new")} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700">
+            + Novo Pedido
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
@@ -13343,7 +13351,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "pagar":     return <FinanceModule key="fm-pagar" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="pagar"/>;
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders}/>;
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases}/>;
-      case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} params={params}/>;
+      case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} params={params} currentUser={currentUser}/>;
       case "pdv": return <PdvModule products={products} setProducts={updateProducts} orders={orders} setOrders={updateOrders} movements={movements} setMovements={updateMovements} customers={customers} caixa={caixa} setCaixa={updateCaixa} params={params} currentUser={currentUser}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
       case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento} variantCatalogs={variantCatalogs} setVariantCatalogs={updateVariantCatalogs}/>;
