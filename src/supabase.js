@@ -126,9 +126,10 @@ export async function dbSetUserPassword(id, newPasswordHash) {
   return dbRpc('set_user_password', { p_id: String(id), p_new_hash: newPasswordHash })
 }
 
-export async function dbUpdateUserProfile(id, displayName, role, customModules) {
+export async function dbUpdateUserProfile(id, displayName, role, customModules, customPermissions) {
   return dbRpc('update_user_profile', {
     p_id: String(id), p_display_name: displayName, p_role: role, p_custom_modules: customModules,
+    p_custom_permissions: customPermissions,
   })
 }
 
