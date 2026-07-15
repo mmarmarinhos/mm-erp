@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.27.1";
+const APP_VERSION = "3.27.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -5128,7 +5128,11 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
           {/* Pending summary */}
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label:"A Receber",  value: fmt(finance.filter(f=>f.status==="pendente"&&f.type==="receita").reduce((s,f)=>s+f.amount,0)), color:"text-green-600", bg:"bg-green-50", border:"border-green-100" },
+              // "A Receber" reflete pedidos faturados e ainda não pagos (mesmo
+              // critério da aba Contas a Receber) — receita de venda nunca
+              // gera lançamento financeiro automático, então olhar só pra
+              // "finance" sempre dava zero.
+              { label:"A Receber",  value: fmt(orders.filter(o=>o.status!=="Cancelado"&&!!o.nfNumero&&!o.paidDate).reduce((s,o)=>s+o.total,0)), color:"text-green-600", bg:"bg-green-50", border:"border-green-100" },
               { label:"A Pagar",    value: fmt(finance.filter(f=>f.status==="pendente"&&f.type==="despesa").reduce((s,f)=>s+f.amount,0)), color:"text-red-500",   bg:"bg-red-50",   border:"border-red-100"   },
             ].map(k => (
               <div key={k.label} className={`${k.bg} rounded-xl p-4 border ${k.border} shadow-sm`}>
