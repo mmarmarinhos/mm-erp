@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.26.2";
+const APP_VERSION = "3.26.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -2090,7 +2090,7 @@ const FinanceModal = ({ tx, onClose, onSave, defaultType = "receita" }) => {
   const isNew = !tx;
   const [form, setForm] = useState(tx || {
     type:defaultType, category:defaultType==="despesa" ? EXPENSE_CATS[0] : "Vendas ML", description:"", amount:"",
-    date:today(), status:"pago", notes:""
+    date:today(), status:"pendente", notes:""
   });
   const set = (k,v) => setForm(f => ({ ...f, [k]:v }));
   const cats = form.type === "receita" ? INCOME_CATS : EXPENSE_CATS;
