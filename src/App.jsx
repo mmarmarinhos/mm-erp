@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.28.1";
+const APP_VERSION = "3.28.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -8573,6 +8573,21 @@ const UsersModule = ({ currentUser }) => {
           action:"create", username:form.username.toLowerCase(), displayName:form.displayName||form.username,
           passwordHash:hash, role:form.role,
         });
+        // create_erp_user não aceita customModules/customPermissions direto —
+        // se a pessoa já personalizou na hora de criar, busca o usuário recém
+        // criado e aplica a personalização com uma segunda chamada, senão
+        // essas escolhas eram descartadas em silêncio.
+        if (form.useCustom || form.useCustomPerms) {
+          const fresh = await callUsersApi({ action:"list" });
+          const created = (fresh.users||[]).find(u=>u.username===form.username.toLowerCase());
+          if (created) {
+            await callUsersApi({
+              action:"updateProfile", id:created.id, displayName:form.displayName||form.username,
+              role:form.role, customModules: form.useCustom?form.customModules:null,
+              customPermissions: form.useCustomPerms?form.customPermissions:null,
+            });
+          }
+        }
         setOk(`✅ Usuário criado! Chave de recuperação: ${data.recoveryKey}`);
         load();
         setForm(emptyForm);
