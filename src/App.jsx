@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.3";
+const APP_VERSION = "3.31.4";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -1144,16 +1144,16 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
     return new Date(y,m-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"});
   };
 
-  const prevMonth = () => {
+  // No modo "Ano" as setas pulam 12 meses (antes, cada clique andava só 1 mês
+  // — pra trocar de ano eram 12 cliques sem o rótulo mudar).
+  const stepPeriod = (dir) => {
     const [y,m] = period.split("-").map(Number);
-    const d = new Date(y,m-2,1);
+    const step = filterMode === "ano" ? 12 : 1;
+    const d = new Date(y, m-1 + dir*step, 1);
     setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
   };
-  const nextMonth = () => {
-    const [y,m] = period.split("-").map(Number);
-    const d = new Date(y,m,1);
-    setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
-  };
+  const prevMonth = () => stepPeriod(-1);
+  const nextMonth = () => stepPeriod(1);
 
   const filtered = orders.filter(o => {
     const matchSearch  = o.customer.toLowerCase().includes(search.toLowerCase()) ||
@@ -1348,6 +1348,13 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
 
   const handleDelete = (id) => {
     if (!canExcluir) return; // segurança extra, além do botão já escondido
+    // Excluir um pedido ATIVO (que baixou estoque) devolve as unidades, igual
+    // ao cancelamento — antes, excluir em vez de cancelar sumia com o estoque
+    // silenciosamente, sem movimento de entrada.
+    const order = orders.find(o => o.id === id);
+    if (order && ACTIVE_ORDER_STATUSES.includes(order.status)) {
+      restoreStockForOrder(order, "Exclusão de pedido");
+    }
     setOrders(prev => prev.filter(o => o.id !== id));
     setConfirmDelete(null);
     if (detailOrder?.id === id) setDetailOrder(null);
@@ -1357,7 +1364,9 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
     // 1. Criar lançamento financeiro de devolução — feito primeiro e isolado
     //    em try/catch, pra garantir que ele seja criado mesmo se algo falhar
     //    nas etapas de estoque mais abaixo.
-    if (setFinance) {
+    // Lançamento de reembolso SÓ quando o pedido já tinha sido pago — devolver
+    // um pedido nunca recebido não gera estorno de dinheiro que nunca entrou.
+    if (setFinance && order.paidDate) {
       try {
         setFinance(prev => {
           const nums = prev.map(t => parseInt((t.id||"").replace("FIN-",""))||0);
@@ -1367,7 +1376,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
             type: "despesa",
             category: "Devoluções / Reembolsos",
             description: `Devolução pedido ${order.id} — ${order.customer}`,
-            amount: order.total,
+            amount: order.pagoComAtraso ? (order.valorRecebido ?? order.total) : order.total,
             date: today(),
             dueDate: today(),
             status: "pendente",
@@ -1737,7 +1746,11 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
               {(devolucaoModal.itemsList||[]).filter(i=>i._prodId&&i.qty>0).length > 0 && (
                 <p>✅ Estoque será <b>restaurado</b> ({(devolucaoModal.itemsList||[]).filter(i=>i._prodId&&i.qty>0).length} item(s))</p>
               )}
-              <p>✅ Lançamento de <b>Devolução / Reembolso</b> criado em Contas a Pagar</p>
+              {devolucaoModal.paidDate ? (
+                <p>✅ Lançamento de <b>Devolução / Reembolso</b> criado em Contas a Pagar</p>
+              ) : (
+                <p>ℹ️ Sem lançamento financeiro — o pedido ainda <b>não tinha sido pago</b></p>
+              )}
             </div>
             <div className="flex gap-2">
               <button onClick={() => setDevolucaoModal(null)}
@@ -1798,7 +1811,10 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
               <Icon name="trash" size={22} className="text-red-500" />
             </div>
             <h3 className="font-semibold text-gray-900 mb-1">Excluir pedido?</h3>
-            <p className="text-sm text-gray-500 mb-4">{confirmDelete.id} — {confirmDelete.customer}</p>
+            <p className="text-sm text-gray-500 mb-2">{confirmDelete.id} — {confirmDelete.customer}</p>
+            {ACTIVE_ORDER_STATUSES.includes(confirmDelete.status) && (confirmDelete.itemsList||[]).some(i=>i._prodId&&(i.qty||0)>0) && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">↩ O estoque dos itens será restaurado automaticamente</p>
+            )}
             <div className="flex gap-2">
               <button onClick={() => setConfirmDelete(null)} className="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
               <button onClick={() => handleDelete(confirmDelete.id)} className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600">Excluir</button>
@@ -4632,16 +4648,16 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
     return new Date(y,m-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"});
   };
 
-  const prevMonth = () => {
+  // No modo "Ano" as setas pulam 12 meses (antes, cada clique andava só 1 mês
+  // — pra trocar de ano eram 12 cliques sem o rótulo mudar).
+  const stepPeriod = (dir) => {
     const [y,m] = period.split("-").map(Number);
-    const d = new Date(y,m-2,1);
+    const step = filterMode === "ano" ? 12 : 1;
+    const d = new Date(y, m-1 + dir*step, 1);
     setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
   };
-  const nextMonth = () => {
-    const [y,m] = period.split("-").map(Number);
-    const d = new Date(y,m,1);
-    setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
-  };
+  const prevMonth = () => stepPeriod(-1);
+  const nextMonth = () => stepPeriod(1);
 
   const activeFin = useMemo(() =>
     finance.filter(f => f.status !== "cancelado" && filterByDate(f.date))
@@ -5753,16 +5769,16 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
     return new Date(y,m-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"});
   };
 
-  const prevMonth = () => {
+  // No modo "Ano" as setas pulam 12 meses (antes, cada clique andava só 1 mês
+  // — pra trocar de ano eram 12 cliques sem o rótulo mudar).
+  const stepPeriod = (dir) => {
     const [y,m] = period.split("-").map(Number);
-    const d = new Date(y,m-2,1);
+    const step = filterMode === "ano" ? 12 : 1;
+    const d = new Date(y, m-1 + dir*step, 1);
     setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
   };
-  const nextMonth = () => {
-    const [y,m] = period.split("-").map(Number);
-    const d = new Date(y,m,1);
-    setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
-  };
+  const prevMonth = () => stepPeriod(-1);
+  const nextMonth = () => stepPeriod(1);
 
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null),3000); };
 
@@ -6346,16 +6362,16 @@ const FiscalModule = ({ nfes, setNfes, currentUser }) => {
     return new Date(y,m-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"});
   };
 
-  const prevMonth = () => {
+  // No modo "Ano" as setas pulam 12 meses (antes, cada clique andava só 1 mês
+  // — pra trocar de ano eram 12 cliques sem o rótulo mudar).
+  const stepPeriod = (dir) => {
     const [y,m] = period.split("-").map(Number);
-    const d = new Date(y,m-2,1);
+    const step = filterMode === "ano" ? 12 : 1;
+    const d = new Date(y, m-1 + dir*step, 1);
     setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
   };
-  const nextMonth = () => {
-    const [y,m] = period.split("-").map(Number);
-    const d = new Date(y,m,1);
-    setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
-  };
+  const prevMonth = () => stepPeriod(-1);
+  const nextMonth = () => stepPeriod(1);
 
   // NF-e stats
   const nfAuth    = nfes.filter(n=>n.status==="Autorizada");
@@ -9642,16 +9658,16 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
     return new Date(y,m-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"});
   };
 
-  const prevMonth = () => {
+  // No modo "Ano" as setas pulam 12 meses (antes, cada clique andava só 1 mês
+  // — pra trocar de ano eram 12 cliques sem o rótulo mudar).
+  const stepPeriod = (dir) => {
     const [y,m] = period.split("-").map(Number);
-    const d = new Date(y,m-2,1);
+    const step = filterMode === "ano" ? 12 : 1;
+    const d = new Date(y, m-1 + dir*step, 1);
     setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
   };
-  const nextMonth = () => {
-    const [y,m] = period.split("-").map(Number);
-    const d = new Date(y,m,1);
-    setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
-  };
+  const prevMonth = () => stepPeriod(-1);
+  const nextMonth = () => stepPeriod(1);
 
   const nextPcId = (list) => {
     const nums = list.map(p => parseInt(p.id.replace("PC-",""))||0);
@@ -10894,16 +10910,16 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
     return new Date(y,m-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"});
   };
 
-  const prevMonth = () => {
+  // No modo "Ano" as setas pulam 12 meses (antes, cada clique andava só 1 mês
+  // — pra trocar de ano eram 12 cliques sem o rótulo mudar).
+  const stepPeriod = (dir) => {
     const [y,m] = period.split("-").map(Number);
-    const d = new Date(y,m-2,1);
+    const step = filterMode === "ano" ? 12 : 1;
+    const d = new Date(y, m-1 + dir*step, 1);
     setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
   };
-  const nextMonth = () => {
-    const [y,m] = period.split("-").map(Number);
-    const d = new Date(y,m,1);
-    setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
-  };
+  const prevMonth = () => stepPeriod(-1);
+  const nextMonth = () => stepPeriod(1);
 
   const showToast = (msg, ok=true) => { setToast({msg,ok}); setTimeout(()=>setToast(null),3000); };
 
