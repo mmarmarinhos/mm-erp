@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.6";
+const APP_VERSION = "3.31.7";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -3880,7 +3880,7 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
     ? { ...supplier }
     : { name:"", cnpj:"", contact:"", phone:"", email:"", website:"",
         city:"", state:"", cep:"", rua:"", numero:"", complemento:"", bairro:"",
-        category:"Linhas / Fios", status:"Ativo", paymentTerms:"30 dias", notes:"" });
+        category:"Linhas / Fios", status:"Ativo", paymentTerms:"30 dias", notes:"", tags:[], totalPurchased:0 });
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
 
   // Duplicate CNPJ check
@@ -4108,7 +4108,7 @@ const SupplierPayModal = ({ purchase, onClose, onSave }) => {
   const [markPaid, setMarkPaid] = useState(!purchase.paidDate);
   const [paidDate, setPaidDate] = useState(purchase.paidDate || todayStr);
   const [payment,  setPayment]  = useState(purchase.paymentTerms || "Pix");
-  const handleSave = () => onSave({ ...purchase, paidDate: markPaid ? paidDate : "" });
+  const handleSave = () => onSave({ ...purchase, paidDate: markPaid ? paidDate : "", payment: markPaid ? payment : purchase.payment || "" });
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
@@ -4448,8 +4448,8 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
   const filtered = useMemo(() => suppliers
     .filter(s => filterCat    === "Todas" || s.category === filterCat)
     .filter(s => filterStatus === "Todos" || s.status   === filterStatus)
-    .filter(s => !search || [s.name,s.cnpj,s.contact,s.email,...s.tags].some(f=>f?.toLowerCase().includes(search.toLowerCase())))
-    .sort((a,b) => b.totalPurchased - a.totalPurchased)
+    .filter(s => !search || [s.name,s.cnpj,s.contact,s.email,...(s.tags||[])].some(f=>f?.toLowerCase().includes(search.toLowerCase())))
+    .sort((a,b) => (b.totalPurchased||0) - (a.totalPurchased||0))
   , [suppliers, filterCat, filterStatus, search]);
 
   const selectedSupplier = suppliers.find(s => s.id === selected);
@@ -4476,9 +4476,9 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
     const newFinId = `FIN-${String(Math.max(0,...finNums)+1).padStart(3,"0")}`;
     setFinance(prev=>[{ id:newFinId, type:"despesa", category:"Fornecedores",
       description:data.description, amount:data.amount, date:data.date,
-      status:"pago", notes:data.notes, supplierId:data.supplierId }, ...prev]);
+      status:"pago", paidDate:data.date, payment:data.paymentMethod||"", notes:data.notes, supplierId:data.supplierId }, ...prev]);
     setSuppliers(prev=>prev.map(s=>s.id===data.supplierId
-      ? { ...s, totalPurchased:s.totalPurchased+data.amount, lastPurchase:data.date } : s));
+      ? { ...s, totalPurchased:(s.totalPurchased||0)+data.amount, lastPurchase:data.date } : s));
     setPurchaseModal(null);
     showToast(`✅ Compra de ${fmt(data.amount)} registrada!`);
   };
@@ -4599,7 +4599,16 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
       )}
 
       {selected && <SupplierDetailPanel supplier={selectedSupplier} finance={finance} purchases={purchases}
-        onUpdatePurchase={(updated)=>{ if(setPurchases) setPurchases(prev=>prev.map(p=>p.id===updated.id?updated:p)); }}
+        onUpdatePurchase={(updated)=>{
+          if (!canAlterar) return;
+          if (setPurchases) setPurchases(prev=>prev.map(p=>p.id===updated.id?updated:p));
+          // Sincroniza o lançamento vinculado em Contas a Pagar (criado na baixa
+          // com purchaseId) — antes, pagar pelo painel do fornecedor deixava o
+          // financeiro "pendente", cobrando uma compra já paga.
+          if (setFinance) setFinance(prev=>prev.map(f=>f.purchaseId===updated.id
+            ? { ...f, paidDate:updated.paidDate||"", status:updated.paidDate?"pago":"pendente", payment:updated.payment||f.payment||"" }
+            : f));
+        }}
         onClose={()=>setSelected(null)}
         onEdit={(s)=>{ setModal(s); setSelected(null); }}
         onDelete={(s)=>{ setConfirmDelete(s); setSelected(null); }}
