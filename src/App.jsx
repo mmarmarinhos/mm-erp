@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.2";
+const APP_VERSION = "3.31.3";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -1848,12 +1848,14 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
   const totalReceberVencido = recVencidos.reduce((s,o)=>s+o.total,0);
 
   // ── 3) Prévia Contas a Pagar — vencendo hoje + vencidos ──────────────────
+  // Mesmo critério da aba Contas a Pagar: lançamento sem vencimento usa a
+  // própria data do lançamento como vencimento (dueDate || date).
   const pagVencendoHoje = (finance||[]).filter(f =>
-    f.type === "despesa" && f.status !== "pago" && f.status !== "cancelado" && f.dueDate === todayISO
+    f.type === "despesa" && f.status !== "pago" && f.status !== "cancelado" && (f.dueDate || f.date) === todayISO
   );
   const totalPagarHoje = pagVencendoHoje.reduce((s,f)=>s+(f.amount||0),0);
   const pagVencidos = (finance||[]).filter(f =>
-    f.type === "despesa" && f.status !== "pago" && f.status !== "cancelado" && f.dueDate && f.dueDate < todayISO
+    f.type === "despesa" && f.status !== "pago" && f.status !== "cancelado" && (f.dueDate || f.date) < todayISO
   );
   const totalPagarVencido = pagVencidos.reduce((s,f)=>s+(f.amount||0),0);
 
@@ -2128,7 +2130,7 @@ const FinanceModal = ({ tx, onClose, onSave, defaultType = "receita" }) => {
   const isNew = !tx;
   const [form, setForm] = useState(tx || {
     type:defaultType, category:defaultType==="despesa" ? EXPENSE_CATS[0] : "Vendas ML", description:"", amount:"",
-    date:today(), status:"pendente", notes:""
+    date:today(), dueDate:"", status:"pendente", notes:""
   });
   const set = (k,v) => setForm(f => ({ ...f, [k]:v }));
   const cats = form.type === "receita" ? INCOME_CATS : EXPENSE_CATS;
@@ -2187,6 +2189,11 @@ const FinanceModal = ({ tx, onClose, onSave, defaultType = "receita" }) => {
               <label className="text-xs font-medium text-gray-600 mb-1 block">Data</label>
               <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                 value={form.date} onChange={e => set("date",e.target.value)} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Vencimento</label>
+              <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                value={form.dueDate||""} onChange={e => set("dueDate",e.target.value)} />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Status</label>
@@ -2679,11 +2686,9 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
               <FinPagModal item={payPag} onClose={()=>setPayPag(null)}
                 onSave={(updated)=>{
                   if (!canAlterar) return;
-                  if (updated._type === "lancamento") {
-                    setFinance(prev => prev.map(t => t.id === updated.id ? {...t, status:updated.status, paidDate:updated.paidDate, payment:updated.payment} : t));
-                  } else if (updated._type === "compra") {
-                    setPurchases(prev => prev.map(p => p.id === updated.id ? {...p, paidDate:updated.paidDate, payment:updated.payment} : p));
-                  }
+                  // Desde a v3.29.x a aba só lista lançamentos financeiros —
+                  // compras nunca chegam aqui, então não há ramo pra elas.
+                  setFinance(prev => prev.map(t => t.id === updated.id ? {...t, status:updated.status, paidDate:updated.paidDate, payment:updated.payment} : t));
                   setPayPag(null);
                 }}/>
             )}
@@ -9900,7 +9905,11 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
 
     // 3. Cria o lançamento em Contas a Pagar com o valor recebido nesta baixa
     if (setFinance) {
-      const valorBaixa = purchase.items.reduce((s,it,i)=>s+((data.qtys[i]||0)*(it.unitPrice||0)), 0);
+      // Mesmo total do pedido baixado (updatedPurchase.total): subtotal recebido
+      // JÁ COM descontos por item + frete − desconto geral. Antes, o lançamento
+      // era qty × preço bruto — ignorava descontos (cobrava a mais) e frete
+      // (cobrava a menos), divergindo do total mostrado em Compras.
+      const valorBaixa = updatedPurchase.total || 0;
       if (valorBaixa > 0) {
         setFinance(prev => {
           const n = prev.map(f=>parseInt((f.id||"").replace("FIN-",""))||0);
