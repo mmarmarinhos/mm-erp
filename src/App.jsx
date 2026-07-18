@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.4";
+const APP_VERSION = "3.31.5";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -10872,7 +10872,7 @@ const gerarCotacaoPDF = (cotacao, empresaRaw) => {
   if (w) { w.document.write(html); w.document.close(); }
 };
 
-const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [], products = [], setProducts, movements = [], setMovements, empresa = {}, representantes = [], formasPagamento = [], params, currentUser }) => {
+const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements, empresa = {}, representantes = [], formasPagamento = [], params, currentUser }) => {
   const canIncluir = getUserPerm(currentUser, "cotacao", "incluir");
   const canAlterar = getUserPerm(currentUser, "cotacao", "alterar");
   const canExcluir = getUserPerm(currentUser, "cotacao", "excluir");
@@ -10923,6 +10923,21 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
 
   const showToast = (msg, ok=true) => { setToast({msg,ok}); setTimeout(()=>setToast(null),3000); };
 
+  // Auto-expiração: cotações Em Aberto/Aprovada com validade vencida passam a
+  // "Expirada" ao abrir o módulo — antes, o status "Expirada" existia mas nada
+  // nunca expirava (o pill ficava em 0 e o total "em aberto" somava cotações
+  // vencidas). De quebra, expirar remove o botão de conversão.
+  useEffect(() => {
+    const hoje = today();
+    const vencidas = cotacoes.filter(c =>
+      ["Em Aberto","Aprovada"].includes(c.status) && c.validUntil && c.validUntil < hoje
+    );
+    if (vencidas.length > 0) {
+      const ids = new Set(vencidas.map(c => c.id));
+      setCotacoes(prev => prev.map(c => ids.has(c.id) ? { ...c, status:"Expirada" } : c));
+    }
+  }, []); // uma vez por abertura do módulo
+
   const nextId = (list) => {
     const nums = list.map(c=>parseInt(c.id.replace("COT-",""))||0);
     return `COT-${String(Math.max(0,...nums)+1).padStart(3,"0")}`;
@@ -10939,6 +10954,31 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
   // Convert quote to order
   const handleConvert = (cot) => {
     if (!canAlterar) return; // segurança extra, além do botão já escondido
+    // Trava contra clique duplo / reconversão: o estado ATUAL da cotação é a
+    // fonte da verdade — se já foi convertida, não cria um segundo pedido nem
+    // baixa o estoque de novo.
+    const atual = cotacoes.find(c => c.id === cot.id);
+    if (!atual || atual.status === "Convertida") return;
+
+    // O pedido não tem campo de desconto geral (total = itens + frete), então
+    // o desconto geral da cotação é distribuído proporcionalmente nos totais
+    // dos itens — assim a soma dos itens já reflete o desconto e qualquer
+    // edição futura do pedido recalcula o total certo (antes, a primeira
+    // edição fazia o desconto sumir e o total aumentar em silêncio).
+    const descGeral = Number(cot.discount) || 0;
+    let itensConvertidos = (cot.items || []).map(it => ({ ...it }));
+    const somaItens = itensConvertidos.reduce((s,it)=>s+(Number(it.total)||0),0);
+    if (descGeral > 0 && somaItens > 0) {
+      let aplicado = 0;
+      itensConvertidos = itensConvertidos.map((it, i) => {
+        const t = Number(it.total)||0;
+        const isLast = i === itensConvertidos.length - 1;
+        const desc = isLast ? (descGeral - aplicado) : parseFloat((descGeral * (t / somaItens)).toFixed(2));
+        aplicado += desc;
+        return { ...it, total: parseFloat(Math.max(0, t - desc).toFixed(2)) };
+      });
+    }
+
     const newOrderId = `PED-${String(Math.max(0,...orders.map(o=>parseInt(o.id.replace("PED-",""))||0))+1).padStart(3,"0")}`;
     const newOrder = {
       id:       newOrderId,
@@ -10947,7 +10987,7 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
       status:   "Novo",
       total:    cot.total,
       items:    cot.items.map(it=>`${it.description} x${it.qty}`).join(", "),
-      itemsList: cot.items || [],
+      itemsList: itensConvertidos,
       date:     today(),
       payment:  cot.payment,
       freight:  cot.freight || 0,
@@ -10961,8 +11001,18 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
     setCotacoes(prev=>prev.map(c=>c.id===cot.id ? {...c,status:"Convertida",orderId:newOrderId} : c));
     if (detail?.id===cot.id) setDetail({...cot,status:"Convertida",orderId:newOrderId});
 
+    // Reativa o cliente inativo, igual à criação manual de pedido no módulo
+    // Pedidos — antes, converter cotação deixava o cliente como Inativo.
+    if (cot.customer && setCustomers) {
+      setCustomers(prev => prev.map(cli =>
+        cli.name?.toLowerCase() === cot.customer?.toLowerCase() && cli.segment === "Inativo"
+          ? { ...cli, segment: "Ativo" }
+          : cli
+      ));
+    }
+
     // ── Baixa no estoque e registro de movimentação ──────────────────────
-    const itensVinculados = (cot.items||[]).filter(it=>it._prodId);
+    const itensVinculados = itensConvertidos.filter(it=>it._prodId);
     if (setProducts && itensVinculados.length > 0) {
       setProducts(prev => prev.map(prod => {
         const it = itensVinculados.find(i=>String(i._prodId)===String(prod.id));
@@ -13307,7 +13357,7 @@ function ERPApp({ currentUser, onLogout }) {
         onGoToEmAberto={()=>{ setInitialOrdersFilter("EM_ABERTO_FAT"); setActive("orders"); }}
         onGoToFaturados={()=>{ setInitialOrdersFilter("FATURADOS"); setActive("orders"); }} />;
       case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)} initialStatusFilter={initialOrdersFilter} onConsumeStatusFilter={()=>setInitialOrdersFilter(null)} currentUser={currentUser}/>;
-      case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params} currentUser={currentUser}/>;
+      case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params} currentUser={currentUser}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} currentUser={currentUser}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} params={params} currentUser={currentUser}/>;
       case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber" onViewOrder={(id)=>{ setOpenOrderId(id); setActive("orders"); }} currentUser={currentUser}/>;
