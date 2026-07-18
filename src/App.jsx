@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.5";
+const APP_VERSION = "3.31.6";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -3453,8 +3453,8 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
                   const due  = o.dueDate  ? new Date(o.dueDate +"T12:00:00") : null;
                   const paid = o.paidDate ? new Date(o.paidDate+"T12:00:00") : null;
                   return (
-                    <div key={o.id} onClick={()=>setPayModal(o)}
-                      className={`rounded-xl border p-3 cursor-pointer hover:shadow-md transition-all ${fs.bg} ${o.paidDate?"opacity-75":""}`}>
+                    <div key={o.id} onClick={()=>{ if (canAlterar) setPayModal(o); }}
+                      className={`rounded-xl border p-3 ${canAlterar?"cursor-pointer hover:shadow-md":""} transition-all ${fs.bg} ${o.paidDate?"opacity-75":""}`}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -3484,7 +3484,7 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
         )}
 
         {/* Payment Modal */}
-        {payModal && <PaymentModal order={payModal} onClose={()=>setPayModal(null)} onSave={(updated)=>{ onUpdateOrder(updated); setPayModal(null); }} />}
+        {payModal && <PaymentModal order={payModal} onClose={()=>setPayModal(null)} onSave={(updated)=>{ if (canAlterar && onUpdateOrder) onUpdateOrder(updated); setPayModal(null); }} />}
 
         {/* Footer actions */}
         <div className="p-4 border-t border-gray-100 flex gap-2 shrink-0">
@@ -3559,7 +3559,7 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {}, curr
       if (sortBy === "totalOrders")  return getStats(b.name).totalOrders - getStats(a.name).totalOrders;
       if (sortBy === "lastPurchase") return (getStats(b.name).lastPurchase||"").localeCompare(getStats(a.name).lastPurchase||"");
       return getStats(b.name).totalSpent - getStats(a.name).totalSpent;
-    }), [customers, filterSeg, filterCh, search, sortBy]);
+    }), [customers, filterSeg, filterCh, search, sortBy, customerStats]);
 
   const selectedCustomer = customers.find(c => c.id === selected);
 
@@ -3587,8 +3587,21 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {}, curr
     if (selected === cust.id) setSelected(null);
   };
 
+  // Regra única de segmentação, usada pela importação e pelo recálculo:
+  // sem pedidos → Desenvolvimento (prospect); última compra há mais de 90
+  // dias → Inativo; senão → Ativo.
+  const calcSegment = (stats) => {
+    if (!stats || stats.totalOrders === 0) return "Desenvolvimento";
+    const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+    const days = stats.lastPurchase
+      ? Math.floor((TODAY - new Date(stats.lastPurchase + "T12:00:00")) / 86400000)
+      : 999;
+    return days > 90 ? "Inativo" : "Ativo";
+  };
+
   // Import customers from orders
   const handleImport = () => {
+    if (!canIncluir) return; // importar CRIA clientes — exige permissão de incluir
     const existingNames = new Set(customers.map(c => c.name.toLowerCase()));
     const seen = new Set();
     const toAdd = [];
@@ -3597,10 +3610,11 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {}, curr
       if (!existingNames.has(key) && !seen.has(key)) {
         seen.add(key);
         const custsAll = [...customers, ...toAdd];
+        const stats = getStats(o.customer);
         toAdd.push({
           id: nextCliId(custsAll), name: o.customer, phone:"", email:"",
-          city:"", state:"", channel: o.channel, segment:"Ativo",
-          totalOrders:1, totalSpent: o.total, lastPurchase: o.date,
+          city:"", state:"", channel: o.channel, segment: calcSegment(stats),
+          totalOrders: stats.totalOrders, totalSpent: stats.totalSpent, lastPurchase: stats.lastPurchase,
           createdAt: today(), tags:[], notes:"Importado automaticamente dos pedidos."
         });
       }
@@ -3611,19 +3625,12 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {}, curr
 
   // Recalculate segments
   const handleRecalc = () => {
-    const TODAY = new Date();
-    TODAY.setHours(0,0,0,0);
-    setCustomers(prev => prev.map(c => {
-      const stats = getStats(c.name);
-      const lastDate = stats.lastPurchase;
-      const days = lastDate
-        ? Math.floor((TODAY - new Date(lastDate + "T12:00:00")) / 86400000)
-        : 999;
-      let segment = "Desenvolvimento";
-      if (days > 90 || stats.totalOrders === 0) segment = "Inativo";
-      else if (stats.totalOrders >= 1)          segment = "Ativo";
-      return { ...c, segment };
-    }));
+    if (!canAlterar) return; // recalcular ALTERA todos os clientes — exige permissão de alterar
+    // Antes, a lógica só produzia Ativo/Inativo: "Desenvolvimento" era
+    // inalcançável (cliente sem pedidos caía em Inativo) e o botão destruía
+    // o segmento marcado manualmente em prospects. Agora: sem pedidos →
+    // Desenvolvimento; >90 dias sem comprar → Inativo; senão → Ativo.
+    setCustomers(prev => prev.map(c => ({ ...c, segment: calcSegment(getStats(c.name)) })));
     showToast("✅ Status recalculados!");
   };
 
@@ -3643,14 +3650,18 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {}, curr
           <p className="text-sm text-gray-500 mt-0.5">{customers.length} clientes cadastrados</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={handleImport}
-            className="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-1.5">
-            <Icon name="arrowDown" size={14}/> Importar Pedidos
-          </button>
-          <button onClick={handleRecalc}
-            className="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-1.5">
-            <Icon name="tag" size={14}/> Recalcular Status
-          </button>
+          {canIncluir && (
+            <button onClick={handleImport}
+              className="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-1.5">
+              <Icon name="arrowDown" size={14}/> Importar Pedidos
+            </button>
+          )}
+          {canAlterar && (
+            <button onClick={handleRecalc}
+              className="px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-1.5">
+              <Icon name="tag" size={14}/> Recalcular Status
+            </button>
+          )}
           {canIncluir && (
             <button onClick={() => setModal("new")}
               className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 shadow-sm flex items-center gap-1.5">
