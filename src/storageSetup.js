@@ -9,9 +9,12 @@ const SESSION_KEY = 'erp_session_v2' // mesma chave que o app usa pra guardar a 
 
 function getToken() {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY)
+    // Sessão persistente fica em localStorage; sessionStorage é só legado
+    // (sessões criadas antes da v3.30.0), lido como fallback até o App migrar.
+    const raw = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY)
     if (!raw) return null
     const session = JSON.parse(raw)
+    if (session?.exp && Date.now() > session.exp) return null
     return session?.token || null
   } catch { return null }
 }
@@ -31,6 +34,7 @@ async function apiStorage(action, payload = {}) {
     // Tíquete inválido/expirado — desloga e volta pro login, mas só recarrega
     // uma vez (evita loop infinito caso algo chame isso repetidamente rápido)
     const lastReload = Number(sessionStorage.getItem('erp_last_401_reload') || 0)
+    localStorage.removeItem(SESSION_KEY)
     sessionStorage.removeItem(SESSION_KEY)
     if (Date.now() - lastReload > 3000) {
       sessionStorage.setItem('erp_last_401_reload', String(Date.now()))
