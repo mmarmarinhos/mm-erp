@@ -8,7 +8,7 @@ import crypto from 'crypto';
 
 const SB_URL = process.env.SUPABASE_URL;
 const SB_SECRET = process.env.SUPABASE_SECRET_KEY;
-const SESSION_HOURS = 24; // teto de segurança no servidor; o navegador, por padrão, descarta antes (ao fechar a aba)
+const SESSION_HOURS = 24 * 30; // 30 dias — sessão persistente (o navegador guarda o tíquete em localStorage; a validade real é controlada aqui, no servidor)
 
 function secretHeaders(extra = {}) {
   return {
