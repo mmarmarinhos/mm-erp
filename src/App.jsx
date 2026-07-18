@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.30.0";
+const APP_VERSION = "3.31.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -676,7 +676,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
 
           {/* Fees + Total */}
           <div className="bg-gray-50 rounded-xl p-3 space-y-3">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">🚚 Frete (R$)</label>
                 <input type="number" min="0" step="0.01" className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-indigo-300"
@@ -1546,7 +1546,46 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
             <p className="text-sm">Nenhum pedido encontrado</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Visão mobile: cards (tabela com rolagem lateral é ruim no celular) */}
+          <div className="md:hidden divide-y divide-gray-50">
+            {filtered.map(order => (
+              <div key={order.id} className="p-4 space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <button onClick={() => setDetailOrder(order)} className="text-indigo-600 font-mono text-xs font-semibold hover:underline">{order.id}</button>
+                    <p className="text-gray-800 font-medium text-sm truncate">{order.customer}</p>
+                    <p className="text-gray-400 text-xs truncate">{order.items}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-semibold text-gray-900 text-sm">{fmt(order.total)}</p>
+                    <p className="text-gray-400 text-[11px] mt-0.5">{order.date}</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  {canAlterar ? (
+                    <StatusDropdown order={order} onChange={(s) => handleStatusChange(order.id, s)} statusOptions={params?.vendas?.statusList?.length ? params.vendas.statusList : ORDER_STATUSES} />
+                  ) : (
+                    <Badge label={order.status} style={STATUS_STYLES[order.status]} />
+                  )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {canAlterar && (
+                      <button onClick={() => setModal(order)} className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                        <Icon name="edit" size={15} />
+                      </button>
+                    )}
+                    {canExcluir && (
+                      <button onClick={() => setConfirmDelete(order)} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                        <Icon name="trash" size={15} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Visão desktop: tabela */}
+          <div className="overflow-x-auto hidden md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/60">
@@ -1601,6 +1640,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 
@@ -1904,7 +1944,7 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
       </div>
 
       {/* ── 1) Pedidos em Aberto / Faturados / A Enviar ─────────────────── */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <button onClick={onGoToEmAberto} className="text-left bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:border-gray-300 transition-colors">
           <p className="text-xs text-gray-400 font-medium">📂 Pedidos em Aberto</p>
           <p className="text-2xl font-bold text-gray-800 mt-1">{pedidosEmAberto}</p>
@@ -2603,7 +2643,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
                       open:   {bg:"bg-blue-50",text:"text-blue-600",icon:"🔵"} };
         return (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="bg-green-50 border border-green-100 rounded-xl p-3 text-center">
                 <p className="text-xs text-gray-500 font-medium">Total a Receber</p>
                 <p className="text-lg font-bold text-green-700 mt-0.5">{fmt(totalRec)}</p>
@@ -2733,7 +2773,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
                       open:   {bg:"bg-blue-50",text:"text-blue-600",icon:"🔵"} };
         return (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-center">
                 <p className="text-xs text-gray-500 font-medium">Total a Pagar</p>
                 <p className="text-lg font-bold text-red-700 mt-0.5">{fmt(totalPag)}</p>
@@ -3012,7 +3052,7 @@ const CustomerModal = ({ customer, onClose, onSave, orders = [], customers = [] 
               ) : (
                 <>
                   {/* Summary */}
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <div className="bg-green-50 border border-green-100 rounded-xl p-2.5 text-center">
                       <p className="text-[10px] text-green-600 font-medium">Pago</p>
                       <p className="text-sm font-bold text-green-700">{fmt(totalPaid)}</p>
@@ -3154,7 +3194,7 @@ const EnderecoFields = ({ form, set, inp }) => {
         {cepError && <p className="text-[10px] text-red-500 mt-1">⚠️ {cepError}</p>}
       </div>
       {/* Rua + Número */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <div className="col-span-2">
           <label className="text-xs font-medium text-gray-600 mb-1 block">Rua / Logradouro</label>
           <input className={inp} value={form.rua||""} onChange={e=>set("rua",e.target.value)} placeholder="Rua, Av., Alameda..."/>
@@ -3465,7 +3505,7 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
 
                 {/* Summary cards */}
                 {cOrders.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <div className="bg-green-50 border border-green-100 rounded-xl p-2.5 text-center">
                       <p className="text-xs text-green-600 font-medium">Pago</p>
                       <p className="text-sm font-bold text-green-700">{fmt(totalPaid)}</p>
@@ -3544,7 +3584,7 @@ const CustomerPanel = ({ customer, orders, onClose, onEdit, onDelete, onUpdateOr
           ) : (
             <>
               {/* Summary cards */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <div className="bg-green-50 border border-green-100 rounded-xl p-3 text-center">
                   <p className="text-[10px] text-green-600 font-semibold uppercase">Pago</p>
                   <p className="text-sm font-bold text-green-700 mt-0.5">{fmt(totalPaid)}</p>
@@ -3774,7 +3814,7 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {}, curr
       </div>
 
       {/* Segment overview */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {SEGMENTS.map(s => {
           const st = SEG_STYLES[s] || SEG_STYLES["default"];
           return (
@@ -3788,7 +3828,7 @@ const CrmModule = ({ customers, setCustomers, orders, setOrders = () => {}, curr
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm text-center">
           <p className="text-xs text-gray-400 uppercase tracking-wide">Receita Total</p>
           <p className="text-lg font-bold text-indigo-700 mt-0.5">{fmt(totalSpentAll)}</p>
@@ -4145,7 +4185,7 @@ const SupplierModal = ({ supplier, onClose, onSave, purchases = [], suppliers = 
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <div className="bg-green-50 border border-green-100 rounded-xl p-2.5 text-center">
                       <p className="text-[10px] text-green-600 font-medium">Pago</p>
                       <p className="text-sm font-bold text-green-700">{fmt(totalPaid)}</p>
@@ -4433,7 +4473,7 @@ const SupplierDetailPanel = ({ supplier, finance, purchases, onUpdatePurchase, o
         {panelTab==="financeiro" && (
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {supPurchases.length > 0 && (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <div className="bg-green-50 border border-green-100 rounded-xl p-2.5 text-center">
                 <p className="text-xs text-green-600 font-medium">Pago</p>
                 <p className="text-sm font-bold text-green-700">{fmt(totalPaid)}</p>
@@ -5204,7 +5244,7 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
       {tab==="clientes" && (
         <div className="space-y-4">
           {/* Summary stats */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {[
               { label:"Total Clientes",  value: customers.length,                                                                                   color:"text-gray-900"  },
               { label:"LTV Médio",       value: customers.length ? fmt(totalCustomerSpent/customers.length) : "—",                                  color:"text-indigo-700"},
@@ -5553,7 +5593,7 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], variantC
           {/* Stock */}
           <div className="border-t border-gray-100 pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Estoque</p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {isNew && (
                 <div>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">Estoque Inicial</label>
@@ -6303,7 +6343,7 @@ const NfeModal = ({ nfe, onClose, onSave }) => {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><Icon name="x"/></button>
         </div>
         <div className="p-5 space-y-3">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Número *</label>
               <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"
@@ -6390,7 +6430,7 @@ const NfeModal = ({ nfe, onClose, onSave }) => {
           {/* Impostos */}
           <div className="border-t border-gray-100 pt-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Impostos <span className="font-normal text-gray-400">(conforme preenchido na SEFAZ)</span></p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[["icms","ICMS (R$)"],["pis","PIS (R$)"],["cofins","COFINS (R$)"]].map(([k,l])=>(
                 <div key={k}>
                   <label className="text-xs font-medium text-gray-600 mb-1 block">{l}</label>
@@ -8041,7 +8081,7 @@ const SyncOperationsPanel = ({ orders, setOrders, backendUrl }) => {
 
       {/* Health / Auth status */}
       {health && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {Object.entries(PLATFORM_INFO).map(([key, info]) => {
             const ok = health.auth?.[key];
             return (
@@ -9101,7 +9141,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], params, onClose, on
           </div>
 
           {/* Totais */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">🚛 Frete (R$)</label>
               <input type="number" min="0" step="0.01" className={inp}
@@ -9539,7 +9579,7 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
               <p className="text-sm font-semibold text-gray-600">Total</p>
               <p className="text-2xl font-bold text-gray-900">{fmt(cartTotal)}</p>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[["dinheiro","💵 Dinheiro"],["credito","💳 Crédito"],["debito","💳 Débito"],["pix","📱 Pix"]].map(([id,label])=>(
                 <button key={id} onClick={()=>setPayment(id)}
                   className={`py-2 rounded-xl text-xs font-semibold border-2 transition-colors ${payment===id?"border-indigo-500 bg-indigo-50 text-indigo-700":"border-gray-100 text-gray-500"}`}>
