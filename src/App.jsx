@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.1";
+const APP_VERSION = "3.31.2";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -2381,179 +2381,13 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
   const canIncluir = getUserPerm(currentUser, permModule, "incluir");
   const canAlterar = getUserPerm(currentUser, permModule, "alterar");
   const canExcluir = getUserPerm(currentUser, permModule, "excluir");
-  const [tab, setTab]         = useState(initialTab);
-  const [filterMode, setFilterMode] = useState("mes");  // mes | trimestre | ano | personalizado | todos
-  const [period, setPeriod]   = useState(() => {
-    const n = new Date();
-    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;
-  });
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo,   setDateTo]   = useState("");
+  const [tab] = useState(initialTab);
   const [modal, setModal]     = useState(null);
-  const [filterType, setFilterType]   = useState("todos");
-  const [filterCat, setFilterCat]     = useState("Todas");
   const [confirmDelete, setConfirmDelete] = useState(null);
-  const [search, setSearch]   = useState("");
   const [payRec, setPayRec]   = useState(null); // order being marked as paid
   const [payPag, setPayPag]   = useState(null); // expense being marked as paid
   const [showPaidRec, setShowPaidRec] = useState(false);
   const [showPaidPag, setShowPaidPag] = useState(false);
-
-  // ── Period filter logic ──
-  const filterByPeriod = (tx) => {
-    if (filterMode === "todos") return true;
-    if (filterMode === "mes") return tx.date.startsWith(period);
-    if (filterMode === "personalizado") {
-      if (dateFrom && tx.date < dateFrom) return false;
-      if (dateTo   && tx.date > dateTo)   return false;
-      return true;
-    }
-    if (filterMode === "trimestre") {
-      const [y,m] = period.split("-").map(Number);
-      const months = [m, m===1?12:m-1, m<=2?m+10:m-2].map(x=>String(x).padStart(2,"0"));
-      return months.some(mo => tx.date.startsWith(`${y}-${mo}`));
-    }
-    if (filterMode === "ano") {
-      return tx.date.startsWith(period.split("-")[0]);
-    }
-    return true;
-  };
-
-  const periodLabel = () => {
-    if (filterMode === "todos") return "Todos os períodos";
-    if (filterMode === "personalizado") return dateFrom||dateTo ? `${dateFrom||"..."} → ${dateTo||"..."}` : "Personalizado";
-    if (filterMode === "ano") return period.split("-")[0];
-    if (filterMode === "trimestre") {
-      const [y,m] = period.split("-").map(Number);
-      return `T${Math.ceil(m/3)} ${y}`;
-    }
-    const [y,m] = period.split("-").map(Number);
-    return new Date(y,m-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"});
-  };
-
-  // ── Derived data ──
-  const activeFin = finance.filter(t => t.status !== "cancelado");
-
-  const periodTx = useMemo(() =>
-    finance.filter(t => filterByPeriod(t)).sort((a,b) => b.date.localeCompare(a.date))
-  , [finance, filterMode, period, dateFrom, dateTo]);
-
-  const periodActive   = periodTx.filter(t => t.status !== "cancelado");
-  // Receitas dos pedidos pagos no período
-  const paidOrdersInPeriod = (orders||[]).filter(o => {
-    if (!o.paidDate || o.status === "Cancelado") return false;
-    const dateToCheck = o.paidDate;
-    if (filterMode === "todos") return true;
-    if (filterMode === "mes") return dateToCheck.startsWith(period);
-    if (filterMode === "ano") return dateToCheck.startsWith(period.split("-")[0]);
-    if (filterMode === "personalizado") {
-      if (dateFrom && dateToCheck < dateFrom) return false;
-      if (dateTo   && dateToCheck > dateTo)   return false;
-      return true;
-    }
-    if (filterMode === "trimestre") {
-      const [y,m] = period.split("-").map(Number);
-      const months = [m, m===1?12:m-1, m<=2?m+10:m-2].map(x=>String(x).padStart(2,"0"));
-      return months.some(mo => dateToCheck.startsWith(String(y)+"-"+mo));
-    }
-    return true;
-  });
-  const valorRecebidoOrder = (o) => o.pagoComAtraso ? (o.valorRecebido ?? o.total ?? 0) : (o.total||0);
-  const ordersReceitas = paidOrdersInPeriod.reduce((s,o) => s+valorRecebidoOrder(o), 0);
-  const multaJurosRecebidosPeriodo = paidOrdersInPeriod.reduce((s,o) => s+(o.pagoComAtraso ? (o.valorMulta||0)+(o.valorJuros||0) : 0), 0);
-
-  // Despesas das compras pagas no período (mesma lógica usada pras receitas dos pedidos)
-  const paidPurchasesInPeriod = (purchases||[]).filter(p => {
-    if (!p.paidDate || p.status === "Cancelado") return false;
-    const dateToCheck = p.paidDate;
-    if (filterMode === "todos") return true;
-    if (filterMode === "mes") return dateToCheck.startsWith(period);
-    if (filterMode === "ano") return dateToCheck.startsWith(period.split("-")[0]);
-    if (filterMode === "personalizado") {
-      if (dateFrom && dateToCheck < dateFrom) return false;
-      if (dateTo   && dateToCheck > dateTo)   return false;
-      return true;
-    }
-    if (filterMode === "trimestre") {
-      const [y,m] = period.split("-").map(Number);
-      const months = [m, m===1?12:m-1, m<=2?m+10:m-2].map(x=>String(x).padStart(2,"0"));
-      return months.some(mo => dateToCheck.startsWith(String(y)+"-"+mo));
-    }
-    return true;
-  });
-  const purchasesDespesas = paidPurchasesInPeriod.reduce((s,p) => s+(p.total||0), 0);
-
-  const periodReceitasManual = periodActive.filter(t => t.type === "receita").reduce((s,t) => s+t.amount, 0);
-  const periodReceitas = periodReceitasManual + ordersReceitas;
-  const periodDespesasManual = periodActive.filter(t => t.type === "despesa").reduce((s,t) => s+t.amount, 0);
-  const periodDespesas = periodDespesasManual + purchasesDespesas;
-  const periodResult   = periodReceitas - periodDespesas;
-
-  const prevMonth = () => {
-    const [y,m] = period.split("-").map(Number);
-    const d = new Date(y, m-2, 1);
-    setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
-  };
-  const nextMonth = () => {
-    const [y,m] = period.split("-").map(Number);
-    const d = new Date(y, m, 1);
-    setPeriod(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
-  };
-
-  const pending = finance.filter(t => t.status === "pendente" && !t.paidDate);
-  const pendingRec  = pending.filter(t => t.type === "receita").reduce((s,t) => s+t.amount, 0);
-  const pendingDesp = pending.filter(t => t.type === "despesa").reduce((s,t) => s+t.amount, 0);
-
-  // ── Chart: last 6 months ──
-  const chartData = useMemo(() => {
-    const now = new Date();
-    return Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - (5-i), 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-      const label = d.toLocaleDateString("pt-BR", { month:"short" }).replace(".","");
-      const txs = activeFin.filter(t => t.date.startsWith(key));
-      const ordersRec = (orders||[]).filter(o => o.paidDate && o.paidDate.startsWith(key) && o.status !== "Cancelado");
-      const purchasesRec = (purchases||[]).filter(p => p.paidDate && p.paidDate.startsWith(key) && p.status !== "Cancelado");
-      return {
-        label,
-        receitas: txs.filter(t => t.type==="receita").reduce((s,t) => s+t.amount, 0)
-                + ordersRec.reduce((s,o) => s+valorRecebidoOrder(o), 0),
-        despesas: txs.filter(t => t.type==="despesa").reduce((s,t) => s+t.amount, 0)
-                + purchasesRec.reduce((s,p) => s+(p.total||0), 0),
-      };
-    });
-  }, [finance, orders, purchases]);
-
-  // ── DRE categories for current period ──
-  const dreData = useMemo(() => {
-    const cats = {};
-    periodActive.forEach(t => {
-      if (!cats[t.category]) cats[t.category] = { cat:t.category, type:t.type, total:0 };
-      cats[t.category].total += t.amount;
-    });
-    paidOrdersInPeriod.forEach(o => {
-      const cat = o.channel || "Vendas";
-      if (!cats[cat]) cats[cat] = { cat, type:"receita", total:0 };
-      cats[cat].total += valorRecebidoOrder(o);
-    });
-    paidPurchasesInPeriod.forEach(p => {
-      const cat = p.supplier || "Compras";
-      if (!cats[cat]) cats[cat] = { cat, type:"despesa", total:0 };
-      cats[cat].total += (p.total||0);
-    });
-    return Object.values(cats).sort((a,b) => b.total-a.total);
-  }, [periodActive, paidOrdersInPeriod, paidPurchasesInPeriod]);
-
-  // ── Filtered list ──
-  const allCats = ["Todas", ...INCOME_CATS, ...EXPENSE_CATS];
-  const filteredList = useMemo(() => {
-    return finance
-      .filter(t => filterType === "todos" || t.type === filterType)
-      .filter(t => filterCat === "Todas" || t.category === filterCat)
-      .filter(t => !search || t.description.toLowerCase().includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase()))
-      .filter(t => filterByPeriod(t))
-      .sort((a,b) => b.date.localeCompare(a.date));
-  }, [finance, filterType, filterCat, search, period]);
 
   // ── CRUD ──
   const nextFinId = (fin) => {
@@ -2620,9 +2454,13 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
           })
           .sort((a,b) => ({overdue:0,today:1,soon:2,open:3}[a.urgency]??3)-({overdue:0,today:1,soon:2,open:3}[b.urgency]??3));
 
-        const totalRec     = recItems.reduce((s,o)=>s+o.total,0);
-        const totalOverdue = recItems.filter(o=>o.urgency==="overdue").reduce((s,o)=>s+o.totalComEncargos,0);
-        const overdueCount = recItems.filter(o=>o.urgency==="overdue").length;
+        // Cards do topo sempre sobre os PENDENTES — o botão "Ver pagos também"
+        // só muda a lista exibida, nunca os totais (senão o "Total a Receber"
+        // incluiria dinheiro que já entrou).
+        const recPendentes = recItems.filter(o => !o.paidDate);
+        const totalRec     = recPendentes.reduce((s,o)=>s+o.total,0);
+        const totalOverdue = recPendentes.filter(o=>o.urgency==="overdue").reduce((s,o)=>s+o.totalComEncargos,0);
+        const overdueCount = recPendentes.filter(o=>o.urgency==="overdue").length;
         const urg = { overdue:{bg:"bg-red-100",text:"text-red-700",icon:"🔴"},
                       today:  {bg:"bg-amber-100",text:"text-amber-700",icon:"🟡"},
                       soon:   {bg:"bg-yellow-50",text:"text-yellow-700",icon:"🟠"},
@@ -2633,7 +2471,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
               <div className="bg-green-50 border border-green-100 rounded-xl p-3 text-center">
                 <p className="text-xs text-gray-500 font-medium">Total a Receber</p>
                 <p className="text-lg font-bold text-green-700 mt-0.5">{fmt(totalRec)}</p>
-                <p className="text-xs text-green-500">{recItems.length} pedido{recItems.length!==1?"s":""}</p>
+                <p className="text-xs text-green-500">{recPendentes.length} pedido{recPendentes.length!==1?"s":""}</p>
               </div>
               <div className={`border rounded-xl p-3 text-center ${totalOverdue>0?"bg-red-50 border-red-100":"bg-gray-50 border-gray-100"}`}>
                 <p className="text-xs text-gray-500 font-medium">Vencidos (+ multa/juros)</p>
@@ -2642,8 +2480,8 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
               </div>
               <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
                 <p className="text-xs text-gray-500 font-medium">Sem vencimento</p>
-                <p className="text-lg font-bold text-gray-400 mt-0.5">{recItems.filter(o=>!o.dueDate).length}</p>
-                <p className="text-xs text-gray-400">pedido{recItems.filter(o=>!o.dueDate).length!==1?"s":""}</p>
+                <p className="text-lg font-bold text-gray-400 mt-0.5">{recPendentes.filter(o=>!o.dueDate).length}</p>
+                <p className="text-xs text-gray-400">pedido{recPendentes.filter(o=>!o.dueDate).length!==1?"s":""}</p>
               </div>
             </div>
             <div className="flex justify-end">
@@ -2750,9 +2588,11 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
           })
           .sort((a,b) => ({overdue:0,today:1,soon:2,open:3}[a.urgency]??3)-({overdue:0,today:1,soon:2,open:3}[b.urgency]??3));
 
-        const totalPag     = pagItems.reduce((s,p)=>s+p.total,0);
-        const totalOverdue = pagItems.filter(p=>p.urgency==="overdue").reduce((s,p)=>s+p.total,0);
-        const overdueCount = pagItems.filter(p=>p.urgency==="overdue").length;
+        // Mesmo princípio do Contas a Receber: totais sempre sobre pendentes.
+        const pagPendentes = pagItems.filter(p => !(p.paidDate || p.status === "pago"));
+        const totalPag     = pagPendentes.reduce((s,p)=>s+p.total,0);
+        const totalOverdue = pagPendentes.filter(p=>p.urgency==="overdue").reduce((s,p)=>s+p.total,0);
+        const overdueCount = pagPendentes.filter(p=>p.urgency==="overdue").length;
         const urg = { overdue:{bg:"bg-red-100",text:"text-red-700",icon:"🔴"},
                       today:  {bg:"bg-amber-100",text:"text-amber-700",icon:"🟡"},
                       soon:   {bg:"bg-yellow-50",text:"text-yellow-700",icon:"🟠"},
@@ -2763,7 +2603,7 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
               <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-center">
                 <p className="text-xs text-gray-500 font-medium">Total a Pagar</p>
                 <p className="text-lg font-bold text-red-700 mt-0.5">{fmt(totalPag)}</p>
-                <p className="text-xs text-red-400">{pagItems.length} pedido{pagItems.length!==1?"s":""}</p>
+                <p className="text-xs text-red-400">{pagPendentes.length} lançamento{pagPendentes.length!==1?"s":""}</p>
               </div>
               <div className={`border rounded-xl p-3 text-center ${totalOverdue>0?"bg-red-50 border-red-100":"bg-gray-50 border-gray-100"}`}>
                 <p className="text-xs text-gray-500 font-medium">Vencidos</p>
@@ -2772,8 +2612,8 @@ const FinanceModule = ({ finance, setFinance, orders, setOrders, purchases, setP
               </div>
               <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
                 <p className="text-xs text-gray-500 font-medium">Sem vencimento</p>
-                <p className="text-lg font-bold text-gray-400 mt-0.5">{pagItems.filter(p=>!p.dueDate).length}</p>
-                <p className="text-xs text-gray-400">pedido{pagItems.filter(p=>!p.dueDate).length!==1?"s":""}</p>
+                <p className="text-lg font-bold text-gray-400 mt-0.5">{pagPendentes.filter(p=>!p.dueDate).length}</p>
+                <p className="text-xs text-gray-400">lançamento{pagPendentes.filter(p=>!p.dueDate).length!==1?"s":""}</p>
               </div>
             </div>
             <div className="flex justify-end">
