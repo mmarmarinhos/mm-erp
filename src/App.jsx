@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.29.5";
+const APP_VERSION = "3.30.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -8184,10 +8184,36 @@ async function sha256(text) {
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
 }
 
-// Session helpers
-const getSession  = () => { try { return JSON.parse(sessionStorage.getItem(AUTH.sess)); } catch { return null; } };
-const setSession  = (u) => sessionStorage.setItem(AUTH.sess, JSON.stringify(u));
-const clearSession= () => sessionStorage.removeItem(AUTH.sess);
+// Session helpers — sessão persistente (v3.30.0)
+// A sessão fica em localStorage com validade de 30 dias (alinhada ao teto do
+// servidor em /api/login), então fechar o navegador/app não desloga mais.
+// A validade REAL continua sendo controlada no servidor: todo acesso valida o
+// tíquete contra a tabela sessions e devolve 401 se expirado/revogado — o
+// carimbo `exp` aqui é só pra não tentar usar um tíquete já vencido.
+const SESSION_DAYS = 30;
+const getSession = () => {
+  try {
+    const raw = localStorage.getItem(AUTH.sess);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s?.exp && Date.now() > s.exp) { localStorage.removeItem(AUTH.sess); return null; }
+      return s;
+    }
+    // Migração: sessão antiga (pré-v3.30.0) vivia em sessionStorage — promove
+    // pra localStorage com validade, sem deslogar quem estava usando.
+    const legacy = sessionStorage.getItem(AUTH.sess);
+    if (legacy) {
+      const s = JSON.parse(legacy);
+      s.exp = Date.now() + SESSION_DAYS * 24 * 3600 * 1000;
+      localStorage.setItem(AUTH.sess, JSON.stringify(s));
+      sessionStorage.removeItem(AUTH.sess);
+      return s;
+    }
+    return null;
+  } catch { return null; }
+};
+const setSession = (u) => localStorage.setItem(AUTH.sess, JSON.stringify({ ...u, exp: u.exp || (Date.now() + SESSION_DAYS * 24 * 3600 * 1000) }));
+const clearSession = () => { localStorage.removeItem(AUTH.sess); sessionStorage.removeItem(AUTH.sess); };
 
 function buildUserSession(u) {
   const modules = u.customModules || ROLES_DEF[u.role]?.modules || ROLES_DEF.viewer.modules;
