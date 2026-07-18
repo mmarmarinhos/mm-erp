@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.0";
+const APP_VERSION = "3.31.1";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -1826,16 +1826,13 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
 
 // ─── Dashboard Module ─────────────────────────────────────────────────────
 const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnviar, onGoToEmAberto, onGoToFaturados }) => {
-  const total = orders.reduce((s, o) => s + o.total, 0);
-  const countByStatus = ORDER_STATUSES.reduce((acc, s) => {
-    acc[s] = orders.filter(o => o.status === s).length;
-    return acc;
-  }, {});
+  // Mesma base do gráfico de Produtos Mais Vendidos: pedidos cancelados e
+  // devolvidos ficam de fora, pra os dois painéis contarem a mesma coisa.
+  const ordersValidos = orders.filter(o => o.status !== "Cancelado" && o.status !== "Devolvido");
   const countByChannel = CHANNELS.reduce((acc, c) => {
-    acc[c] = orders.filter(o => o.channel === c).length;
+    acc[c] = ordersValidos.filter(o => o.channel === c).length;
     return acc;
   }, {});
-  const recent = [...orders].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
 
   // ── 1) Pedidos em Aberto / Faturados / A Enviar ──────────────────────────
   const pedidosEmAberto  = orders.filter(o => !o.nfNumero && o.status !== "Cancelado").length;
@@ -1876,17 +1873,6 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
     const restoQty = sorted.slice(6).reduce((s,[,q])=>s+q,0);
     if (restoQty > 0) top.push({name:"Outros", qty:restoQty});
     return top;
-  })();
-
-  // ── Canais com mais venda (por valor, exclui Cancelado/Devolvido) ────────
-  const topChannels = (() => {
-    const valByChannel = {};
-    orders.forEach(o => {
-      if (o.status === "Cancelado" || o.status === "Devolvido") return;
-      const ch = o.channel || "Sem canal";
-      valByChannel[ch] = (valByChannel[ch]||0) + (Number(o.total)||0);
-    });
-    return Object.entries(valByChannel).sort((a,b)=>b[1]-a[1]).filter(([,v])=>v>0).map(([name,value])=>({name,value}));
   })();
 
   // ── Shipping deadline logic ──────────────────────────────────────────────
@@ -2078,7 +2064,7 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
       </div>
 
       {/* ── Produtos Mais Vendidos + Canais com Mais Venda ──────────────── */}
-      {(topProducts.length > 0 || topChannels.length > 0) && (
+      {(topProducts.length > 0 || ordersValidos.length > 0) && (
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {topProducts.length > 0 && (
@@ -2112,11 +2098,11 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
             )}
             <div>
               <h3 className="font-bold text-gray-800 text-sm mb-1">🛒 Pedidos por Canal</h3>
-              <p className="text-xs text-gray-400 mb-3">Quantidade de pedidos por canal de venda</p>
+              <p className="text-xs text-gray-400 mb-3">Quantidade de pedidos por canal — exclui Cancelados/Devolvidos</p>
               <div className="space-y-2">
                 {CHANNELS.map(c => {
                   const count = countByChannel[c];
-                  const pct = orders.length ? (count / orders.length) * 100 : 0;
+                  const pct = ordersValidos.length ? (count / ordersValidos.length) * 100 : 0;
                   const s = CHANNEL_STYLES[c];
                   return (
                     <div key={c} className="flex items-center gap-3">
