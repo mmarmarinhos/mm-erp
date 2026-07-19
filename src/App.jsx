@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.13";
+const APP_VERSION = "3.31.14";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -11840,7 +11840,9 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
   const [collapsed, setCollapsed] = useState({});
   const [faturando, setFaturando] = useState({});
 
-  const isEligible = (o) => o.status === "Entregue" || !!o.paidDate;
+  // Cancelado e Devolvido nunca comissionam — antes, um pedido pago e depois
+  // cancelado (ou devolvido) continuava elegível e entrava no fechamento.
+  const isEligible = (o) => o.status !== "Cancelado" && o.status !== "Devolvido" && (o.status === "Entregue" || !!o.paidDate);
 
   const periodLabel = (() => {
     const [y,m] = period.split("-");
@@ -11967,6 +11969,11 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
           {repBlocks.map(block => {
             const isOpen = !collapsed[block.rep.id];
             const fechado = !!block.fech;
+            // O fechamento congela o valor, mas os pedidos do período seguem
+            // vivos: pedido que virou Entregue depois, ou foi cancelado depois,
+            // faz o total recalculado divergir do fechado — sem esse aviso, a
+            // divergência ficava invisível (o botão de faturar já sumiu).
+            const divergiuFechamento = fechado && Math.abs((block.totalComissao||0) - (block.fech.valorTotal||0)) > 0.005;
             return (
               <div key={block.rep.id} className={`bg-white border rounded-2xl shadow-sm overflow-hidden ${fechado?"border-green-200":"border-gray-100"}`}>
                 <button onClick={()=>setCollapsed(c=>({...c,[block.rep.id]:isOpen}))}
@@ -11975,6 +11982,7 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
                     <span className={`text-xs shrink-0 transition-transform ${isOpen?"rotate-90":"rotate-0"}`}>▶</span>
                     <span className="font-semibold text-sm text-gray-800 truncate">{block.rep.nome}</span>
                     {fechado && <span className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full font-medium shrink-0">🧾 Faturado</span>}
+                    {divergiuFechamento && <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-medium shrink-0" title={`Fechado em ${fmt(block.fech.valorTotal||0)} · recalculado agora: ${fmt(block.totalComissao)}`}>⚠️ Período mudou após o fechamento — reabra para ajustar</span>}
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="text-xs text-gray-400">{block.items.length} pedido(s)</span>
