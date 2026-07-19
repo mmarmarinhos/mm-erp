@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.8";
+const APP_VERSION = "3.31.9";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -5332,6 +5332,7 @@ const StockMovementModal = ({ product, onClose, onSave }) => {
   const [reason, setReason] = useState("");
   const [date, setDate]   = useState(today());
   const [notes, setNotes] = useState("");
+  const [saidaErr, setSaidaErr] = useState(false);
   const reasons = type==="entrada" ? MOV_REASONS_IN : type==="saida" ? MOV_REASONS_OUT : ["Contagem física","Correção de sistema","Outro"];
   const newStock = qty ? (type==="entrada" ? product.stock+Number(qty) : type==="saida" ? Math.max(0,product.stock-Number(qty)) : Number(qty)) : null;
 
@@ -5345,7 +5346,7 @@ const StockMovementModal = ({ product, onClose, onSave }) => {
         <div className="p-5 space-y-4">
           <div className="flex rounded-xl overflow-hidden border border-gray-200">
             {[["entrada","↑ Entrada","bg-green-500"],["saida","↓ Saída","bg-red-500"],["ajuste","⇔ Ajuste","bg-blue-500"]].map(([t,label,clr])=>(
-              <button key={t} onClick={()=>{setType(t);setReason("");}}
+              <button key={t} onClick={()=>{setType(t);setReason("");setSaidaErr(false);}}
                 className={`flex-1 py-2 text-sm font-medium transition-colors ${type===t?`${clr} text-white`:"bg-white text-gray-500 hover:bg-gray-50"}`}>{label}</button>
             ))}
           </div>
@@ -5353,7 +5354,8 @@ const StockMovementModal = ({ product, onClose, onSave }) => {
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">{type==="ajuste"?"Nova Qtd":"Quantidade"} *</label>
               <input type="number" min="0" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                value={qty} onChange={e=>setQty(e.target.value)} placeholder="0"/>
+                value={qty} onChange={e=>{setQty(e.target.value);setSaidaErr(false);}} placeholder="0"/>
+              {saidaErr && <p className="text-xs text-red-600 mt-1">⚠️ Saída maior que o estoque disponível ({product.stock||0} {product.unit}). Use "Ajuste" se for correção de contagem.</p>}
               <p className="text-xs text-gray-400 mt-1">
                 Atual: <strong>{product.stock}</strong>
                 {newStock!==null && <> → <strong className={newStock>product.stock?"text-green-600":newStock<product.stock?"text-red-500":"text-gray-700"}>{newStock}</strong></>}
@@ -5382,7 +5384,14 @@ const StockMovementModal = ({ product, onClose, onSave }) => {
         </div>
         <div className="flex gap-2 p-5 border-t border-gray-100">
           <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
-          <button onClick={() => { if(!qty||Number(qty)<=0) return; onSave({type,qty:Number(qty),reason:reason||reasons[0],date,notes}); }}
+          <button onClick={() => {
+              if(!qty||Number(qty)<=0) return;
+              // Saída maior que o estoque disponível: bloqueia — antes, o
+              // estoque clampava em zero mas o movimento gravava a quantidade
+              // cheia, e o histórico dizia que saíram unidades que não existiam.
+              if(type==="saida" && Number(qty) > (product.stock||0)) { setSaidaErr(true); return; }
+              onSave({type,qty:Number(qty),reason:reason||reasons[0],date,notes});
+            }}
             className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">Registrar</button>
         </div>
       </div>
@@ -5803,10 +5812,10 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null),3000); };
 
   // Stats
-  const totalItems   = products.filter(p=>p.status==="Ativo").reduce((s,p)=>s+p.stock,0);
-  const totalValue   = products.filter(p=>p.status==="Ativo").reduce((s,p)=>s+p.stock*p.cost,0);
-  const alertProducts = products.filter(p=>p.status==="Ativo" && (p.stock===0 || p.stock<p.minStock));
-  const zeroProducts  = products.filter(p=>p.status==="Ativo" && p.stock===0);
+  const totalItems   = products.filter(p=>p.status==="Ativo").reduce((s,p)=>s+(p.stock||0),0);
+  const totalValue   = products.filter(p=>p.status==="Ativo").reduce((s,p)=>s+(p.stock||0)*(p.cost||0),0);
+  const alertProducts = products.filter(p=>p.status==="Ativo" && ((p.stock||0)===0 || (p.stock||0)<(p.minStock||0)));
+  const zeroProducts  = products.filter(p=>p.status==="Ativo" && (p.stock||0)===0);
 
   // Filter
   const filtered = useMemo(() => products
@@ -5819,7 +5828,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
     })
     .filter(p => filterStatus === "Todos" || p.status === filterStatus)
     .filter(p => !search || [p.name,p.sku,p.category].some(f=>f?.toLowerCase().includes(search.toLowerCase())))
-    .filter(p => filterByDate(p.createdAt||""))
+    .filter(p => !p.createdAt || filterByDate(p.createdAt))
   , [products, filterCat, filterStock, filterStatus, search, filterMode, period, dateFrom, dateTo]);
 
   const selectedProduct = products.find(p=>p.id===selected);
@@ -6164,7 +6173,13 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
             <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3"><Icon name="trash" size={22} className="text-red-500"/></div>
             <h3 className="font-semibold text-gray-900 mb-1">Excluir produto?</h3>
-            <p className="text-sm text-gray-500 mb-4">{confirmDelete.name}</p>
+            <p className="text-sm text-gray-500 mb-2">{confirmDelete.name}</p>
+            {(confirmDelete.stock||0) > 0 && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+                ⚠️ Este produto tem <strong>{confirmDelete.stock} {confirmDelete.unit||"un"}</strong> em estoque
+                ({fmt((confirmDelete.stock||0)*(confirmDelete.cost||0))} em custo). A exclusão remove esse valor do inventário sem rastro.
+              </p>
+            )}
             <div className="flex gap-2">
               <button onClick={()=>setConfirmDelete(null)} className="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
               <button onClick={()=>handleDelete(confirmDelete)} className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600">Excluir</button>
