@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.9";
+const APP_VERSION = "3.31.10";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -9349,31 +9349,52 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
       setMovements(prev => {
         const nums = prev.map(m=>parseInt(String(m.id).replace("MOV-",""))||0);
         const base = Math.max(0,...nums,0);
-        const novas = cart.filter(i=>i._prodId).map((i,idx)=>({
-          id:`MOV-${String(base+idx+1).padStart(3,"0")}`, productId:i._prodId, type:"saida",
-          qty:i.qty, date: today(), reason:"Venda PDV", notes:`Venda PDV ${newId}`,
-        }));
+        const novas = cart.filter(i=>i._prodId).map((i,idx)=>{
+          // Venda acima do estoque do sistema: o PDV não bloqueia (o produto
+          // físico está na mão do cliente), mas a divergência fica anotada no
+          // movimento pra rastrear depois na contagem.
+          const prodAtual = products.find(p=>String(p.id)===String(i._prodId));
+          const estSistema = prodAtual?.stock||0;
+          const divergiu = (i.qty||0) > estSistema;
+          return {
+            id:`MOV-${String(base+idx+1).padStart(3,"0")}`, productId:i._prodId, type:"saida",
+            qty:i.qty, date: today(), reason:"Venda PDV",
+            notes:`Venda PDV ${newId}${divergiu?` · ⚠️ estoque no sistema era ${estSistema}`:""}`,
+          };
+        });
         return [...prev, ...novas];
       });
 
+      // A VENDA é o essencial; a NFC-e é acessória. O pedido é gravado ANTES
+      // de chamar a emissão — antes, uma queda de rede no fetch lançava
+      // exceção e o pedido nunca era gravado, mas o estoque já tinha baixado
+      // e os movimentos já estavam registrados: venda fantasma. Se a emissão
+      // falhar agora, a venda fica registrada com o aviso âmbar e a nota pode
+      // ser emitida depois pelo módulo Fiscal.
+      setOrders(prev => [...prev, newOrder]);
+      setCart([]);
+
       let nfceResult = null;
       if (params?.fiscal?.provider === "focus") {
-        const token = getSession()?.token;
-        const r = await fetch("/api/nfe-issue", {
-          method: "POST",
-          headers: { "Content-Type":"application/json", ...(token?{Authorization:`Bearer ${token}`}:{}) },
-          body: JSON.stringify({ order:newOrder, ref:`${newId}-${Date.now()}`, tipo:"nfce" }),
-        });
-        nfceResult = await r.json().catch(()=>({ ok:false, error:"Erro de comunicação" }));
+        try {
+          const token = getSession()?.token;
+          const r = await fetch("/api/nfe-issue", {
+            method: "POST",
+            headers: { "Content-Type":"application/json", ...(token?{Authorization:`Bearer ${token}`}:{}) },
+            body: JSON.stringify({ order:newOrder, ref:`${newId}-${Date.now()}`, tipo:"nfce" }),
+          });
+          nfceResult = await r.json().catch(()=>({ ok:false, error:"Erro de comunicação" }));
+        } catch(e) {
+          nfceResult = { ok:false, error:"Sem conexão com o servidor de notas — emita depois pelo módulo Fiscal" };
+        }
         if (nfceResult.ok) {
-          newOrder.nfceStatus = nfceResult.status; newOrder.nfceChave = nfceResult.chave;
-          newOrder.nfcePdfUrl = nfceResult.pdfUrl; newOrder.nfceQrcode = nfceResult.qrcodeUrl;
+          const nf = { nfceStatus:nfceResult.status, nfceChave:nfceResult.chave, nfcePdfUrl:nfceResult.pdfUrl, nfceQrcode:nfceResult.qrcodeUrl };
+          Object.assign(newOrder, nf);
+          setOrders(prev => prev.map(o => o.id===newId ? { ...o, ...nf } : o));
         }
       }
 
-      setOrders(prev => [...prev, newOrder]);
       setResult({ order:newOrder, nfce:nfceResult });
-      setCart([]);
     } catch(e) { setErr("Erro: "+e.message); }
     setFinalizing(false);
   };
@@ -9442,6 +9463,13 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 truncate">{item.description}</p>
                   <p className="text-xs text-gray-400">{fmt(item.unitPrice)} cada</p>
+                  {(() => {
+                    const prodAtual = products.find(p=>String(p.id)===String(item._prodId));
+                    const est = prodAtual?.stock||0;
+                    return item.qty > est
+                      ? <p className="text-[11px] text-amber-600 font-medium">⚠️ Estoque no sistema: {est}</p>
+                      : null;
+                  })()}
                 </div>
                 <input type="number" min="1" value={item.qty} onChange={e=>updateQty(item._prodId, e.target.value)}
                   ref={el=>qtyInputRefs.current[item._prodId]=el}
