@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.15";
+const APP_VERSION = "3.31.16";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -11553,7 +11553,13 @@ const RepresentanteModal = ({ rep, onClose, onSave }) => {
 
   const handleSave = () => {
     if (!form.nome.trim()) return;
-    const faixasOrdenadas = form.faixas.slice().sort((a,b)=>(a.ate||0)-(b.ate||0));
+    // Faixas com "até %" em branco viravam "até 0%" no cálculo e capturavam os
+    // pedidos sem desconto com a comissão errada — normaliza: vazio vira 0
+    // explícito e faixas totalmente vazias (até 0 E comissão 0) são descartadas.
+    const faixasOrdenadas = form.faixas
+      .map(fx => ({ ate: Number(fx.ate)||0, comissao: Number(fx.comissao)||0 }))
+      .filter(fx => !(fx.ate === 0 && fx.comissao === 0))
+      .sort((a,b)=>a.ate-b.ate);
     onSave({ ...form, faixas: faixasOrdenadas });
   };
 
@@ -12067,7 +12073,7 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
   );
 };
 
-const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setContas, formasPagamento=[], setFormasPagamento, variantCatalogs=[], setVariantCatalogs, currentUser }) => {
+const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setContas, formasPagamento=[], setFormasPagamento, variantCatalogs=[], setVariantCatalogs, orders=[], fechamentos=[], currentUser }) => {
   const canIncluir = getUserPerm(currentUser, "cadastros", "incluir");
   const canAlterar = getUserPerm(currentUser, "cadastros", "alterar");
   const canExcluir = getUserPerm(currentUser, "cadastros", "excluir");
@@ -12394,6 +12400,31 @@ const CadastrosModule = ({ representantes=[], setRepresentantes, contas=[], setC
               {confirmDelete.type==="fp" && `Remover a forma de pagamento "${confirmDelete.item.nome}"?`}
               {confirmDelete.type==="catalogo" && `Remover o catálogo "${confirmDelete.item.nome}"? Produtos já gerados a partir dele não são afetados.`}
             </p>
+            {(() => {
+              // Aviso de vínculos: excluir um representante com pedidos faz os
+              // pedidos dele SUMIREM do fechamento de comissões (o bloco é
+              // descartado quando o rep não existe); excluir uma conta deixa
+              // formas de pagamento apontando pra conta inexistente.
+              if (confirmDelete.type==="rep") {
+                const nPed = orders.filter(o=>o.representanteId===confirmDelete.item.id).length;
+                const nFch = fechamentos.filter(f=>f.representanteId===confirmDelete.item.id).length;
+                if (nPed>0 || nFch>0) return (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+                    ⚠️ Este representante tem <strong>{nPed} pedido(s)</strong>{nFch>0?<> e <strong>{nFch} fechamento(s) de comissão</strong></>:null} vinculado(s).
+                    Ao excluir, os pedidos dele <strong>deixam de aparecer no fechamento de comissões</strong> e o histórico perde a referência.
+                  </p>
+                );
+              }
+              if (confirmDelete.type==="conta") {
+                const nFp = formasPagamento.filter(f=>f.contaId===confirmDelete.item.id).length;
+                if (nFp>0) return (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+                    ⚠️ Esta conta está vinculada a <strong>{nFp} forma(s) de pagamento</strong> — elas ficarão sem conta de destino.
+                  </p>
+                );
+              }
+              return null;
+            })()}
             <div className="flex gap-2">
               <button onClick={()=>setConfirmDelete(null)} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
               <button onClick={()=>{
@@ -13627,7 +13658,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} params={params} currentUser={currentUser}/>;
       case "pdv": return <PdvModule products={products} setProducts={updateProducts} orders={orders} setOrders={updateOrders} movements={movements} setMovements={updateMovements} customers={customers} caixa={caixa} setCaixa={updateCaixa} setNfes={updateNfes} params={params} currentUser={currentUser}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
-      case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento} variantCatalogs={variantCatalogs} setVariantCatalogs={updateVariantCatalogs} currentUser={currentUser}/>;
+      case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento} variantCatalogs={variantCatalogs} setVariantCatalogs={updateVariantCatalogs} orders={orders} fechamentos={fechamentos} currentUser={currentUser}/>;
       case "parametros": return <ParamsModule params={params} setParams={updateParams} onSaveEmpresa={(data)=>setEmpresaForm(data)} orders={orders} setOrders={updateOrders} currentUser={currentUser}/>;
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes} currentUser={currentUser}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
