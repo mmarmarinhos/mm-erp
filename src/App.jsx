@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.12";
+const APP_VERSION = "3.31.13";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -4694,7 +4694,12 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
     // Só pedidos já FATURADOS entram como receita real — um pedido "Novo"
     // sem NF emitida ainda não é uma venda concretizada (mesmo critério já
     // usado em Contas a Receber e no Dashboard).
-    orders.filter(o => o.status !== "Cancelado" && !!o.nfNumero && filterByDate(o.date))
+    // Devolvido SEM pagamento também fica de fora: desde a v3.31.4 o estorno
+    // só é lançado quando o pedido estava pago, então uma devolução não paga
+    // não tem contrapartida em despesa — contá-la inflaria a receita.
+    // Devolvido PAGO permanece: a receita conta e o estorno em despesa fecha
+    // o resultado líquido corretamente.
+    orders.filter(o => o.status !== "Cancelado" && !(o.status === "Devolvido" && !o.paidDate) && !!o.nfNumero && filterByDate(o.date))
   , [orders, filterMode, period, dateFrom, dateTo]);
 
   const periodPurchases = useMemo(() =>
@@ -4729,7 +4734,7 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
       const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
       const txs = finance.filter(f=>f.status!=="cancelado"&&f.date.startsWith(key));
       // Mesmo critério do resumo: só pedidos faturados e compras baixadas
-      const ordMes = orders.filter(o=>o.status!=="Cancelado"&&(o.nfNumero)&&(o.date||"").startsWith(key));
+      const ordMes = orders.filter(o=>o.status!=="Cancelado"&&!(o.status==="Devolvido"&&!o.paidDate)&&(o.nfNumero)&&(o.date||"").startsWith(key));
       const pcMes  = (purchases||[]).filter(p=>p.status==="Baixado"&&(p.date||"").startsWith(key));
       return {
         label: d.toLocaleDateString("pt-BR",{month:"short"}).replace(".",""),
@@ -4784,12 +4789,29 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
   const dreDespesas = dreGroups.filter(g=>g.type==="despesa");
   const expenseChartData = dreDespesas.map(g=>({ label:g.category.length>20?g.category.slice(0,18)+"…":g.category, fullLabel:g.category, value:g.total }));
 
-  // Customer data
+  // Customer data — stats calculados DINAMICAMENTE dos pedidos (mesma regra
+  // do CRM: exclui cancelados, match por nome normalizado). Antes, usava os
+  // campos totalSpent/totalOrders gravados no cadastro: clientes criados
+  // manualmente não têm esses campos (→ NaN nas somas) e, mesmo quando
+  // existem, ficam congelados no valor da importação — divergindo do CRM.
+  const custStats = useMemo(() => {
+    const map = {};
+    orders.forEach(o => {
+      if (o.status === "Cancelado") return;
+      const k = (o.customer||"").toLowerCase();
+      if (!k) return;
+      if (!map[k]) map[k] = { totalSpent:0, totalOrders:0 };
+      map[k].totalSpent  += Number(o.total)||0;
+      map[k].totalOrders += 1;
+    });
+    return map;
+  }, [orders]);
+  const getCustStats = (c) => custStats[(c.name||"").toLowerCase()] || { totalSpent:0, totalOrders:0 };
   const segData = SEGMENTS.map(s => ({ label:s, count:customers.filter(c=>c.segment===s).length }));
-  const topCustomers = [...customers].sort((a,b)=>b.totalSpent-a.totalSpent).slice(0,5);
+  const topCustomers = [...customers].sort((a,b)=>getCustStats(b).totalSpent-getCustStats(a).totalSpent).slice(0,5);
   const custChannelData = CHANNELS.map(c => ({ label:c, count:customers.filter(x=>x.channel===c).length })).sort((a,b)=>b.count-a.count);
-  const totalCustomerSpent = customers.reduce((s,c)=>s+c.totalSpent,0);
-  const totalCustomerOrders = customers.reduce((s,c)=>s+c.totalOrders,0);
+  const totalCustomerSpent = customers.reduce((s,c)=>s+getCustStats(c).totalSpent,0);
+  const totalCustomerOrders = customers.reduce((s,c)=>s+getCustStats(c).totalOrders,0);
 
   return (
     <div className="space-y-4">
@@ -5179,8 +5201,9 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
             <h3 className="font-semibold text-gray-700 text-sm mb-4">Top 5 Clientes por LTV</h3>
             <div className="space-y-3">
               {topCustomers.map((c,i) => {
-                const maxSpent = topCustomers[0]?.totalSpent||1;
-                const pct = c.totalSpent/maxSpent*100;
+                const st = getCustStats(c);
+                const maxSpent = getCustStats(topCustomers[0]||{}).totalSpent||1;
+                const pct = st.totalSpent/maxSpent*100;
                 const seg = SEG_STYLES[c.segment]||SEG_STYLES.Novo;
                 return (
                   <div key={c.id} className="flex items-center gap-3 py-1.5 border-b border-gray-50 last:border-0">
@@ -5195,10 +5218,10 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
                         <div className="flex-1 bg-gray-100 rounded-full h-1.5">
                           <div className="bg-indigo-500 h-1.5 rounded-full" style={{width:`${pct}%`}}/>
                         </div>
-                        <span className="text-[10px] text-gray-400">{c.totalOrders} ped.</span>
+                        <span className="text-[10px] text-gray-400">{st.totalOrders} ped.</span>
                       </div>
                     </div>
-                    <span className="font-bold text-gray-900 text-sm shrink-0">{fmt(c.totalSpent)}</span>
+                    <span className="font-bold text-gray-900 text-sm shrink-0">{fmt(st.totalSpent)}</span>
                   </div>
                 );
               })}
