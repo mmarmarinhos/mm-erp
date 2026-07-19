@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.14";
+const APP_VERSION = "3.31.15";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -8499,12 +8499,18 @@ const UsersModule = ({ currentUser }) => {
     return data;
   };
 
+  const [loadErr, setLoadErr] = useState("");
   const load = async () => {
-    setLoading(true);
+    setLoading(true); setLoadErr("");
     try {
       const data = await callUsersApi({ action:"list" });
       setUsers((data.users||[]).map(normalizeUser));
-    } catch(e) { console.error(e); }
+    } catch(e) {
+      console.error(e);
+      // Antes o erro ia só pro console e a tela mostrava lista vazia —
+      // indistinguível de "não há usuários".
+      setLoadErr(e.message || "Erro ao carregar usuários");
+    }
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -8575,6 +8581,10 @@ const UsersModule = ({ currentUser }) => {
               role:form.role, customModules: form.useCustom?form.customModules:null,
               customPermissions: form.useCustomPerms?form.customPermissions:null,
             });
+          } else {
+            // Sem confirmação de que a personalização foi aplicada — avisa em
+            // vez de perder as escolhas em silêncio.
+            setErr("⚠️ Usuário criado, mas a personalização de módulos/permissões não pôde ser confirmada — abra o usuário e aplique de novo.");
           }
         }
         setOk(`✅ Usuário criado! Chave de recuperação: ${data.recoveryKey}`);
@@ -8596,15 +8606,19 @@ const UsersModule = ({ currentUser }) => {
     setSaving(false);
   };
 
+  const [actionErr, setActionErr] = useState("");
   const toggleActive = async (u) => {
-    try { await callUsersApi({ action:"toggleActive", id:u.id, active:!u.active }); } catch(e) { console.error(e); }
+    setActionErr("");
+    try { await callUsersApi({ action:"toggleActive", id:u.id, active:!u.active }); }
+    catch(e) { console.error(e); setActionErr(e.message || "Erro ao alterar o usuário"); }
     load();
   };
 
   const [confirmDelete, setConfirmDelete] = useState(null);
   const deleteUser = async (u) => {
+    setActionErr("");
     try { await callUsersApi({ action:"delete", id:u.id }); load(); }
-    catch(e) { setErr("Erro ao excluir: "+e.message); }
+    catch(e) { setActionErr("Erro ao excluir: "+e.message); }
     setConfirmDelete(null);
   };
 
@@ -8614,6 +8628,12 @@ const UsersModule = ({ currentUser }) => {
 
   return (
     <div className="space-y-4">
+      {(loadErr || actionErr) && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+          <p className="text-sm text-red-700">⚠️ {loadErr || actionErr}</p>
+          {loadErr && <button onClick={load} className="text-xs font-medium text-red-700 underline shrink-0">Tentar de novo</button>}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Usuários do Sistema</h1>
@@ -8700,7 +8720,9 @@ const UsersModule = ({ currentUser }) => {
                 <div>
                   <label className="text-xs font-medium text-gray-600 block mb-1">Perfil base</label>
                   <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                    value={form.role} onChange={e=>{ setF("role",e.target.value); setF("customModules",null); }}>
+                    value={form.role} onChange={e=>{ setF("role",e.target.value); setF("customModules",null); }}
+                    disabled={modal!=="new" && modal?.username===currentUser.username}
+                    title={modal!=="new" && modal?.username===currentUser.username ? "Você não pode alterar o próprio nível de acesso" : undefined}>
                     {Object.entries(ROLES_DEF).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}
                   </select>
                 </div>
