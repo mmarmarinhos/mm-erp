@@ -18,7 +18,7 @@ function secretHeaders(extra = {}) {
 async function validateSession(token) {
   if (!token) return null;
   const r = await fetch(
-    `${SB_URL}/rest/v1/sessions?token=eq.${encodeURIComponent(token)}&select=user_id,username,expires_at&limit=1`,
+    `${SB_URL}/rest/v1/sessions?token=eq.${encodeURIComponent(token)}&select=user_id,username,expires_at,tenant_id&limit=1`,
     { headers: secretHeaders() }
   );
   if (!r.ok) return null;
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
     }
 
     const r = await fetch(
-      `${SB_URL}/rest/v1/erp_users?id=eq.${encodeURIComponent(session.user_id)}&select=password_hash&limit=1`,
+      `${SB_URL}/rest/v1/erp_users?id=eq.${encodeURIComponent(session.user_id)}&tenant_id=eq.${session.tenant_id}&select=password_hash&limit=1`,
       { headers: secretHeaders() }
     );
     const rows = await r.json();
@@ -54,7 +54,7 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Senha atual incorreta' });
     }
 
-    const u = await fetch(`${SB_URL}/rest/v1/erp_users?id=eq.${encodeURIComponent(session.user_id)}`, {
+    const u = await fetch(`${SB_URL}/rest/v1/erp_users?id=eq.${encodeURIComponent(session.user_id)}&tenant_id=eq.${session.tenant_id}`, {
       method: 'PATCH',
       headers: secretHeaders({ Prefer: 'return=minimal' }),
       body: JSON.stringify({ password_hash: newPasswordHash }),
