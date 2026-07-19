@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.17";
+const APP_VERSION = "3.32.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -58,6 +58,28 @@ const WEEKDAYS = [
 const CHANNEL_TO_ID = {"Mercado Livre":"ml","Shopee":"shopee","WhatsApp":"wpp","Loja Própria":"loja","Loja Propria":"loja"};
 const chId = (ch) => CHANNEL_TO_ID[ch] || ch;
 const ORDER_STATUSES = ["Novo", "Em Separação", "Enviado", "Entregue", "Cancelado", "Devolvido"];
+
+// ─── Semântica de status ────────────────────────────────────────────────────
+// Cada status carrega 3 chaves de comportamento:
+//   holdsStock — pedido nesse status baixa/mantém a baixa do estoque
+//   toShip     — conta como "a enviar" (card do Dashboard, Prazos de Postagem, filtro A_ENVIAR)
+//   delivered  — vale como entrega concluída (elegibilidade de comissão)
+// Os status essenciais têm semântica FIXA aqui; os customizados declaram a sua
+// nos Parâmetros (params.vendas.statusMeta) — antes, status customizado era só
+// etiqueta: não baixava estoque, não aparecia como "a enviar" e não comissionava,
+// tudo em silêncio.
+const CORE_STATUS_META = {
+  "Novo":         { holdsStock:true,  toShip:true,  delivered:false },
+  "Em Separação": { holdsStock:true,  toShip:true,  delivered:false },
+  "Enviado":      { holdsStock:true,  toShip:false, delivered:false },
+  "Entregue":     { holdsStock:true,  toShip:false, delivered:true  },
+  "Cancelado":    { holdsStock:false, toShip:false, delivered:false },
+  "Devolvido":    { holdsStock:false, toShip:false, delivered:false },
+};
+const statusMeta       = (params, s) => CORE_STATUS_META[s] || params?.vendas?.statusMeta?.[s] || { holdsStock:false, toShip:false, delivered:false };
+const statusHoldsStock = (params, s) => statusMeta(params, s).holdsStock;
+const statusToShip     = (params, s) => statusMeta(params, s).toShip;
+const statusDelivered  = (params, s) => statusMeta(params, s).delivered;
 const PAYMENT_METHODS = ["Pix", "Cartão de Crédito", "Boleto", "Mercado Pago", "Dinheiro"];
 
 // ─── Finance Constants ────────────────────────────────────────────────────
@@ -1161,7 +1183,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
       o.items.toLowerCase().includes(search.toLowerCase());
     const matchChannel = filterChannel === "Todos" || o.channel === filterChannel;
     const matchStatus  = filterStatus === "Todos" ? true
-      : filterStatus === "A_ENVIAR" ? (o.status === "Novo" || o.status === "Em Separação")
+      : filterStatus === "A_ENVIAR" ? statusToShip(params, o.status)
       : filterStatus === "EM_ABERTO_FAT" ? (!o.nfNumero && o.status !== "Cancelado")
       : filterStatus === "FATURADOS" ? !!o.nfNumero
       : o.status === filterStatus;
@@ -1176,13 +1198,15 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
 
   const totalValue = filtered.reduce((s, o) => s + o.total, 0);
 
-  const ACTIVE_ORDER_STATUSES = ["Novo", "Em Separação", "Enviado", "Entregue"];
+  // Semântica declarada nos Parâmetros: status customizados com "segura
+  // estoque" ligado entram aqui automaticamente.
+  const isActiveStatus = (s) => statusHoldsStock(params, s);
 
   // Quanto estoque este pedido está "segurando" agora, por produto.
   // Pedidos Cancelado/Devolvido não seguram nada (estoque já foi/não foi baixado).
   const computeHeldQtyMap = (order) => {
     const map = {};
-    if (!order || !ACTIVE_ORDER_STATUSES.includes(order.status)) return map;
+    if (!order || !isActiveStatus(order.status)) return map;
     (order.itemsList || []).forEach(it => {
       if (!it._prodId || (it.qty||0) <= 0) return;
       const key = String(it._prodId);
@@ -1320,8 +1344,8 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
     const order = orders.find(o => o.id === id);
     if (!order || order.status === newStatus) return;
 
-    const wasActive    = ACTIVE_ORDER_STATUSES.includes(order.status);
-    const willBeActive = ACTIVE_ORDER_STATUSES.includes(newStatus);
+    const wasActive    = isActiveStatus(order.status);
+    const willBeActive = isActiveStatus(newStatus);
 
     // Selecionar "Devolvido" direto no menu de status passa a usar o MESMO
     // fluxo do botão "↩ Devolver" (restaura estoque + cria lançamento
@@ -1352,7 +1376,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
     // ao cancelamento — antes, excluir em vez de cancelar sumia com o estoque
     // silenciosamente, sem movimento de entrada.
     const order = orders.find(o => o.id === id);
-    if (order && ACTIVE_ORDER_STATUSES.includes(order.status)) {
+    if (order && isActiveStatus(order.status)) {
       restoreStockForOrder(order, "Exclusão de pedido");
     }
     setOrders(prev => prev.filter(o => o.id !== id));
@@ -1426,8 +1450,12 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
     setDevolucaoModal(null);
   };
 
-  // Stats
-  const stats = ORDER_STATUSES.reduce((acc, s) => {
+  // Stats — a lista completa inclui os status customizados dos Parâmetros;
+  // antes, pedido em status customizado ficava invisível nos contadores.
+  const allStatuses = params?.vendas?.statusList?.length
+    ? [...new Set([...ORDER_STATUSES, ...params.vendas.statusList])]
+    : ORDER_STATUSES;
+  const stats = allStatuses.reduce((acc, s) => {
     acc[s] = orders.filter(o => o.status === s).length;
     return acc;
   }, {});
@@ -1450,9 +1478,9 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
       </div>
 
       {/* Status pills */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-        {ORDER_STATUSES.map(s => {
-          const st = STATUS_STYLES[s];
+      <div className={`grid grid-cols-3 gap-2 ${allStatuses.length>6?"sm:grid-cols-4 lg:grid-cols-8":"sm:grid-cols-6"}`}>
+        {allStatuses.map(s => {
+          const st = STATUS_STYLES[s] || { bg:"bg-slate-100", text:"text-slate-700" };
           return (
             <button key={s} onClick={() => setFilterStatus(filterStatus === s ? "Todos" : s)}
               className={`rounded-xl p-2.5 text-center border transition-all ${filterStatus === s ? `${st.bg} border-transparent` : "bg-white border-gray-100 hover:border-gray-200"}`}>
@@ -1819,7 +1847,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
             </div>
             <h3 className="font-semibold text-gray-900 mb-1">Excluir pedido?</h3>
             <p className="text-sm text-gray-500 mb-2">{confirmDelete.id} — {confirmDelete.customer}</p>
-            {ACTIVE_ORDER_STATUSES.includes(confirmDelete.status) && (confirmDelete.itemsList||[]).some(i=>i._prodId&&(i.qty||0)>0) && (
+            {isActiveStatus(confirmDelete.status) && (confirmDelete.itemsList||[]).some(i=>i._prodId&&(i.qty||0)>0) && (
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">↩ O estoque dos itens será restaurado automaticamente</p>
             )}
             <div className="flex gap-2">
@@ -1860,7 +1888,7 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
   // ── 1) Pedidos em Aberto / Faturados / A Enviar ──────────────────────────
   const pedidosEmAberto  = orders.filter(o => !o.nfNumero && o.status !== "Cancelado").length;
   const pedidosFaturados = orders.filter(o => !!o.nfNumero).length;
-  const pedidosAEnviar   = orders.filter(o => o.status === "Novo" || o.status === "Em Separação").length;
+  const pedidosAEnviar   = orders.filter(o => statusToShip(params, o.status)).length;
 
   // ── 2) Prévia Contas a Receber (mesmo critério da aba Contas a Receber:
   //      só pedidos já faturados e não pagos) ──────────────────────────────
@@ -1918,7 +1946,7 @@ const DashboardModule = ({ orders, finance = [], params, setActive, onGoToAEnvia
   todayDate.setHours(0, 0, 0, 0);
 
   const pendingOrders = orders
-    .filter(o => o.status === "Novo" || o.status === "Em Separação")
+    .filter(o => statusToShip(params, o.status))
     .map(o => {
       const sla         = params?.canais?.[o.channel]?.sla ?? SHIP_SLA[o.channel] ?? 3;
       const diasValidos = params?.canais?.[o.channel]?.diasDespacho ?? DEFAULT_DIAS_DESPACHO;
@@ -4645,7 +4673,7 @@ const SupplierModule = ({ suppliers, setSuppliers, finance, setFinance, purchase
 // ─── Reports Module ───────────────────────────────────────────────────────
 const PERIOD_OPTS = { "1m":"1 mês", "3m":"3 meses", "6m":"6 meses", "all":"Todo período" };
 
-const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], products = [] }) => {
+const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], products = [], params }) => {
   const [tab, setTab]           = useState("resumo");
   const [filterMode, setFilterMode] = useState("todos");
   const [period, setPeriod] = useState(() => {
@@ -4770,7 +4798,10 @@ const ReportsModule = ({ orders, finance, customers, suppliers, purchases = [], 
   })).sort((a,b)=>b.total-a.total), [periodOrders]);
 
   // Orders by status (all time)
-  const statusData = ORDER_STATUSES.map(s => ({ label:s, count:orders.filter(o=>o.status===s).length }));
+  const statusData = (params?.vendas?.statusList?.length
+    ? [...new Set([...ORDER_STATUSES, ...params.vendas.statusList])]
+    : ORDER_STATUSES
+  ).map(s => ({ label:s, count:orders.filter(o=>o.status===s).length })).filter(d => d.count > 0 || ORDER_STATUSES.includes(d.label));
 
   // DRE grouped by category — inclui pedidos faturados e compras baixadas
   // como categorias próprias, pra bater com o total do Resumo (que soma os
@@ -11857,7 +11888,7 @@ const VariantCatalogModal = ({ catalog, onClose, onSave }) => {
 };
 
 // ─── MovimentosModule — Fechamento/Faturamento de Comissão dos Representantes ──
-const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFechamentos, finance=[], setFinance, currentUser }) => {
+const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFechamentos, finance=[], setFinance, params, currentUser }) => {
   const canIncluir = getUserPerm(currentUser, "movimentos", "incluir");
   const canAlterar = getUserPerm(currentUser, "movimentos", "alterar");
   const [period, setPeriod] = useState(() => {
@@ -11870,7 +11901,7 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
 
   // Cancelado e Devolvido nunca comissionam — antes, um pedido pago e depois
   // cancelado (ou devolvido) continuava elegível e entrava no fechamento.
-  const isEligible = (o) => o.status !== "Cancelado" && o.status !== "Devolvido" && (o.status === "Entregue" || !!o.paidDate);
+  const isEligible = (o) => o.status !== "Cancelado" && o.status !== "Devolvido" && (statusDelivered(params, o.status) || !!o.paidDate);
 
   const periodLabel = (() => {
     const [y,m] = period.split("-");
@@ -12860,24 +12891,40 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders, cur
               Personalize os status que aparecem nos Pedidos de Venda.
             </p>
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-              ⚠️ <strong>Novo, Em Separação, Enviado, Entregue, Cancelado e Devolvido</strong> têm comportamento automático no sistema (estorno de estoque ao cancelar, liberação de devolução, débito de estoque conforme o status). Não remova nem renomeie esses — só <strong>adicione</strong> status extras pra uso interno (ex: "Aguardando Retirada"). Os novos aparecem no dropdown e nos relatórios, mas não disparam nenhuma ação automática de estoque.
+              ⚠️ <strong>Novo, Em Separação, Enviado, Entregue, Cancelado e Devolvido</strong> têm comportamento automático no sistema (estorno de estoque ao cancelar, liberação de devolução, débito de estoque conforme o status). Os essenciais têm 🔒 e semântica fixa. Ao adicionar um status próprio (ex: "Aguardando Retirada"), use as chavinhas pra declarar o comportamento dele: <strong>📦 Segura estoque</strong> (baixa/mantém o estoque), <strong>🚚 Conta como a enviar</strong> (entra no card do Dashboard e nos Prazos de Postagem) e <strong>✅ Entrega concluída</strong> (vale pra comissão do representante).
             </p>
 
             <div className="flex flex-wrap gap-2">
               {(vendas.statusList||[]).map((s,idx)=>{
                 // Status essenciais do sistema (disparam estoque/financeiro) têm
-                // cadeado — o texto de ajuda pedia pra não remover, mas o ✕
-                // permitia: sem "Cancelado" no dropdown, ninguém conseguia mais
-                // cancelar pedido (o fluxo que devolve estoque).
+                // cadeado e semântica fixa; os customizados declaram a própria
+                // semântica nas chavinhas abaixo do chip.
                 const essencial = ORDER_STATUSES.includes(s);
+                const meta = essencial ? CORE_STATUS_META[s] : (vendas.statusMeta?.[s] || { holdsStock:false, toShip:false, delivered:false });
+                const toggleMeta = (k) => setVendas(prev=>({...prev,
+                  statusMeta: { ...(prev.statusMeta||{}), [s]: { ...(prev.statusMeta?.[s]||{ holdsStock:false, toShip:false, delivered:false }), [k]: !(prev.statusMeta?.[s]?.[k]) } }
+                }));
                 return (
-                <span key={idx} className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-full pl-3 pr-2 py-1.5">
-                  {s}
-                  {essencial
-                    ? <span className="text-indigo-300" title="Status essencial do sistema — não pode ser removido">🔒</span>
-                    : <button onClick={()=>setVendas(prev=>({...prev, statusList: prev.statusList.filter((_,i)=>i!==idx)}))}
-                        className="text-indigo-400 hover:text-red-500 font-bold">✕</button>}
-                </span>
+                <div key={idx} className="bg-indigo-50 rounded-xl px-3 py-2">
+                  <div className="flex items-center gap-1.5 text-indigo-700 text-sm font-medium">
+                    {s}
+                    {essencial
+                      ? <span className="text-indigo-300" title="Status essencial do sistema — não pode ser removido">🔒</span>
+                      : <button onClick={()=>setVendas(prev=>({...prev,
+                          statusList: prev.statusList.filter((_,i)=>i!==idx),
+                          statusMeta: Object.fromEntries(Object.entries(prev.statusMeta||{}).filter(([k])=>k!==s)),
+                        }))}
+                          className="text-indigo-400 hover:text-red-500 font-bold">✕</button>}
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-1.5">
+                    {[["holdsStock","📦 Segura estoque"],["toShip","🚚 Conta como a enviar"],["delivered","✅ Entrega concluída"]].map(([k,label])=>(
+                      essencial
+                        ? <span key={k} className={`text-[10px] px-1.5 py-0.5 rounded-full ${meta[k]?"bg-indigo-200 text-indigo-800":"bg-white/60 text-gray-400 line-through"}`}>{label}</span>
+                        : <button key={k} onClick={()=>toggleMeta(k)}
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full border transition-all ${meta[k]?"bg-indigo-600 text-white border-indigo-600":"bg-white text-gray-400 border-gray-200 hover:border-indigo-300"}`}>{label}</button>
+                    ))}
+                  </div>
+                </div>
               );})}
               {(!vendas.statusList || vendas.statusList.length===0) && <p className="text-xs text-gray-400 italic">Nenhum status configurado — usando os padrões do sistema.</p>}
             </div>
@@ -13680,8 +13727,8 @@ function ERPApp({ currentUser, onLogout }) {
       case "parametros": return <ParamsModule params={params} setParams={updateParams} onSaveEmpresa={(data)=>setEmpresaForm(data)} orders={orders} setOrders={updateOrders} currentUser={currentUser}/>;
       case "fiscal":    return <FiscalModule nfes={nfes} setNfes={updateNfes} currentUser={currentUser}/>;
       case "pricehunt": return <PriceHuntModule products={products} initialQuery={phQuery} initialPrice={phPrice}/>;
-      case "reports":   return <ReportsModule orders={orders} finance={finance} customers={customers} suppliers={suppliers} purchases={purchases} products={products}/>;
-      case "movimentos": return <MovimentosModule orders={orders} representantes={representantes} fechamentos={fechamentos} setFechamentos={updateFechamentos} finance={finance} setFinance={updateFinance} currentUser={currentUser}/>;
+      case "reports":   return <ReportsModule orders={orders} finance={finance} customers={customers} suppliers={suppliers} purchases={purchases} products={products} params={params}/>;
+      case "movimentos": return <MovimentosModule orders={orders} representantes={representantes} fechamentos={fechamentos} setFechamentos={updateFechamentos} finance={finance} setFinance={updateFinance} params={params} currentUser={currentUser}/>;
       default: return null;
     }
   };
