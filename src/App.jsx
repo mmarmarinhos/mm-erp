@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.32.0";
+const APP_VERSION = "3.33.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -80,6 +80,20 @@ const statusMeta       = (params, s) => CORE_STATUS_META[s] || params?.vendas?.s
 const statusHoldsStock = (params, s) => statusMeta(params, s).holdsStock;
 const statusToShip     = (params, s) => statusMeta(params, s).toShip;
 const statusDelivered  = (params, s) => statusMeta(params, s).delivered;
+
+// ─── Limite de desconto ─────────────────────────────────────────────────────
+// Política da empresa (Parâmetros → Vendas): desconto máximo em % que usuários
+// não-admin podem conceder por item. 0 = sem limite. Admins podem exceder.
+// Retorna o maior desconto % encontrado na lista de itens (tipo % direto;
+// tipo R$ convertido sobre o bruto do item).
+const maiorDescontoPercent = (itemsList) => (itemsList||[]).reduce((max, it) => {
+  const gross = (Number(it.qty)||0) * (Number(it.unitPrice)||0);
+  const pct = it.discountType === "%"
+    ? (Number(it.discount)||0)
+    : (gross > 0 ? (Number(it.discount)||0) / gross * 100 : 0);
+  return Math.max(max, pct);
+}, 0);
+const limiteDesconto = (params) => Number(params?.vendas?.descontoMaximoPercent) || 0;
 const PAYMENT_METHODS = ["Pix", "Cartão de Crédito", "Boleto", "Mercado Pago", "Dinheiro"];
 
 // ─── Finance Constants ────────────────────────────────────────────────────
@@ -385,7 +399,7 @@ const Badge = ({ label, style }) => {
 };
 
 // ─── Order Modal ──────────────────────────────────────────────────────────
-const OrderModal = ({ order, onClose, onSave, customers = [], products = [], representantes = [], formasPagamento = [], params }) => {
+const OrderModal = ({ order, onClose, onSave, customers = [], products = [], representantes = [], formasPagamento = [], params, currentUser }) => {
   const isNew = !order;
   const orderStatusOptions = (params?.vendas?.statusList?.length ? params.vendas.statusList : ORDER_STATUSES);
   const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, discount:0, discountType:"%", total:0 });
@@ -512,8 +526,18 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
   const formasAtivas = formasPagamento.filter(f => f.status==="Ativo");
   const paymentOptions = formasAtivas.length > 0 ? formasAtivas.map(f=>f.nome) : PAYMENT_METHODS;
 
+  const [descErr, setDescErr] = useState("");
   const handleSave = () => {
     if (!form.customer.trim()) return;
+    // Política de desconto máximo (Parâmetros → Vendas): não-admin não salva
+    // pedido com desconto acima do limite; admin pode (é a válvula de exceção).
+    const limite = limiteDesconto(params);
+    const maior = maiorDescontoPercent(form.itemsList);
+    if (limite > 0 && maior > limite + 0.01 && currentUser?.role !== "admin") {
+      setDescErr(`⛔ Desconto de ${maior.toFixed(1)}% acima do limite da empresa (${limite}%). Somente administradores podem conceder desconto maior.`);
+      return;
+    }
+    setDescErr("");
     const itemsStr = form.itemsList.map(it=>`${it.description} (${it.qty}${it.unit})`).join(", ");
     onSave({ ...form, subtotal, total:parseFloat(form.total)||0, items:itemsStr });
   };
@@ -766,7 +790,8 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
           </div>
         </div>
 
-        <div className="flex gap-2 p-5 border-t border-gray-100 shrink-0">
+        {descErr && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-2">{descErr}</p>}
+          <div className="flex gap-2 p-5 border-t border-gray-100 shrink-0">
           <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
           <button onClick={handleSave} className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
             {isNew ? "Criar Pedido" : "Salvar Alterações"}
@@ -1869,6 +1894,7 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
           representantes={representantes}
           formasPagamento={formasPagamento}
           params={params}
+          currentUser={currentUser}
         />
       )}
     </div>
@@ -10598,7 +10624,7 @@ const PARAMS_DEFAULT = {
     shopee: { partnerId: "",  partnerKey: "", shopId: "",     autoImport: false },
     backendUrl: "",
   },
-  vendas: { validadeCotacaoDias: 10, multaAtrasoPercent: 2, jurosAtrasoPercentMes: 1, statusList: ["Novo","Em Separação","Enviado","Entregue","Cancelado","Devolvido"] },
+  vendas: { validadeCotacaoDias: 10, multaAtrasoPercent: 2, jurosAtrasoPercentMes: 1, descontoMaximoPercent: 0, statusList: ["Novo","Em Separação","Enviado","Entregue","Cancelado","Devolvido"] },
   compras: { statusList: ["Em Aberto","Baixado","Cancelado"] },
   fiscal: { provider: "", token: "", ambiente: "homologacao" },
 };
@@ -10658,7 +10684,7 @@ async function saveCotacoes(c) {
 }
 
 // ─── Cotação Modal ────────────────────────────────────────────────────────
-const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [], representantes = [], formasPagamento = [], params }) => {
+const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [], representantes = [], formasPagamento = [], params, currentUser }) => {
   const isNew = !cotacao;
   const emptyItem = () => ({ sku:"", description:"", qty:1, unit:"un", unitPrice:0, discount:0, discountType:"%", total:0 });
   const [form, setForm] = useState(cotacao ? { ...cotacao } : {
@@ -10752,8 +10778,20 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
   const formasAtivas = formasPagamento.filter(f => f.status==="Ativo");
   const paymentOptions = formasAtivas.length > 0 ? formasAtivas.map(f=>f.nome) : PAYMENT_METHODS;
 
+  const [descErr, setDescErr] = useState("");
   const handleSave = () => {
     if (!form.customer.trim()) return;
+    // Mesma política do pedido: limite de desconto da empresa vale também na
+    // cotação (senão a trava seria burlada cotando e convertendo). Considera o
+    // maior entre os descontos por item e o desconto geral como % do subtotal.
+    const limite = limiteDesconto(params);
+    const descGeralPct = subtotal > 0 ? (Number(form.discount)||0) / subtotal * 100 : 0;
+    const maior = Math.max(maiorDescontoPercent(form.itemsList||form.items), descGeralPct);
+    if (limite > 0 && maior > limite + 0.01 && currentUser?.role !== "admin") {
+      setDescErr(`⛔ Desconto de ${maior.toFixed(1)}% acima do limite da empresa (${limite}%). Somente administradores podem conceder desconto maior.`);
+      return;
+    }
+    setDescErr("");
     onSave({ ...form, subtotal, total:parseFloat(total.toFixed(2)) });
   };
 
@@ -10995,6 +11033,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
           </div>
         </div>
 
+        {descErr && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-2">{descErr}</p>}
         <div className="flex gap-2 p-5 border-t border-gray-100 shrink-0">
           <button onClick={onClose} className="flex-1 px-4 py-2 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
           {!isNew && (
@@ -11554,7 +11593,7 @@ const nextId = (list) => {
         })}
       </div>
 
-      {modal && <CotacaoModal cotacao={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={handleSave} customers={customers} products={products} representantes={representantes} formasPagamento={formasPagamento} params={params}/>}
+      {modal && <CotacaoModal cotacao={modal==="new"?null:modal} onClose={()=>setModal(null)} onSave={handleSave} customers={customers} products={products} representantes={representantes} formasPagamento={formasPagamento} params={params} currentUser={currentUser}/>}
     </div>
   );
 };
@@ -11569,7 +11608,7 @@ const nextCadId = (list, prefix) => {
 const RepresentanteModal = ({ rep, onClose, onSave }) => {
   const [form, setForm] = useState(() => ({
     nome:"", cpfCnpj:"", telefone:"", email:"", status:"Ativo",
-    tipoComissao:"fixa", comissaoFixa:0,
+    tipoComissao:"fixa", comissaoFixa:0, comissaoIncluiFrete:false,
     faixas:[{ ate:5, comissao:10 },{ ate:10, comissao:7 },{ ate:20, comissao:4 }],
     ...(rep||{}),
   }));
@@ -11641,6 +11680,17 @@ const RepresentanteModal = ({ rep, onClose, onSave }) => {
                 📊 Faixas por Desconto
               </button>
             </div>
+
+            <label className="flex items-start gap-2.5 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 cursor-pointer">
+              <input type="checkbox" className="mt-0.5 accent-indigo-600"
+                checked={!!form.comissaoIncluiFrete}
+                onChange={e=>set("comissaoIncluiFrete", e.target.checked)}/>
+              <span className="text-xs text-gray-600">
+                <strong className="text-gray-800">🚚 Comissão inclui frete e taxas</strong><br/>
+                Marcado: a comissão é calculada sobre o <strong>total do pedido</strong> (mercadoria + frete + taxas).
+                Desmarcado: só sobre a <strong>mercadoria</strong> (itens com desconto).
+              </span>
+            </label>
 
             {form.tipoComissao==="fixa" ? (
               <div>
@@ -11922,8 +11972,12 @@ const MovimentosModule = ({ orders=[], representantes=[], fechamentos=[], setFec
         const net   = (o.itemsList||[]).reduce((s,it)=>s+(it.total||0),0);
         const discPercent = gross>0 ? Math.max(0,(1-net/gross)*100) : 0;
         const comissaoPercent = comissaoAplicavel(rep, discPercent);
-        const comissaoValor = (Number(o.total)||0) * (comissaoPercent/100);
-        return { order:o, discPercent, comissaoPercent, comissaoValor };
+        // Base da comissão conforme o acordo do representante (checkbox no
+        // cadastro): marcado = total do pedido (inclui frete/taxas);
+        // desmarcado (padrão) = só a mercadoria (itens com desconto).
+        const baseComissao = rep.comissaoIncluiFrete ? (Number(o.total)||0) : net;
+        const comissaoValor = baseComissao * (comissaoPercent/100);
+        return { order:o, discPercent, comissaoPercent, comissaoValor, baseComissao };
       }).sort((a,b)=>(a.order.date||"").localeCompare(b.order.date||""));
       const totalComissao = items.reduce((s,it)=>s+it.comissaoValor,0);
       const fech = fechamentos.find(f=>f.representanteId===repId && f.periodo===period);
@@ -12859,6 +12913,23 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders, cur
               <p className="mt-2 text-xs text-gray-400 bg-gray-50 rounded-xl px-3 py-2">
                 Toda cotação nova nasce com "Válida até" igual à data de emissão + esse número de dias. Cotações já criadas não são alteradas.
               </p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">🏷️ Limite de Desconto</p>
+            <p className="text-xs text-gray-500">
+              Desconto máximo (%) que usuários <strong>não-administradores</strong> podem conceder por item em Pedidos e Cotações.
+              <strong> Administradores podem exceder</strong> (válvula pra exceções negociadas). Deixe 0 pra não limitar.
+              Dica: alinhe com o teto das faixas de comissão dos representantes.
+            </p>
+            <div className="max-w-[220px]">
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Desconto máximo (%)</label>
+              <input type="number" min="0" max="100" step="0.5" className={inp}
+                value={vendas.descontoMaximoPercent===0?"":(vendas.descontoMaximoPercent??"")}
+                placeholder="0 = sem limite"
+                onChange={e=>setV("descontoMaximoPercent", e.target.value===""?"":(parseFloat(e.target.value)||0))}
+                onBlur={e=>{ if (e.target.value==="") setV("descontoMaximoPercent",0); }}/>
             </div>
           </div>
 
