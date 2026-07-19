@@ -41,6 +41,19 @@ async function validateAdminSession(token) {
   return session;
 }
 
+// Proteções contra trancamento: um admin não pode se desativar nem se
+// rebaixar, e nenhuma ação pode deixar o sistema com ZERO admins ativos
+// (senão só SQL direto no banco recupera o acesso).
+async function getUsersSafe() {
+  return (await sbRpc('list_users_safe')) || [];
+}
+function isLastActiveAdmin(users, targetId) {
+  const target = users.find(u => String(u.id) === String(targetId));
+  if (!target || target.role !== 'admin' || target.active === false) return false;
+  const activeAdmins = users.filter(u => u.role === 'admin' && u.active !== false);
+  return activeAdmins.length <= 1;
+}
+
 function genRecoveryKey() {
   const ch = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return [0, 1, 2, 3].map(() => [0, 1, 2, 3].map(() => ch[Math.floor(Math.random() * ch.length)]).join('')).join('-');
@@ -78,6 +91,15 @@ export default async function handler(req, res) {
     if (action === 'toggleActive') {
       const { id, active } = req.body;
       if (!id) return res.status(400).json({ error: 'Informe o id do usuário' });
+      if (!active && String(id) === String(session.user_id)) {
+        return res.status(400).json({ error: 'Você não pode desativar a própria conta' });
+      }
+      if (!active) {
+        const all = await getUsersSafe();
+        if (isLastActiveAdmin(all, id)) {
+          return res.status(400).json({ error: 'Não é possível desativar o último administrador ativo do sistema' });
+        }
+      }
       await sbRpc('set_user_active', { p_id: String(id), p_active: !!active });
       return res.status(200).json({ ok: true });
     }
@@ -85,6 +107,15 @@ export default async function handler(req, res) {
     if (action === 'updateProfile') {
       const { id, displayName, role, customModules, customPermissions } = req.body;
       if (!id) return res.status(400).json({ error: 'Informe o id do usuário' });
+      if (role && role !== 'admin') {
+        if (String(id) === String(session.user_id)) {
+          return res.status(400).json({ error: 'Você não pode remover o próprio acesso de administrador' });
+        }
+        const all = await getUsersSafe();
+        if (isLastActiveAdmin(all, id)) {
+          return res.status(400).json({ error: 'Não é possível rebaixar o último administrador ativo do sistema' });
+        }
+      }
       await sbRpc('update_user_profile', {
         p_id: String(id), p_display_name: displayName, p_role: role, p_custom_modules: customModules ?? null,
         p_custom_permissions: customPermissions ?? null,
@@ -104,6 +135,12 @@ export default async function handler(req, res) {
       if (!id) return res.status(400).json({ error: 'Informe o id do usuário' });
       if (String(id) === String(session.user_id)) {
         return res.status(400).json({ error: 'Você não pode excluir a própria conta' });
+      }
+      {
+        const all = await getUsersSafe();
+        if (isLastActiveAdmin(all, id)) {
+          return res.status(400).json({ error: 'Não é possível excluir o último administrador ativo do sistema' });
+        }
       }
       await sbRpc('delete_erp_user', { p_id: String(id) });
       return res.status(200).json({ ok: true });
