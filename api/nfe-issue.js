@@ -18,7 +18,7 @@ function secretHeaders(extra = {}) {
 async function validateSession(token) {
   if (!token) return null;
   const r = await fetch(
-    `${SB_URL}/rest/v1/sessions?token=eq.${encodeURIComponent(token)}&select=username,role,expires_at&limit=1`,
+    `${SB_URL}/rest/v1/sessions?token=eq.${encodeURIComponent(token)}&select=username,role,expires_at,tenant_id&limit=1`,
     { headers: secretHeaders() }
   );
   if (!r.ok) return null;
@@ -29,8 +29,8 @@ async function validateSession(token) {
   return session;
 }
 
-async function getKv(key) {
-  const r = await fetch(`${SB_URL}/rest/v1/kv_store?key=eq.${encodeURIComponent(key)}&limit=1`, { headers: secretHeaders() });
+async function getKv(key, tenantId) {
+  const r = await fetch(`${SB_URL}/rest/v1/kv_store?key=eq.${encodeURIComponent(key)}&tenant_id=eq.${tenantId}&limit=1`, { headers: secretHeaders() });
   const rows = await r.json();
   const row = rows && rows[0];
   return row ? JSON.parse(row.value) : null;
@@ -241,9 +241,9 @@ export default async function handler(req, res) {
     if (!order) return res.status(400).json({ error: "Informe os dados do pedido" });
     const docTipo = tipo === "nfce" ? "nfce" : "nfe";
 
-    const fiscalCfg = await getKv("erp-mmarmarinhos-params"); // params completo
+    const fiscalCfg = await getKv("erp-mmarmarinhos-params", session.tenant_id); // params completo
     const fiscal = fiscalCfg?.fiscal;
-    const empresa = await getKv("erp_empresa_dados");
+    const empresa = await getKv("erp_empresa_dados", session.tenant_id);
 
     if (!fiscal || !fiscal.provider || !fiscal.token) {
       return res.status(400).json({ error: "Nenhum fornecedor de NF-e configurado. Acesse Parâmetros > Fiscal." });
