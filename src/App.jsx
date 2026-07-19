@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.7";
+const APP_VERSION = "3.31.8";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -9707,19 +9707,42 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
       // Calcular movimentos ANTES do setProducts (setState é assíncrono)
       const movimentos = [];
       if (isReceived && data.items) {
+        // Ao EDITAR uma compra já baixada, registra só o DELTA de cada produto
+        // (novo − antigo) — antes, cada salvamento registrava entrada de todos
+        // os itens de novo, poluindo o histórico com entradas fantasma (o
+        // estoque em si ficava certo, porque a reconciliação abaixo subtrai o
+        // antigo e soma o novo).
         data.items.forEach(newItem => {
           if (!newItem._prodId && !(newItem.sku)) return;
           const prod = products.find(p => p.id === newItem._prodId || (newItem.sku && p.sku === newItem.sku));
-          if (!prod || (newItem.qty||0) <= 0) return;
+          if (!prod) return;
+          const oldItem = wasReceived
+            ? oldPurchase?.items?.find(it => String(it._prodId)===String(prod.id) || (it.sku && it.sku===prod.sku))
+            : null;
+          const delta = (newItem.qty||0) - (oldItem?.qty||0);
+          if (delta === 0) return;
           movimentos.push({
             productId: prod.id,
-            type: "entrada",
-            qty: newItem.qty || 0,
+            type: delta > 0 ? "entrada" : "saida",
+            qty: Math.abs(delta),
             date: data.date || today(),
-            reason: "Entrada por compra",
+            reason: delta > 0 ? "Entrada por compra" : "Ajuste de compra",
             notes: `Pedido ${data.id||"novo"} · ${data.supplierName||""}`.trim(),
           });
         });
+        // Produto que SAIU da lista numa edição de compra baixada: registra a saída
+        if (wasReceived && oldPurchase?.items) {
+          oldPurchase.items.forEach(oldItem => {
+            if (!oldItem._prodId && !(oldItem.sku)) return;
+            const still = data.items.find(it => String(it._prodId)===String(oldItem._prodId) || (oldItem.sku && it.sku===oldItem.sku));
+            if (still || (oldItem.qty||0) <= 0) return;
+            const prod = products.find(p => p.id === oldItem._prodId || (oldItem.sku && p.sku === oldItem.sku));
+            if (!prod) return;
+            movimentos.push({ productId: prod.id, type:"saida", qty: oldItem.qty||0,
+              date: data.date || today(), reason:"Ajuste de compra",
+              notes:`Pedido ${data.id} · item removido na edição`.trim() });
+          });
+        }
       }
       // Saiu do status "Baixado" (ex: virou "Cancelado") — o estoque já
       // recebido é estornado abaixo; aqui só registramos essa saída no
@@ -9786,11 +9809,57 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
       ));
     }
 
+    // ENTROU em "Baixado" pelo modal de edição — cria o lançamento em Contas a
+    // Pagar, igual ao fluxo do botão "Baixar Pedido". Antes, baixar pelo modal
+    // dava entrada no estoque mas não registrava a dívida (assimetria: os dois
+    // caminhos removiam o lançamento ao sair de Baixado, mas só um criava).
+    if (setFinance && isReceived && !wasReceived && data.id) {
+      const valor = Number(data.total) || 0;
+      if (valor > 0) {
+        setFinance(prev => {
+          // idempotência: se já existe lançamento vinculado, não duplica
+          if (prev.some(f => f.purchaseId === data.id)) return prev;
+          const n = prev.map(f=>parseInt((f.id||"").replace("FIN-",""))||0);
+          const newId = `FIN-${String(Math.max(0,...n,0)+1).padStart(3,"0")}`;
+          return [{
+            id:newId, type:"despesa", category:"Fornecedores",
+            description:`Pedido ${data.id} · NF ${data.nfNumber||"—"} · ${data.supplierName||""}`,
+            amount:valor, date:data.nfEmissionDate||data.date||today(), dueDate:data.dueDate||"",
+            status:"pendente", notes:"", supplierId:data.supplierId, purchaseId:data.id,
+          }, ...prev];
+        });
+      }
+    }
+
     setModal(null); setDetail(null);
   };
 
   const handleDelete = (pc) => {
     if (!canExcluir) return; // segurança extra, além do botão já escondido
+    // Excluir uma compra BAIXADA estorna o estoque que entrou por ela (com
+    // movimento de rastro), igual ao que já acontecia ao mudar o status pra
+    // Cancelado — antes, excluir deixava estoque fantasma sem origem.
+    if (pc.status === "Baixado" && setProducts && pc.items?.length) {
+      const estornos = [];
+      pc.items.forEach(it => {
+        if ((!it._prodId && !it.sku) || (it.qty||0) <= 0) return;
+        const prod = products.find(p => String(p.id)===String(it._prodId) || (it.sku && p.sku===it.sku));
+        if (!prod) return;
+        estornos.push({ productId: prod.id, type:"saida", qty: it.qty||0, date: today(),
+          reason:"Estorno de compra", notes:`Exclusão do pedido ${pc.id} · ${pc.supplierName||""}`.trim() });
+      });
+      setProducts(prev => prev.map(prod => {
+        const it = pc.items.find(x => String(x._prodId)===String(prod.id) || (x.sku && x.sku===prod.sku));
+        return it ? { ...prod, stock: Math.max(0, (prod.stock||0) - (it.qty||0)) } : prod;
+      }));
+      if (setMovements && estornos.length > 0) {
+        setMovements(prev => {
+          const n = prev.map(x => parseInt((x.id||"").replace("MOV-",""))||0);
+          const base = Math.max(0,...n,0);
+          return [...prev, ...estornos.map((m,i)=>({ ...m, id:`MOV-${String(base+i+1).padStart(3,"0")}` }))];
+        });
+      }
+    }
     setPurchases(prev => prev.filter(p => p.id !== pc.id));
     // Remove também o(s) lançamento(s) em Contas a Pagar gerados pela baixa deste pedido —
     // por id vinculado (purchaseId) ou, em lançamentos antigos sem esse campo, pela descrição.
@@ -9857,6 +9926,10 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
     if (!canAlterar) return; // segurança extra, além do botão já escondido
     const purchase = baixaPedido;
     if (!purchase) return;
+    // Trava contra clique duplo: o estado ATUAL do pedido é a fonte da verdade
+    // — se já foi baixado, não dá entrada de estoque nem cria lançamento de novo.
+    const atualState = purchases.find(p => p.id === purchase.id);
+    if (!atualState || atualState.status === "Baixado") return;
 
     const calcItemTotal = (it) => {
       const gross = (it.qty||0)*(it.unitPrice||0);
@@ -9912,8 +9985,22 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
     // efeito colateral ali dentro causava perda intermitente do histórico de movimentação
     // (o estoque sempre atualizava certo, porque isso o React aplica de qualquer forma,
     // mas a checagem "tem movimento pra salvar?" às vezes rodava antes do array ser populado).
+    // Movimentos calculados de forma síncrona (fora do updater — motivo do
+    // comentário acima), mas o ESTOQUE é aplicado com updater funcional sobre
+    // `prev`, não sobrescrevendo o array inteiro com um snapshot da prop —
+    // assim nenhuma atualização concorrente de produtos se perde.
     const movimentos = [];
-    const novosProdutos = (products||[]).map(prod => {
+    (products||[]).forEach(prod => {
+      const idx = purchase.items.findIndex(it => (String(it._prodId)===String(prod.id) || (it.sku && it.sku===prod.sku)));
+      if (idx === -1) return;
+      const qtd = data.qtys[idx]||0;
+      if (qtd <= 0) return;
+      movimentos.push({
+        productId: prod.id, type: "entrada", qty: qtd, date: data.receivedDate || today(),
+        reason: "Entrada por compra", notes: `Pedido ${purchase.id} · ${purchase.supplierName||""}`.trim(),
+      });
+    });
+    if (setProducts) setProducts(prev => prev.map(prod => {
       const idx = purchase.items.findIndex(it => (String(it._prodId)===String(prod.id) || (it.sku && it.sku===prod.sku)));
       if (idx === -1) return prod;
       const qtd = data.qtys[idx]||0;
@@ -9924,13 +10011,8 @@ const PurchasesModule = ({ purchases, setPurchases, suppliers, products = [], se
       const novoCusto = estAtual > 0
         ? parseFloat(((estAtual*custoAtual + qtd*preco) / (estAtual+qtd)).toFixed(4))
         : preco;
-      movimentos.push({
-        productId: prod.id, type: "entrada", qty: qtd, date: data.receivedDate || today(),
-        reason: "Entrada por compra", notes: `Pedido ${purchase.id} · ${purchase.supplierName||""}`.trim(),
-      });
       return { ...prod, stock: estAtual+qtd, cost: novoCusto, lastPurchasePrice: preco };
-    });
-    if (setProducts) setProducts(novosProdutos);
+    }));
     if (setMovements && movimentos.length > 0) {
       setMovements(prev => {
         const n = prev.map(x => parseInt((x.id||"").replace("MOV-",""))||0);
