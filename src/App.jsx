@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.16";
+const APP_VERSION = "3.31.17";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -12473,6 +12473,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders, cur
       setSync(params.sincronizacao   || PARAMS_DEFAULT.sincronizacao);
       setVendas(params.vendas        || PARAMS_DEFAULT.vendas);
       setCompras(params.compras      || PARAMS_DEFAULT.compras);
+      setFiscal(params.fiscal        || PARAMS_DEFAULT.fiscal); // única seção que faltava na re-sincronização
     }
   }, [params]);
 
@@ -12800,7 +12801,12 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders, cur
             );
           })}
           {canAlterar && (
-            <button onClick={()=>mergeAndSave({canais}).then(()=>showToast("✅ Canais & Comissões salvos!"))}
+            <button onClick={()=>{
+                const canaisNorm = Object.fromEntries(Object.entries(canais).map(([ch,cfg])=>[ch,{...cfg,
+                  comissao:Number(cfg.comissao)||0, taxaFixa:Number(cfg.taxaFixa)||0, diasDespacho:Number(cfg.diasDespacho)||0}]));
+                setCanais(canaisNorm);
+                mergeAndSave({canais:canaisNorm}).then(()=>showToast("✅ Canais & Comissões salvos!"));
+              }}
               className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
               💾 Salvar Canais & Comissões
             </button>
@@ -12858,13 +12864,21 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders, cur
             </p>
 
             <div className="flex flex-wrap gap-2">
-              {(vendas.statusList||[]).map((s,idx)=>(
+              {(vendas.statusList||[]).map((s,idx)=>{
+                // Status essenciais do sistema (disparam estoque/financeiro) têm
+                // cadeado — o texto de ajuda pedia pra não remover, mas o ✕
+                // permitia: sem "Cancelado" no dropdown, ninguém conseguia mais
+                // cancelar pedido (o fluxo que devolve estoque).
+                const essencial = ORDER_STATUSES.includes(s);
+                return (
                 <span key={idx} className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-full pl-3 pr-2 py-1.5">
                   {s}
-                  <button onClick={()=>setVendas(prev=>({...prev, statusList: prev.statusList.filter((_,i)=>i!==idx)}))}
-                    className="text-indigo-400 hover:text-red-500 font-bold">✕</button>
+                  {essencial
+                    ? <span className="text-indigo-300" title="Status essencial do sistema — não pode ser removido">🔒</span>
+                    : <button onClick={()=>setVendas(prev=>({...prev, statusList: prev.statusList.filter((_,i)=>i!==idx)}))}
+                        className="text-indigo-400 hover:text-red-500 font-bold">✕</button>}
                 </span>
-              ))}
+              );})}
               {(!vendas.statusList || vendas.statusList.length===0) && <p className="text-xs text-gray-400 italic">Nenhum status configurado — usando os padrões do sistema.</p>}
             </div>
 
@@ -12911,13 +12925,17 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders, cur
             </p>
 
             <div className="flex flex-wrap gap-2">
-              {(compras.statusList||[]).map((s,idx)=>(
+              {(compras.statusList||[]).map((s,idx)=>{
+                const essencial = PC_STATUS.includes(s); // "Baixado"/"Cancelado" disparam estoque e financeiro
+                return (
                 <span key={idx} className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-full pl-3 pr-2 py-1.5">
                   {s}
-                  <button onClick={()=>setCompras(prev=>({...prev, statusList: prev.statusList.filter((_,i)=>i!==idx)}))}
-                    className="text-indigo-400 hover:text-red-500 font-bold">✕</button>
+                  {essencial
+                    ? <span className="text-indigo-300" title="Status essencial do sistema — não pode ser removido">🔒</span>
+                    : <button onClick={()=>setCompras(prev=>({...prev, statusList: prev.statusList.filter((_,i)=>i!==idx)}))}
+                        className="text-indigo-400 hover:text-red-500 font-bold">✕</button>}
                 </span>
-              ))}
+              );})}
               {(!compras.statusList || compras.statusList.length===0) && <p className="text-xs text-gray-400 italic">Nenhum status configurado — usando os padrões do sistema.</p>}
             </div>
 
