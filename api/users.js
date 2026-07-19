@@ -29,7 +29,7 @@ async function sbRpc(fn, args = {}) {
 async function validateAdminSession(token) {
   if (!token) return null;
   const r = await fetch(
-    `${SB_URL}/rest/v1/sessions?token=eq.${encodeURIComponent(token)}&select=user_id,username,role,expires_at&limit=1`,
+    `${SB_URL}/rest/v1/sessions?token=eq.${encodeURIComponent(token)}&select=user_id,username,role,expires_at,tenant_id&limit=1`,
     { headers: secretHeaders() }
   );
   if (!r.ok) return null;
@@ -44,8 +44,8 @@ async function validateAdminSession(token) {
 // Proteções contra trancamento: um admin não pode se desativar nem se
 // rebaixar, e nenhuma ação pode deixar o sistema com ZERO admins ativos
 // (senão só SQL direto no banco recupera o acesso).
-async function getUsersSafe() {
-  return (await sbRpc('list_users_safe')) || [];
+async function getUsersSafe(tenantId) {
+  return (await sbRpc('list_users_safe_t', { p_tenant: tenantId })) || [];
 }
 function isLastActiveAdmin(users, targetId) {
   const target = users.find(u => String(u.id) === String(targetId));
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     const { action } = req.body || {};
 
     if (action === 'list') {
-      const rows = await sbRpc('list_users_safe');
+      const rows = await sbRpc('list_users_safe_t', { p_tenant: session.tenant_id });
       return res.status(200).json({ users: rows || [] });
     }
 
@@ -80,9 +80,10 @@ export default async function handler(req, res) {
       const { username, displayName, passwordHash, role } = req.body;
       if (!username || !passwordHash) return res.status(400).json({ error: 'Informe usuário e senha' });
       const rkey = genRecoveryKey();
-      const created = await sbRpc('create_erp_user', {
+      const created = await sbRpc('create_erp_user_t', {
         p_username: username, p_display_name: displayName || username,
         p_password_hash: passwordHash, p_recovery_key: rkey, p_role: role || 'vendedor',
+        p_tenant: session.tenant_id,
       });
       if (!created) return res.status(400).json({ error: 'Usuário já existe' });
       return res.status(200).json({ recoveryKey: rkey });
@@ -95,12 +96,12 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Você não pode desativar a própria conta' });
       }
       if (!active) {
-        const all = await getUsersSafe();
+        const all = await getUsersSafe(session.tenant_id);
         if (isLastActiveAdmin(all, id)) {
           return res.status(400).json({ error: 'Não é possível desativar o último administrador ativo do sistema' });
         }
       }
-      await sbRpc('set_user_active', { p_id: String(id), p_active: !!active });
+      await sbRpc('set_user_active_t', { p_id: String(id), p_active: !!active, p_tenant: session.tenant_id });
       return res.status(200).json({ ok: true });
     }
 
@@ -111,14 +112,14 @@ export default async function handler(req, res) {
         if (String(id) === String(session.user_id)) {
           return res.status(400).json({ error: 'Você não pode remover o próprio acesso de administrador' });
         }
-        const all = await getUsersSafe();
+        const all = await getUsersSafe(session.tenant_id);
         if (isLastActiveAdmin(all, id)) {
           return res.status(400).json({ error: 'Não é possível rebaixar o último administrador ativo do sistema' });
         }
       }
-      await sbRpc('update_user_profile', {
+      await sbRpc('update_user_profile_t', {
         p_id: String(id), p_display_name: displayName, p_role: role, p_custom_modules: customModules ?? null,
-        p_custom_permissions: customPermissions ?? null,
+        p_custom_permissions: customPermissions ?? null, p_tenant: session.tenant_id,
       });
       return res.status(200).json({ ok: true });
     }
@@ -126,7 +127,7 @@ export default async function handler(req, res) {
     if (action === 'setPassword') {
       const { id, passwordHash } = req.body;
       if (!id || !passwordHash) return res.status(400).json({ error: 'Informe o id e a nova senha' });
-      await sbRpc('set_user_password', { p_id: String(id), p_new_hash: passwordHash });
+      await sbRpc('set_user_password_t', { p_id: String(id), p_new_hash: passwordHash, p_tenant: session.tenant_id });
       return res.status(200).json({ ok: true });
     }
 
@@ -137,12 +138,12 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Você não pode excluir a própria conta' });
       }
       {
-        const all = await getUsersSafe();
+        const all = await getUsersSafe(session.tenant_id);
         if (isLastActiveAdmin(all, id)) {
           return res.status(400).json({ error: 'Não é possível excluir o último administrador ativo do sistema' });
         }
       }
-      await sbRpc('delete_erp_user', { p_id: String(id) });
+      await sbRpc('delete_erp_user_t', { p_id: String(id), p_tenant: session.tenant_id });
       return res.status(200).json({ ok: true });
     }
 
