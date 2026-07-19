@@ -46,7 +46,9 @@ export default async function handler(req, res) {
     const { username, passwordHash } = req.body || {};
     if (!username || !passwordHash) return res.status(400).json({ error: 'Informe usuário e senha' });
 
-    const rows = await sbRpc('verify_login', {
+    // verify_login_t devolve também o tenant_id do usuário — o tenant da
+    // sessão nasce aqui e nunca vem do cliente (Etapa 2 do multi-tenancy).
+    const rows = await sbRpc('verify_login_t', {
       p_username: String(username).trim().toLowerCase(),
       p_password_hash: passwordHash,
     });
@@ -62,6 +64,7 @@ export default async function handler(req, res) {
       username: safeUser.username,
       display_name: safeUser.display_name,
       role: safeUser.role,
+      tenant_id: safeUser.tenant_id,
       expires_at: expiresAt,
     });
 
