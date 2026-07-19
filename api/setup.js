@@ -66,7 +66,7 @@ export default async function handler(req, res) {
     });
     if (!created) return res.status(400).json({ error: 'Não foi possível criar o usuário' });
 
-    const rows = await sbRpc('verify_login', {
+    const rows = await sbRpc('verify_login_t', {
       p_username: String(username).trim().toLowerCase(),
       p_password_hash: passwordHash,
     });
@@ -80,6 +80,7 @@ export default async function handler(req, res) {
       username: safeUser.username,
       display_name: safeUser.display_name,
       role: safeUser.role,
+      tenant_id: safeUser.tenant_id,
       expires_at: expiresAt,
     });
 
