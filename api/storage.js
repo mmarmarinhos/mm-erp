@@ -18,7 +18,7 @@ function secretHeaders(extra = {}) {
 async function validateSession(token) {
   if (!token) return null;
   const r = await fetch(
-    `${SB_URL}/rest/v1/sessions?token=eq.${encodeURIComponent(token)}&select=username,role,expires_at&limit=1`,
+    `${SB_URL}/rest/v1/sessions?token=eq.${encodeURIComponent(token)}&select=username,role,expires_at,tenant_id&limit=1`,
     { headers: secretHeaders() }
   );
   if (!r.ok) return null;
@@ -26,6 +26,7 @@ async function validateSession(token) {
   const session = rows && rows[0];
   if (!session) return null;
   if (new Date(session.expires_at) < new Date()) return null;
+  if (!session.tenant_id) return null; // sessão pré-multi-tenancy: força novo login
   return session;
 }
 
@@ -43,7 +44,7 @@ export default async function handler(req, res) {
 
     if (action === 'get') {
       if (!key) return res.status(400).json({ error: 'Informe a chave' });
-      const r = await fetch(`${SB_URL}/rest/v1/kv_store?key=eq.${encodeURIComponent(key)}&limit=1`, { headers: secretHeaders() });
+      const r = await fetch(`${SB_URL}/rest/v1/kv_store?key=eq.${encodeURIComponent(key)}&tenant_id=eq.${session.tenant_id}&limit=1`, { headers: secretHeaders() });
       const rows = await r.json();
       if (!rows || !rows[0]) return res.status(200).json({ value: null });
       return res.status(200).json({ key, value: rows[0].value });
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
       const r = await fetch(`${SB_URL}/rest/v1/kv_store`, {
         method: 'POST',
         headers: secretHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
-        body: JSON.stringify({ key, value, updated_at: new Date().toISOString() }),
+        body: JSON.stringify({ key, value, tenant_id: session.tenant_id, updated_at: new Date().toISOString() }),
       });
       if (!r.ok) throw new Error(await r.text());
       return res.status(200).json({ key, value });
@@ -62,7 +63,7 @@ export default async function handler(req, res) {
 
     if (action === 'delete') {
       if (!key) return res.status(400).json({ error: 'Informe a chave' });
-      const r = await fetch(`${SB_URL}/rest/v1/kv_store?key=eq.${encodeURIComponent(key)}`, {
+      const r = await fetch(`${SB_URL}/rest/v1/kv_store?key=eq.${encodeURIComponent(key)}&tenant_id=eq.${session.tenant_id}`, {
         method: 'DELETE',
         headers: secretHeaders(),
       });
@@ -71,7 +72,7 @@ export default async function handler(req, res) {
     }
 
     if (action === 'list') {
-      const qs = prefix ? `?key=like.${encodeURIComponent(prefix + '%')}&select=key` : '?select=key';
+      const qs = (prefix ? `?key=like.${encodeURIComponent(prefix + '%')}&select=key` : '?select=key') + `&tenant_id=eq.${session.tenant_id}`;
       const r = await fetch(`${SB_URL}/rest/v1/kv_store${qs}`, { headers: secretHeaders() });
       const rows = await r.json();
       return res.status(200).json({ keys: (rows || []).map(row => row.key), prefix: prefix || '' });
