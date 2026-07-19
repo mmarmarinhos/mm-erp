@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.10";
+const APP_VERSION = "3.31.11";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -1086,7 +1086,7 @@ const EmitNfeModal = ({ order, onClose, onIssued, params, customers = [] }) => {
   );
 };
 
-const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance, representantes = [], formasPagamento = [], params, openOrderId = null, onConsumeOpenOrder, initialStatusFilter = null, onConsumeStatusFilter, currentUser }) => {
+const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, products = [], setProducts, movements = [], setMovements, finance = [], setFinance, setNfes, representantes = [], formasPagamento = [], params, openOrderId = null, onConsumeOpenOrder, initialStatusFilter = null, onConsumeStatusFilter, currentUser }) => {
   const canIncluir = getUserPerm(currentUser, "orders", "incluir");
   const canAlterar = getUserPerm(currentUser, "orders", "alterar");
   const canExcluir = getUserPerm(currentUser, "orders", "excluir");
@@ -1770,6 +1770,13 @@ const OrdersModule = ({ orders, setOrders, customers = [], setCustomers, product
         <EmitNfeModal order={emitNfeOrder} onClose={()=>setEmitNfeOrder(null)} params={params} customers={customers}
           onIssued={(updated)=>{
             setOrders(prev => prev.map(o => o.id===emitNfeOrder.id ? {...o, ...updated} : o));
+            // NF-e emitida pelo sistema entra automaticamente no painel Fiscal
+            registrarNfeFiscal(setNfes, {
+              order: emitNfeOrder, tipo: "NF-e",
+              numero: updated.nfNumero, chave: updated.nfeChave,
+              status: updated.nfeStatus, dataEmissao: updated.nfEmissionDate,
+              cpfCnpj: updated.cpfCnpj,
+            });
             setEmitNfeOrder(null);
           }}/>
       )}
@@ -6410,8 +6417,8 @@ const FiscalModule = ({ nfes, setNfes, currentUser }) => {
 
   // NF-e stats
   const nfAuth    = nfes.filter(n=>n.status==="Autorizada");
-  const totalFat  = nfAuth.reduce((s,n)=>s+n.valorTotal,0);
-  const totalImp  = nfAuth.reduce((s,n)=>s+(n.icms+n.pis+n.cofins),0);
+  const totalFat  = nfAuth.reduce((s,n)=>s+(n.valorTotal||0),0);
+  const totalImp  = nfAuth.reduce((s,n)=>s+((n.icms||0)+(n.pis||0)+(n.cofins||0)),0);
   const rascunhos = nfes.filter(n=>n.status==="Em Aberto").length;
 
   const nextNfeId = (ns) => { const nums=ns.map(n=>parseInt(n.id.replace("NFE-",""))||0); return `NFE-${String(Math.max(0,...nums)+1).padStart(3,"0")}`; };
@@ -6420,7 +6427,7 @@ const FiscalModule = ({ nfes, setNfes, currentUser }) => {
     .filter(n=>filterStatus==="Todos"||n.status===filterStatus)
     .filter(n=>!search||[n.numero,n.destinatario,n.cpfCnpj,n.descricao].some(f=>f?.toLowerCase().includes(search.toLowerCase())))
     .filter(n=>filterByDate(n.dataEmissao||""))
-    .sort((a,b)=>b.dataEmissao.localeCompare(a.dataEmissao))
+    .sort((a,b)=>(b.dataEmissao||"").localeCompare(a.dataEmissao||""))
   ,[nfes,filterStatus,search,filterMode,period,dateFrom,dateTo]);
 
   const handleSaveNfe = (data) => {
@@ -6454,8 +6461,15 @@ const FiscalModule = ({ nfes, setNfes, currentUser }) => {
     const [y,m] = agendaMonth.split("-").map(Number);
     const now = new Date();
     return AGENDA_ITEMS.map(item => {
-      const due = new Date(y, m-1, item.dia === 31 && m !== 3 ? new Date(y,m-1,0).getDate() : item.dia);
-      const diffDays = Math.floor((due-now)/86400000);
+      // Obrigação de "dia 31" em mês mais curto: usa o último dia do MÊS
+      // EXIBIDO — antes usava new Date(y,m-1,0) (último dia do mês ANTERIOR),
+      // e em fevereiro o item caía em 2-3 de março.
+      const lastDay = new Date(y, m, 0).getDate();
+      const due = new Date(y, m-1, Math.min(item.dia, lastDay));
+      // Compara dia-a-dia (sem hora) — antes, a partir de 00h01 do próprio
+      // dia do vencimento o item já aparecia como "vencido".
+      const hoje = new Date(now); hoje.setHours(0,0,0,0);
+      const diffDays = Math.floor((due-hoje)/86400000);
       let status = "future";
       if (diffDays < 0) status = "past";
       else if (diffDays <= 7) status = "soon";
@@ -6486,7 +6500,7 @@ const FiscalModule = ({ nfes, setNfes, currentUser }) => {
       <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-3">
         <span className="text-blue-500 text-lg mt-0.5">ℹ️</span>
         <p className="text-xs text-blue-700">
-          <strong>Módulo de gestão fiscal</strong> — registre aqui as NF-es emitidas manualmente no portal SEFAZ para controle e histórico. A emissão eletrônica em si requer certificado digital e é feita diretamente no site da Secretaria da Fazenda ou em sistemas como Bling/Omie.
+          <strong>Painel fiscal</strong> — as NF-es e NFC-es emitidas pelo sistema (Pedidos e PDV) entram aqui automaticamente. Você também pode registrar manualmente notas emitidas fora do sistema (portal SEFAZ) para manter o histórico completo.
         </p>
       </div>
 
@@ -9259,7 +9273,7 @@ const FecharCaixaModal = ({ caixaAtual, vendas, onClose, onConfirm }) => {
   );
 };
 
-const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movements = [], setMovements, customers = [], caixa = [], setCaixa, params, currentUser }) => {
+const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movements = [], setMovements, customers = [], caixa = [], setCaixa, setNfes, params, currentUser }) => {
   const canIncluir = getUserPerm(currentUser, "pdv", "incluir");
   const canAlterar = getUserPerm(currentUser, "pdv", "alterar");
   const caixaAtual = caixa.find(c => c.status === "aberto");
@@ -9391,6 +9405,12 @@ const PdvModule = ({ products = [], setProducts, orders = [], setOrders, movemen
           const nf = { nfceStatus:nfceResult.status, nfceChave:nfceResult.chave, nfcePdfUrl:nfceResult.pdfUrl, nfceQrcode:nfceResult.qrcodeUrl };
           Object.assign(newOrder, nf);
           setOrders(prev => prev.map(o => o.id===newId ? { ...o, ...nf } : o));
+          // NFC-e emitida pelo PDV entra automaticamente no painel Fiscal
+          registrarNfeFiscal(setNfes, {
+            order: newOrder, tipo: "NFC-e",
+            numero: nfceResult.numero, chave: nfceResult.chave,
+            status: nfceResult.status, dataEmissao: today(),
+          });
         }
       }
 
@@ -11083,7 +11103,31 @@ const CotacaoModule = ({ cotacoes, setCotacoes, setOrders, orders, customers = [
     }
   }, []); // uma vez por abertura do módulo
 
-  const nextId = (list) => {
+  // Registra no painel Fiscal uma nota emitida eletronicamente pelo sistema
+// (Pedidos ou PDV). Idempotente por orderId+tipo — reemissão não duplica.
+// Notas simuladas nunca entram no painel.
+const registrarNfeFiscal = (setNfes, { order, tipo, numero, chave, status, dataEmissao, cpfCnpj }) => {
+  if (!setNfes || !numero || status === "simulado") return;
+  setNfes(prev => {
+    if (prev.some(n => n.orderId === order.id && n.tipo === tipo)) return prev;
+    const nums = prev.map(n=>parseInt((n.id||"").replace("NFE-",""))||0);
+    const newId = `NFE-${String(Math.max(0,...nums,0)+1).padStart(3,"0")}`;
+    const freight = Number(order.freight)||0;
+    const total   = Number(order.total)||0;
+    return [{
+      id:newId, orderId:order.id, numero:String(numero), serie:"1", tipo,
+      dataEmissao: dataEmissao || today(),
+      destinatario: order.customer || "Consumidor",
+      cpfCnpj: cpfCnpj || order.cpfCnpj || "",
+      cfop:"5102", ncm:"", descricao: order.items || "",
+      valorProdutos: Math.max(0, total - freight), valorFrete: freight, valorDesconto: 0,
+      valorTotal: total, icms:0, pis:0, cofins:0,
+      status:"Autorizada", chave: chave || "", notes:`Emitida pelo sistema · pedido ${order.id}`,
+    }, ...prev];
+  });
+};
+
+const nextId = (list) => {
     const nums = list.map(c=>parseInt(c.id.replace("COT-",""))||0);
     return `COT-${String(Math.max(0,...nums)+1).padStart(3,"0")}`;
   };
@@ -13501,7 +13545,7 @@ function ERPApp({ currentUser, onLogout }) {
         onGoToAEnviar={()=>{ setInitialOrdersFilter("A_ENVIAR"); setActive("orders"); }}
         onGoToEmAberto={()=>{ setInitialOrdersFilter("EM_ABERTO_FAT"); setActive("orders"); }}
         onGoToFaturados={()=>{ setInitialOrdersFilter("FATURADOS"); setActive("orders"); }} />;
-      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)} initialStatusFilter={initialOrdersFilter} onConsumeStatusFilter={()=>setInitialOrdersFilter(null)} currentUser={currentUser}/>;
+      case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} setNfes={updateNfes} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)} initialStatusFilter={initialOrdersFilter} onConsumeStatusFilter={()=>setInitialOrdersFilter(null)} currentUser={currentUser}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params} currentUser={currentUser}/>;
       case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} currentUser={currentUser}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} params={params} currentUser={currentUser}/>;
@@ -13510,7 +13554,7 @@ function ERPApp({ currentUser, onLogout }) {
       case "crm":       return <CrmModule customers={customers} setCustomers={updateCustomers} orders={orders} setOrders={updateOrders} currentUser={currentUser}/>;
       case "suppliers": return <SupplierModule suppliers={suppliers} setSuppliers={updateSuppliers} finance={finance} setFinance={updateFinance} purchases={purchases} setPurchases={updatePurchases} currentUser={currentUser}/>;
       case "purchases": return <PurchasesModule purchases={purchases} setPurchases={updatePurchases} suppliers={suppliers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} params={params} currentUser={currentUser}/>;
-      case "pdv": return <PdvModule products={products} setProducts={updateProducts} orders={orders} setOrders={updateOrders} movements={movements} setMovements={updateMovements} customers={customers} caixa={caixa} setCaixa={updateCaixa} params={params} currentUser={currentUser}/>;
+      case "pdv": return <PdvModule products={products} setProducts={updateProducts} orders={orders} setOrders={updateOrders} movements={movements} setMovements={updateMovements} customers={customers} caixa={caixa} setCaixa={updateCaixa} setNfes={updateNfes} params={params} currentUser={currentUser}/>;
       case "usuarios":  return <UsersModule currentUser={currentUser}/>;
       case "cadastros": return <CadastrosModule representantes={representantes} setRepresentantes={updateRepresentantes} contas={contas} setContas={updateContas} formasPagamento={formasPagamento} setFormasPagamento={updateFormasPagamento} variantCatalogs={variantCatalogs} setVariantCatalogs={updateVariantCatalogs} currentUser={currentUser}/>;
       case "parametros": return <ParamsModule params={params} setParams={updateParams} onSaveEmpresa={(data)=>setEmpresaForm(data)} orders={orders} setOrders={updateOrders} currentUser={currentUser}/>;
