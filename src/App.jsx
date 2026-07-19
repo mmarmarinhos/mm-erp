@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.31.11";
+const APP_VERSION = "3.31.12";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -7499,8 +7499,20 @@ const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHA
             {CHANNELS.map(ch => {
               const d = getData(p, ch);
               const custoBase = cost * (d.qtd||1);
-              const lucro = d.price>0 ? d.price*(1-d.taxaPerc/100) - custoBase - d.freight - d.otherCosts : 0;
+              // Lucro líquido desconta TAMBÉM a taxa fixa do canal — o preço e
+              // a margem já a incluíam no cálculo, mas o lucro exibido não, e
+              // ficava R$ taxaFixa acima do real.
+              const lucro = d.price>0 ? d.price*(1-d.taxaPerc/100) - (d.taxaFixa||0) - custoBase - d.freight - d.otherCosts : 0;
               const mc = d.margin>30?"text-green-600":d.margin>15?"text-amber-500":d.margin>0?"text-red-500":"text-gray-400";
+              // Margem REAL com o custo médio atual: quando o custo muda (a cada
+              // baixa de compra), a margem salva fica velha sem aviso — o badge
+              // abaixo alerta a divergência sem alterar nada automaticamente.
+              const margemReal = d.price>0
+                ? parseFloat((((d.price*(1-d.taxaPerc/100)) - (d.taxaFixa||0) - custoBase - d.freight - d.otherCosts) / d.price * 100).toFixed(1))
+                : 0;
+              const margemDefasada = d.price>0 && Math.abs(margemReal - (d.margin||0)) > 0.5;
+              // Margem + comissão ≥ 100% inviabiliza o cálculo do preço
+              const calcInviavel = ((d.margin||0) + (d.taxaPerc||0)) >= 100;
               return (
                 <div key={ch} className="bg-white rounded-xl p-3 border border-gray-100">
                   <div className="mb-2.5">
@@ -7623,6 +7635,12 @@ const PriceTableRow = ({ p, cost, getData, setField, setFieldBlur, CHANNELS, CHA
                     <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-gray-200">
                       <span className={`text-[10px] font-bold ${mc}`}>{d.margin>0?`${d.margin}% margem`:"sem margem"}</span>
                       <span className="text-[10px] text-gray-400">lucro: <strong className={mc}>{fmt(lucro)}</strong></span>
+                      {calcInviavel && (
+                        <span className="text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5">⚠️ margem + comissão ≥ 100% — cálculo inviável</span>
+                      )}
+                      {!calcInviavel && margemDefasada && (
+                        <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5" title="O custo médio mudou desde que este preço foi salvo">⚠️ margem real: {margemReal}%</span>
+                      )}
                     </div>
                   )}
                 </div>
