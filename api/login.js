@@ -43,17 +43,20 @@ export default async function handler(req, res) {
   if (!SB_URL || !SB_SECRET) return res.status(500).json({ error: 'Servidor não configurado (faltam variáveis de ambiente)' });
 
   try {
-    const { username, passwordHash } = req.body || {};
+    const { username, passwordHash, empresa } = req.body || {};
     if (!username || !passwordHash) return res.status(400).json({ error: 'Informe usuário e senha' });
 
-    // verify_login_t devolve também o tenant_id do usuário — o tenant da
-    // sessão nasce aqui e nunca vem do cliente (Etapa 2 do multi-tenancy).
-    const rows = await sbRpc('verify_login_t', {
+    // Etapa 3: o login identifica a EMPRESA pelo código (slug) e valida o
+    // usuário dentro dela — empresas suspensas não entram. Clientes antigos
+    // (sem o campo) caem no tenant zero, pra transição sem trancar ninguém.
+    const slug = String(empresa || 'mmarmarinhos').trim().toLowerCase();
+    const rows = await sbRpc('verify_login_slug', {
+      p_slug: slug,
       p_username: String(username).trim().toLowerCase(),
       p_password_hash: passwordHash,
     });
     const safeUser = rows && rows[0];
-    if (!safeUser) return res.status(401).json({ error: 'Usuário ou senha incorretos' });
+    if (!safeUser) return res.status(401).json({ error: 'Empresa, usuário ou senha incorretos' });
 
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + SESSION_HOURS * 3600 * 1000).toISOString();
