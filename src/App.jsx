@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.33.0";
+const APP_VERSION = "3.34.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -8376,6 +8376,11 @@ const AuthSetup = ({ onDone }) => {
 
 // ─── Login Screen ─────────────────────────────────────────────────────────
 const AuthLogin = ({ onDone }) => {
+  // Código da empresa (Etapa 3 do multi-tenancy) — lembrado do último login
+  // pra ninguém digitar todo dia; o padrão é o tenant da MM Armarinhos.
+  const [empresa,  setEmpresa]  = useState(() => {
+    try { return localStorage.getItem("erp_last_empresa") || "mmarmarinhos"; } catch { return "mmarmarinhos"; }
+  });
   const [username, setUsername] = useState("");
   const [pwd,      setPwd]      = useState("");
   const [err,      setErr]      = useState("");
@@ -8386,17 +8391,18 @@ const AuthLogin = ({ onDone }) => {
   const setR = (k,v) => setRf(p=>({...p,[k]:v}));
 
   const login = async () => {
-    if (!username.trim()||!pwd) return;
+    if (!username.trim()||!pwd||!empresa.trim()) return;
     setLoading(true); setErr("");
     try {
       const hash = await sha256(pwd);
       const r = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim().toLowerCase(), passwordHash: hash }),
+        body: JSON.stringify({ empresa: empresa.trim().toLowerCase(), username: username.trim().toLowerCase(), passwordHash: hash }),
       });
       const data = await r.json().catch(()=>({}));
-      if (!r.ok) { setErr(data.error||"Usuário ou senha incorretos"); setPwd(""); setLoading(false); return; }
+      if (!r.ok) { setErr(data.error||"Empresa, usuário ou senha incorretos"); setPwd(""); setLoading(false); return; }
+      try { localStorage.setItem("erp_last_empresa", empresa.trim().toLowerCase()); } catch {}
       const u = {
         id: data.user.id, username: data.user.username,
         displayName: data.user.displayName||data.user.username,
@@ -8439,6 +8445,9 @@ const AuthLogin = ({ onDone }) => {
         </div>
         {mode==="login" ? (
           <div className="space-y-4">
+            <div><label className="text-sm font-medium text-gray-700 block mb-1">Empresa</label>
+              <input className={inp} value={empresa} onChange={e=>setEmpresa(e.target.value)} placeholder="código da empresa" autoComplete="organization" onKeyDown={e=>e.key==="Enter"&&login()}/>
+            </div>
             <div><label className="text-sm font-medium text-gray-700 block mb-1">Usuário</label>
               <input className={inp} value={username} onChange={e=>setUsername(e.target.value)} placeholder="seu.usuario" autoFocus onKeyDown={e=>e.key==="Enter"&&login()}/>
             </div>
