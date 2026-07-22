@@ -29,6 +29,21 @@ async function validateSession(token) {
   return session;
 }
 
+// Etapa 4: emissão fiscal é módulo contratável — o servidor valida o contrato
+// da empresa (não confia no menu escondido do cliente).
+async function tenantHasFiscal(tenantId) {
+  const r = await fetch(
+    `${SB_URL}/rest/v1/tenants?id=eq.${tenantId}&select=enabled_modules,status&limit=1`,
+    { headers: secretHeaders() }
+  );
+  if (!r.ok) return false;
+  const rows = await r.json();
+  const t = rows && rows[0];
+  if (!t || t.status !== 'active') return false;
+  const mods = t.enabled_modules || [];
+  return mods.includes('all') || mods.includes('fiscal');
+}
+
 async function getKv(key, tenantId) {
   const r = await fetch(`${SB_URL}/rest/v1/kv_store?key=eq.${encodeURIComponent(key)}&tenant_id=eq.${tenantId}&limit=1`, { headers: secretHeaders() });
   const rows = await r.json();
@@ -235,6 +250,9 @@ export default async function handler(req, res) {
   const sessionToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const session = await validateSession(sessionToken);
   if (!session) return res.status(401).json({ error: "Sessão inválida ou expirada, faça login novamente" });
+  if (!(await tenantHasFiscal(session.tenant_id))) {
+    return res.status(403).json({ error: "Módulo Fiscal não contratado pela empresa" });
+  }
 
   try {
     const { order, ref, tipo } = req.body || {};
