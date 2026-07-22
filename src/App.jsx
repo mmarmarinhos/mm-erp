@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.34.0";
+const APP_VERSION = "3.35.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -8249,9 +8249,19 @@ const getSession = () => {
 const setSession = (u) => localStorage.setItem(AUTH.sess, JSON.stringify({ ...u, exp: u.exp || (Date.now() + SESSION_DAYS * 24 * 3600 * 1000) }));
 const clearSession = () => { localStorage.removeItem(AUTH.sess); sessionStorage.removeItem(AUTH.sess); };
 
+// ─── Módulos por contrato (Etapa 4 do multi-tenancy) ───
+// A empresa contrata módulos (enabled_modules do tenant, vindo do login);
+// o usuário só vê a INTERSEÇÃO: contratado pela empresa ∩ liberado pro
+// usuário. ["all"] (caso da MM Armarinhos) libera tudo, e sessões antigas
+// sem a informação também — nada muda pra quem já usa.
+const tenantAllows = (tenantModules, m) =>
+  !tenantModules || tenantModules.includes("all") || tenantModules.includes(m);
+
 function buildUserSession(u) {
-  const modules = u.customModules || ROLES_DEF[u.role]?.modules || ROLES_DEF.viewer.modules;
-  return { id:u.id, username:u.username, displayName:u.displayName||u.username, role:u.role, modules, customPermissions: u.customPermissions || null };
+  const base = u.customModules || ROLES_DEF[u.role]?.modules || ROLES_DEF.viewer.modules;
+  const tenantModules = u.tenantModules || ["all"];
+  const modules = base.filter(m => tenantAllows(tenantModules, m));
+  return { id:u.id, username:u.username, displayName:u.displayName||u.username, role:u.role, modules, tenantModules, customPermissions: u.customPermissions || null };
 }
 
 // Permissão detalhada (Ver/Incluir/Alterar/Excluir) por módulo. Se o usuário
@@ -8261,6 +8271,8 @@ function buildUserSession(u) {
 // muda pra quem nunca foi personalizado.
 function getUserPerm(session, moduleId, action) {
   if (!session) return false;
+  // Módulo não contratado pela empresa: negado, mesmo com personalização
+  if (!tenantAllows(session.tenantModules, moduleId)) return false;
   const custom = session.customPermissions?.[moduleId];
   if (custom && typeof custom[action] === "boolean") return custom[action];
   const modules = session.modules || ROLES_DEF[session.role]?.modules || ROLES_DEF.viewer.modules;
@@ -8408,6 +8420,7 @@ const AuthLogin = ({ onDone }) => {
         displayName: data.user.displayName||data.user.username,
         role: data.user.role, customModules: data.user.customModules ?? null,
         customPermissions: data.user.customPermissions ?? null,
+        tenantModules: data.user.tenantModules ?? ["all"],
       };
       const session = { ...buildUserSession(u), token: data.token };
       setSession(session); onDone(session);
@@ -8508,8 +8521,8 @@ const AppAuth = ({ children }) => {
       }
       if (session) {
         // Sempre atualiza módulos pelo role atual (captura novos módulos adicionados ao sistema)
-        const freshModules = session.customModules || ROLES_DEF[session.role]?.modules || ROLES_DEF.viewer.modules;
-        session.modules = freshModules;
+        const freshBase = session.customModules || ROLES_DEF[session.role]?.modules || ROLES_DEF.viewer.modules;
+        session.modules = freshBase.filter(m => tenantAllows(session.tenantModules, m));
         setSession(session);
         setCurrentUser(session);
         setAuthState("authed");
