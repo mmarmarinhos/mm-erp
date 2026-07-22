@@ -45,7 +45,7 @@ const Icon = ({ name, size = 18, className = "" }) => {
 // MAJOR → mudança estrutural grande
 // MINOR → nova funcionalidade
 // PATCH → correção de bug ou ajuste visual
-const APP_VERSION = "3.35.0";
+const APP_VERSION = "3.36.0";
 
 const CHANNELS = ["Mercado Livre", "Shopee", "WhatsApp", "Loja Própria"];
 // Dias da semana no padrão JS Date.getDay() (0=Domingo ... 6=Sábado), usados
@@ -681,7 +681,7 @@ const OrderModal = ({ order, onClose, onSave, customers = [], products = [], rep
                         <p className="text-[10px] text-gray-400 mb-0.5">Un</p>
                         <select className="w-full border border-gray-200 rounded-lg px-1 py-1.5 text-xs bg-white focus:outline-none"
                           value={it.unit} onChange={e=>setItem(i,"unit",e.target.value)}>
-                          {INV_UNITS.map(u=><option key={u}>{u}</option>)}
+                          {(params?.estoque?.unidadesList?.length ? params.estoque.unidadesList : INV_UNITS).map(u=><option key={u}>{u}</option>)}
                         </select>
                       </div>
                       <div className="w-24 shrink-0">
@@ -5487,7 +5487,7 @@ const StockMovementModal = ({ product, onClose, onSave }) => {
 };
 
 // ─── Product Modal ────────────────────────────────────────────────────────
-const ProductModal = ({ product, suppliers, products: allProducts = [], variantCatalogs = [], onApplyCatalog, onClose, onSave }) => {
+const ProductModal = ({ product, suppliers, products: allProducts = [], variantCatalogs = [], onApplyCatalog, onClose, onSave, params }) => {
   const isNew = !product;
   const [form, setForm] = useState(product ? { ...product } : {
     name:"", sku:"", category:"Linhas / Fios",
@@ -5531,7 +5531,7 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], variantC
               <label className="text-xs font-medium text-gray-600 mb-1 block">Categoria</label>
               <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                 value={form.category} onChange={e=>set("category",e.target.value)}>
-                {INV_CATS.map(c=><option key={c}>{c}</option>)}
+                {(params?.estoque?.categoriasList?.length ? params.estoque.categoriasList : INV_CATS).map(c=><option key={c}>{c}</option>)}
               </select>
             </div>
           </div>
@@ -5548,7 +5548,7 @@ const ProductModal = ({ product, suppliers, products: allProducts = [], variantC
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Unidade</label>
                 <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                   value={form.unit} onChange={e=>set("unit",e.target.value)}>
-                  {INV_UNITS.map(u=><option key={u}>{u}</option>)}
+                  {(params?.estoque?.unidadesList?.length ? params.estoque.unidadesList : INV_UNITS).map(u=><option key={u}>{u}</option>)}
                 </select>
               </div>
             </div>
@@ -5842,7 +5842,7 @@ const ApplyCatalogModal = ({ product, catalogs, onClose, onConfirm }) => {
   );
 };
 
-const InventoryModule = ({ products, setProducts, movements, setMovements, suppliers, variantCatalogs=[], onPriceHunt, currentUser }) => {
+const InventoryModule = ({ products, setProducts, movements, setMovements, suppliers, variantCatalogs=[], onPriceHunt, params, currentUser }) => {
   const canIncluir = getUserPerm(currentUser, "inventory", "incluir");
   const canAlterar = getUserPerm(currentUser, "inventory", "alterar");
   const canExcluir = getUserPerm(currentUser, "inventory", "excluir");
@@ -6073,7 +6073,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
         </div>
         <select className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none bg-white"
           value={filterCat} onChange={e=>setFilterCat(e.target.value)}>
-          <option>Todas</option>{INV_CATS.map(c=><option key={c}>{c}</option>)}
+          <option>Todas</option>{(params?.estoque?.categoriasList?.length ? params.estoque.categoriasList : INV_CATS).map(c=><option key={c}>{c}</option>)}
         </select>
         <select className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none bg-white"
           value={filterStock} onChange={e=>setFilterStock(e.target.value)}>
@@ -6274,7 +6274,7 @@ const InventoryModule = ({ products, setProducts, movements, setMovements, suppl
           </div>
         </div>
       )}
-      {modal && <ProductModal product={modal==="new"?null:modal} suppliers={suppliers} products={products} variantCatalogs={variantCatalogs}
+      {modal && <ProductModal product={modal==="new"?null:modal} suppliers={suppliers} products={products} variantCatalogs={variantCatalogs} params={params}
         onApplyCatalog={(p)=>{setModal(null); setApplyCatalogProduct(p);}}
         onClose={()=>setModal(null)} onSave={handleSaveProd}/>}
       {applyCatalogProduct && (
@@ -9139,7 +9139,7 @@ const PurchaseModal = ({ purchase, suppliers, products = [], params, onClose, on
                         <p className="text-[10px] text-gray-400 mb-0.5">Un</p>
                         <select className="w-full border border-gray-200 rounded-lg px-1 py-1.5 text-xs bg-white focus:outline-none"
                           value={it.unit} onChange={e=>setItem(i,"unit",e.target.value)}>
-                          {INV_UNITS.map(u=><option key={u}>{u}</option>)}
+                          {(params?.estoque?.unidadesList?.length ? params.estoque.unidadesList : INV_UNITS).map(u=><option key={u}>{u}</option>)}
                         </select>
                       </div>
                       <div className="w-24 shrink-0">
@@ -10647,6 +10647,7 @@ const PARAMS_DEFAULT = {
     backendUrl: "",
   },
   vendas: { validadeCotacaoDias: 10, multaAtrasoPercent: 2, jurosAtrasoPercentMes: 1, descontoMaximoPercent: 0, statusList: ["Novo","Em Separação","Enviado","Entregue","Cancelado","Devolvido"] },
+  estoque: { unidadesList: ["un","m","kg","caixa","rolo","par","pct"], categoriasList: ["Linhas / Fios","Agulhas","Materiais de Bordado","Bastidores / Aros","Embalagens","Kits","Outros"] },
   compras: { statusList: ["Em Aberto","Baixado","Cancelado"] },
   fiscal: { provider: "", token: "", ambiente: "homologacao" },
 };
@@ -10984,7 +10985,7 @@ const CotacaoModal = ({ cotacao, onClose, onSave, customers = [], products = [],
                         <p className="text-[10px] text-gray-400 mb-0.5">Un</p>
                         <select className="w-full border border-gray-200 rounded-lg px-1 py-1.5 text-xs bg-white focus:outline-none"
                           value={it.unit} onChange={e=>setItem(i,"unit",e.target.value)}>
-                          {INV_UNITS.map(u=><option key={u}>{u}</option>)}
+                          {(params?.estoque?.unidadesList?.length ? params.estoque.unidadesList : INV_UNITS).map(u=><option key={u}>{u}</option>)}
                         </select>
                       </div>
                       <div className="w-24 shrink-0">
@@ -12572,6 +12573,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders, cur
   const [vendas,  setVendas]  = useState(params?.vendas        || PARAMS_DEFAULT.vendas);
   const [fiscal,  setFiscal]  = useState(params?.fiscal        || PARAMS_DEFAULT.fiscal);
   const [compras, setCompras] = useState(params?.compras       || PARAMS_DEFAULT.compras);
+  const [estoqueCfg, setEstoqueCfg] = useState(params?.estoque || PARAMS_DEFAULT.estoque);
 
   useEffect(() => {
     if (params) {
@@ -12580,7 +12582,8 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders, cur
       setSync(params.sincronizacao   || PARAMS_DEFAULT.sincronizacao);
       setVendas(params.vendas        || PARAMS_DEFAULT.vendas);
       setCompras(params.compras      || PARAMS_DEFAULT.compras);
-      setFiscal(params.fiscal        || PARAMS_DEFAULT.fiscal); // única seção que faltava na re-sincronização
+      setEstoqueCfg(params.estoque   || PARAMS_DEFAULT.estoque);
+      setFiscal(params.fiscal        || PARAMS_DEFAULT.fiscal);
     }
   }, [params]);
 
@@ -12693,7 +12696,7 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders, cur
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-2xl p-1.5 overflow-x-auto">
-        {[["empresa","🏢 Empresa"],["canais","💳 Canais"],["vendas","🛒 Vendas"],["compras","📦 Compras"],["fiscal","📄 Fiscal"],["alertas","🔔 Alertas"],["sync","🔗 Sincronização"],["automacao","🤖 Automação"]].map(([id,label])=>(
+        {[["empresa","🏢 Empresa"],["canais","💳 Canais"],["vendas","🛒 Vendas"],["compras","📦 Compras"],["estoque","📐 Estoque"],["fiscal","📄 Fiscal"],["alertas","🔔 Alertas"],["sync","🔗 Sincronização"],["automacao","🤖 Automação"]].map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)}
             className={`shrink-0 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${tab===id?"bg-white text-gray-900 shadow-sm":"text-gray-500 hover:text-gray-700"}`}>
             {label}
@@ -13107,6 +13110,72 @@ const ParamsModule = ({ params, setParams, onSaveEmpresa, orders, setOrders, cur
               <button onClick={()=>mergeAndSave({compras}).then(()=>showToast("✅ Status de Compras salvos!"))}
                 className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
                 💾 Salvar Status de Compras
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab==="estoque" && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">📏 Unidades de Medida</p>
+            <p className="text-xs text-gray-400 -mt-2">
+              Opções que aparecem no campo "Unidade" ao cadastrar um produto (Estoque, Compras, Cotações, Pedidos).
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(estoqueCfg.unidadesList||[]).map((u,idx)=>(
+                <span key={idx} className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-full pl-3 pr-2 py-1.5">
+                  {u}
+                  {canAlterar && <button onClick={()=>setEstoqueCfg(prev=>({...prev, unidadesList: prev.unidadesList.filter((_,i)=>i!==idx)}))}
+                    className="text-indigo-400 hover:text-red-500 font-bold">✕</button>}
+                </span>
+              ))}
+            </div>
+            {canAlterar && (
+              <div className="flex gap-2">
+                <input id="newUnidade" placeholder="Nova unidade (ex: cx, dz)" maxLength={12}
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                  onKeyDown={e=>{ if(e.key==="Enter"){ const v=e.target.value.trim(); if(v && !estoqueCfg.unidadesList.includes(v)){ setEstoqueCfg(prev=>({...prev, unidadesList:[...prev.unidadesList, v]})); e.target.value=""; } } }}/>
+                <button onClick={()=>{ const el=document.getElementById("newUnidade"); const v=el.value.trim(); if(v && !estoqueCfg.unidadesList.includes(v)){ setEstoqueCfg(prev=>({...prev, unidadesList:[...prev.unidadesList, v]})); el.value=""; } }}
+                  className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">+ Adicionar</button>
+              </div>
+            )}
+            {canAlterar && (
+              <button onClick={()=>mergeAndSave({estoque:estoqueCfg}).then(()=>showToast("✅ Configurações de Estoque salvas!"))}
+                className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+                💾 Salvar
+              </button>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">🏷️ Categorias de Produto</p>
+            <p className="text-xs text-gray-400 -mt-2">
+              Opções que aparecem no campo "Categoria" ao cadastrar um produto e no filtro do Estoque.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(estoqueCfg.categoriasList||[]).map((c,idx)=>(
+                <span key={idx} className="flex items-center gap-1.5 bg-indigo-50 text-indigo-700 text-sm font-medium rounded-full pl-3 pr-2 py-1.5">
+                  {c}
+                  {canAlterar && <button onClick={()=>setEstoqueCfg(prev=>({...prev, categoriasList: prev.categoriasList.filter((_,i)=>i!==idx)}))}
+                    className="text-indigo-400 hover:text-red-500 font-bold">✕</button>}
+                </span>
+              ))}
+            </div>
+            {canAlterar && (
+              <div className="flex gap-2">
+                <input id="newCategoria" placeholder="Nova categoria" maxLength={40}
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                  onKeyDown={e=>{ if(e.key==="Enter"){ const v=e.target.value.trim(); if(v && !estoqueCfg.categoriasList.includes(v)){ setEstoqueCfg(prev=>({...prev, categoriasList:[...prev.categoriasList, v]})); e.target.value=""; } } }}/>
+                <button onClick={()=>{ const el=document.getElementById("newCategoria"); const v=el.value.trim(); if(v && !estoqueCfg.categoriasList.includes(v)){ setEstoqueCfg(prev=>({...prev, categoriasList:[...prev.categoriasList, v]})); el.value=""; } }}
+                  className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">+ Adicionar</button>
+              </div>
+            )}
+            {canAlterar && (
+              <button onClick={()=>mergeAndSave({estoque:estoqueCfg}).then(()=>showToast("✅ Configurações de Estoque salvas!"))}
+                className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm">
+                💾 Salvar
               </button>
             )}
           </div>
@@ -13807,7 +13876,7 @@ function ERPApp({ currentUser, onLogout }) {
         onGoToFaturados={()=>{ setInitialOrdersFilter("FATURADOS"); setActive("orders"); }} />;
       case "orders":    return <OrdersModule orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} finance={finance} setFinance={updateFinance} setNfes={updateNfes} representantes={representantes} formasPagamento={formasPagamento} params={params} openOrderId={openOrderId} onConsumeOpenOrder={()=>setOpenOrderId(null)} initialStatusFilter={initialOrdersFilter} onConsumeStatusFilter={()=>setInitialOrdersFilter(null)} currentUser={currentUser}/>;
       case "cotacao":   return <CotacaoModule cotacoes={cotacoes} setCotacoes={updateCotacoes} orders={orders} setOrders={updateOrders} customers={customers} setCustomers={updateCustomers} products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} empresa={form} representantes={representantes} formasPagamento={formasPagamento} params={params} currentUser={currentUser}/>;
-      case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} currentUser={currentUser}/>;
+      case "inventory": return <InventoryModule products={products} setProducts={updateProducts} movements={movements} setMovements={updateMovements} suppliers={suppliers} variantCatalogs={variantCatalogs} onPriceHunt={(name,price)=>{setPhQuery(name);setPhPrice(price);setActive("pricehunt");}} params={params} currentUser={currentUser}/>;
       case "pricing":   return <PricingModule products={products} setProducts={updateProducts} params={params} currentUser={currentUser}/>;
       case "receber":   return <FinanceModule key="fm-receber" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="receber" onViewOrder={(id)=>{ setOpenOrderId(id); setActive("orders"); }} currentUser={currentUser}/>;
       case "pagar":     return <FinanceModule key="fm-pagar" finance={finance} setFinance={updateFinance} orders={orders} setOrders={updateOrders} purchases={purchases} setPurchases={updatePurchases} params={params} initialTab="pagar" currentUser={currentUser}/>;
