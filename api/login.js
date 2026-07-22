@@ -82,6 +82,8 @@ export default async function handler(req, res) {
         role: safeUser.role,
         customModules: safeUser.custom_modules ?? null,
         customPermissions: safeUser.custom_permissions ?? null,
+        tenantModules: safeUser.enabled_modules ?? ["all"],
+        tenantName: safeUser.tenant_name ?? null,
       },
     });
   } catch (err) {
