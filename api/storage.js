@@ -18,7 +18,7 @@ function secretHeaders(extra = {}) {
 async function validateSession(token) {
   if (!token) return null;
   const r = await fetch(
-    `${SB_URL}/rest/v1/sessions?token=eq.${encodeURIComponent(token)}&select=username,role,expires_at,tenant_id&limit=1`,
+    `${SB_URL}/rest/v1/sessions?token=eq.${encodeURIComponent(token)}&select=username,role,expires_at,tenant_id,last_activity&limit=1`,
     { headers: secretHeaders() }
   );
   if (!r.ok) return null;
@@ -27,6 +27,19 @@ async function validateSession(token) {
   if (!session) return null;
   if (new Date(session.expires_at) < new Date()) return null;
   if (!session.tenant_id) return null; // sessão pré-multi-tenancy: força novo login
+
+  // Licença por usuários simultâneos: marca "em uso agora". Sem esperar a
+  // resposta (não atrasa a requisição real) e só escreve se fizer mais de 5
+  // min desde a última marca — evita um UPDATE a cada chamada da API.
+  const staleMs = 5 * 60 * 1000;
+  if (!session.last_activity || (Date.now() - new Date(session.last_activity).getTime()) > staleMs) {
+    fetch(`${SB_URL}/rest/v1/sessions?token=eq.${encodeURIComponent(token)}`, {
+      method: 'PATCH',
+      headers: secretHeaders({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ last_activity: new Date().toISOString() }),
+    }).catch(() => {});
+  }
+
   return session;
 }
 
