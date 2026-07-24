@@ -58,6 +58,18 @@ export default async function handler(req, res) {
     const safeUser = rows && rows[0];
     if (!safeUser) return res.status(401).json({ error: 'Empresa, usuário ou senha incorretos' });
 
+    // Licença por usuários simultâneos: 0/NULL no tenant = sem limite. A
+    // checagem conta PESSOAS ativas nos últimos 15 min, não sessões — a
+    // mesma pessoa logando num 2º aparelho não consome vaga extra, e quem
+    // fica 15 min sem usar libera a vaga sozinho, sem precisar deslogar.
+    const hasSlot = await sbRpc('check_concurrent_slot', {
+      p_tenant: safeUser.tenant_id,
+      p_username: safeUser.username,
+    });
+    if (hasSlot === false) {
+      return res.status(403).json({ error: 'Limite de usuários simultâneos atingido. Peça para alguém sair, ou aguarde uma vaga liberar.' });
+    }
+
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + SESSION_HOURS * 3600 * 1000).toISOString();
 
